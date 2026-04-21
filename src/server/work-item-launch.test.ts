@@ -65,6 +65,7 @@ describe('work-item-launch', () => {
         artifactPaths: [],
         acceptanceCriteria: ['Launch API exists', 'Mission metadata is stored'],
         notes: ['User approved Phase 2'],
+        history: [],
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
       },
@@ -118,6 +119,7 @@ describe('work-item-launch', () => {
     expect(result.workItem.status).toBe('active')
     expect(result.workItem.phase).toBe('build')
     expect(result.workItem.missionId).toBe('job-123')
+    expect(result.workItem.missionLink).toBe('/jobs?jobId=job-123')
     expect(result.workItem.sessionKeys).toContain('cron_job-123_pending')
     expect(result.workItem.history.at(-1)).toMatchObject({
       action: 'launch',
@@ -131,6 +133,7 @@ describe('work-item-launch', () => {
 
     const persisted = getWorkItem(workItem.id)
     expect(persisted?.missionId).toBe('job-123')
+    expect(persisted?.missionLink).toBe('/jobs?jobId=job-123')
     expect(persisted?.history.at(-1)?.action).toBe('launch')
   })
 })

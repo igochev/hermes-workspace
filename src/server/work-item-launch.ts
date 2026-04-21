@@ -63,6 +63,10 @@ function buildNotesBlock(workItem: WorkItemRecord): string[] {
   return ['Operator notes:', ...workItem.notes.map((item) => `- ${item}`)]
 }
 
+function buildMissionLink(jobId: string): string {
+  return `/jobs?jobId=${encodeURIComponent(jobId)}`
+}
+
 export function buildWorkItemLaunchGoal(params: {
   workItem: WorkItemRecord
   project: ProjectRecord
@@ -121,10 +125,12 @@ export async function launchWorkItemIntoConductor(
   })
 
   const sessionKeys = Array.from(new Set([...workItem.sessionKeys, launch.sessionKey]))
+  const missionLink = buildMissionLink(launch.jobId)
   const nextWorkItem = updateWorkItem(workItem.id, {
     status: 'active',
     phase,
     missionId: launch.jobId,
+    missionLink,
     sessionKeys,
     repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
   })

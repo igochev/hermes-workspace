@@ -89,6 +89,10 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
               body.missionId === null || typeof body.missionId === 'string'
                 ? (body.missionId ?? undefined)
                 : undefined,
+            missionLink:
+              body.missionLink === null || typeof body.missionLink === 'string'
+                ? (body.missionLink ?? undefined)
+                : undefined,
             sessionKeys: Array.isArray(body.sessionKeys)
               ? body.sessionKeys.filter(
                   (value): value is string => typeof value === 'string',

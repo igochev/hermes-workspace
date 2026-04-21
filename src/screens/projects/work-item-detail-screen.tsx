@@ -168,6 +168,7 @@ export function WorkItemDetailScreen({
                 <Detail label="Project" value={project?.name || 'Unknown project'} />
                 <Detail label="Repo Snapshot" value={workItem.repoPathSnapshot} />
                 <Detail label="Mission ID" value={workItem.missionId || '—'} />
+                <Detail label="Mission Link" value={workItem.missionLink || '—'} />
                 <Detail label="Assigned Profile" value={workItem.assignedProfile || '—'} />
                 <Detail label="Launch Sessions" value={workItem.sessionKeys.join(', ') || '—'} />
                 <Detail label="Created" value={workItem.createdAt} />
@@ -222,6 +223,11 @@ export function WorkItemDetailScreen({
                   icon={GithubIcon}
                   label="PR URL"
                   value={workItem.prUrl || 'No PR recorded'}
+                />
+                <EvidenceRow
+                  icon={PlayIcon}
+                  label="Mission Link"
+                  value={workItem.missionLink || 'No mission link recorded'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}

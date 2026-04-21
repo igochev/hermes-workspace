@@ -31,6 +31,7 @@ export type WorkItemRecord = {
   assignedProfile?: string
   repoPathSnapshot: string
   missionId?: string
+  missionLink?: string
   sessionKeys: Array<string>
   branchName?: string
   prUrl?: string
@@ -57,6 +58,7 @@ type CreateWorkItemInput = {
   assignedProfile?: string
   repoPathSnapshot: string
   missionId?: string
+  missionLink?: string
   sessionKeys?: Array<string>
   branchName?: string
   prUrl?: string
@@ -196,6 +198,7 @@ function normalizeWorkItem(
     assignedProfile: asOptionalString(workItem.assignedProfile),
     repoPathSnapshot: workItem.repoPathSnapshot.trim(),
     missionId: asOptionalString(workItem.missionId),
+    missionLink: asOptionalString(workItem.missionLink),
     sessionKeys: asStringArray(workItem.sessionKeys),
     branchName: asOptionalString(workItem.branchName),
     prUrl: asOptionalString(workItem.prUrl),
@@ -240,6 +243,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     assignedProfile: input.assignedProfile,
     repoPathSnapshot: input.repoPathSnapshot,
     missionId: input.missionId,
+    missionLink: input.missionLink,
     sessionKeys: input.sessionKeys,
     branchName: input.branchName,
     prUrl: input.prUrl,

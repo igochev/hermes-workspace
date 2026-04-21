@@ -34,6 +34,7 @@ export type WorkItemRecord = {
   assignedProfile?: string
   repoPathSnapshot: string
   missionId?: string
+  missionLink?: string
   sessionKeys: Array<string>
   branchName?: string
   prUrl?: string
@@ -76,6 +77,7 @@ export type CreateWorkItemInput = {
   assignedProfile?: string
   repoPathSnapshot?: string
   missionId?: string
+  missionLink?: string
   sessionKeys?: Array<string>
   branchName?: string
   prUrl?: string

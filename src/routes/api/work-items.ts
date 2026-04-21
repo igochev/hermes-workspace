@@ -98,6 +98,7 @@ export const Route = createFileRoute('/api/work-items')({
                 ? body.repoPathSnapshot
                 : project.repoPath,
             missionId: typeof body.missionId === 'string' ? body.missionId : undefined,
+            missionLink: typeof body.missionLink === 'string' ? body.missionLink : undefined,
             sessionKeys: Array.isArray(body.sessionKeys)
               ? body.sessionKeys.filter(
                   (value): value is string => typeof value === 'string',

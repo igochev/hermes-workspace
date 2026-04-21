@@ -58,6 +58,7 @@ describe('work-items-store', () => {
     ])
     expect(workItem.notes).toEqual(['Initial Phase 1 placeholder'])
     expect(workItem.history).toEqual([])
+    expect(workItem.missionLink).toBeUndefined()
     expect(workItem.sessionKeys).toEqual([])
     expect(workItem.artifactPaths).toEqual([])
 
@@ -88,6 +89,7 @@ describe('work-items-store', () => {
       priority: 'medium',
       branchName: 'feature/projects-screen',
       prUrl: 'https://github.com/igochev/hermes-workspace/pull/1',
+      missionLink: '/jobs?jobId=job-123',
       sessionKeys: ['session-1'],
     })
 
@@ -96,6 +98,7 @@ describe('work-items-store', () => {
     expect(updated?.phase).toBe('review')
     expect(updated?.branchName).toBe('feature/projects-screen')
     expect(updated?.prUrl).toBe('https://github.com/igochev/hermes-workspace/pull/1')
+    expect(updated?.missionLink).toBe('/jobs?jobId=job-123')
     expect(updated?.sessionKeys).toEqual(['session-1'])
 
     expect(deleteWorkItem(removeTwo.id)).toBe(true)

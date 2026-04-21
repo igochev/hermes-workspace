@@ -64,6 +64,7 @@ function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
     assignedProfile: overrides.assignedProfile,
     repoPathSnapshot: overrides.repoPathSnapshot ?? '/repos/mission-control',
     missionId: overrides.missionId,
+    missionLink: overrides.missionLink,
     sessionKeys: overrides.sessionKeys ?? [],
     branchName: overrides.branchName,
     prUrl: overrides.prUrl,
