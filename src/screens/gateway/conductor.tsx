@@ -15,11 +15,15 @@ import { Markdown } from '@/components/prompt-kit/markdown'
 import { OfficeView } from './components/office-view'
 import type { AgentWorkingRow } from './components/agents-working-panel'
 import { type GatewaySession } from '@/lib/gateway-api'
+import {
+  CONDUCTOR_PHASE_KEYS,
+  type ConductorPhaseKey,
+} from '@/lib/conductor-phase-profiles'
 import { cn } from '@/lib/utils'
 import { type MissionHistoryEntry, type MissionHistoryWorkerDetail, useConductorGateway } from './hooks/use-conductor-gateway'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
-type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
+type QuickActionId = ConductorPhaseKey
 
 type HistoryMessage = {
   role?: string
@@ -38,6 +42,10 @@ type AvailableModel = {
   id?: string
   provider?: string
   name?: string
+}
+
+type AvailableProfile = {
+  name: string
 }
 
 type FileBrowserEntry = {
@@ -551,6 +559,62 @@ function getDirectorySuggestions() {
   return ['~/conductor-projects', '~/Projects', '/tmp', '~/Desktop']
 }
 
+const PHASE_LABELS: Record<ConductorPhaseKey, string> = {
+  research: 'Research',
+  build: 'Build',
+  review: 'Review',
+  deploy: 'Deploy',
+}
+
+function getProfileSelectValue(value: string): string {
+  const trimmed = value.trim()
+  return trimmed ? trimmed : '__default__'
+}
+
+function getProfileSelectLabel(profileName: string): string {
+  const trimmed = profileName.trim()
+  return trimmed ? trimmed : 'Default worker routing'
+}
+
+function PhaseProfileSelector({
+  phase,
+  value,
+  options,
+  onChange,
+}: {
+  phase: ConductorPhaseKey
+  value: string
+  options: string[]
+  onChange: (nextValue: string) => void
+}) {
+  return (
+    <label className="block space-y-2">
+      <span className="text-sm font-medium text-[var(--theme-text)]">
+        {PHASE_LABELS[phase]} Profile
+      </span>
+      <select
+        value={getProfileSelectValue(value)}
+        onChange={(event) =>
+          onChange(event.target.value === '__default__' ? '' : event.target.value)
+        }
+        className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-[var(--theme-accent)]"
+      >
+        <option value="__default__">Default worker routing</option>
+        {options.map((profileName) => (
+          <option key={profileName} value={profileName}>
+            {profileName}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-[var(--theme-muted-2)]">
+        {value.trim()
+          ? `${PHASE_LABELS[phase]} tasks will prefer Hermes profile “${value.trim()}”.`
+          : `${PHASE_LABELS[phase]} tasks will use the normal Conductor worker path.`}
+      </p>
+    </label>
+  )
+}
+
 function ModelSelectorDropdown({
   label,
   value,
@@ -800,7 +864,23 @@ export function Conductor() {
     enabled: settingsOpen,
     staleTime: 60_000,
   })
+  const profilesQuery = useQuery({
+    queryKey: ['conductor', 'profiles'],
+    queryFn: async () => {
+      const res = await fetch('/api/profiles/list')
+      const data = (await res.json()) as {
+        profiles?: Array<AvailableProfile>
+      }
+      return (data.profiles ?? [])
+        .map((profile) => profile.name)
+        .filter((name): name is string => typeof name === 'string' && name !== 'default')
+        .sort((left, right) => left.localeCompare(right))
+    },
+    enabled: settingsOpen,
+    staleTime: 60_000,
+  })
   const availableModels = modelsQuery.data ?? []
+  const availableProfiles = profilesQuery.data ?? []
 
   useEffect(() => {
     if (!directoryBrowserOpen) return
@@ -927,6 +1007,15 @@ export function Conductor() {
 
   const updateSettings = (patch: Partial<typeof conductor.conductorSettings>) => {
     conductor.setConductorSettings({ ...conductor.conductorSettings, ...patch })
+  }
+
+  const updatePhaseProfile = (phaseKey: ConductorPhaseKey, profileName: string) => {
+    updateSettings({
+      phaseProfiles: {
+        ...conductor.conductorSettings.phaseProfiles,
+        [phaseKey]: profileName,
+      },
+    })
   }
 
   const openDirectoryBrowser = () => {
@@ -1658,6 +1747,24 @@ export function Conductor() {
                     onChange={(nextValue) => updateSettings({ workerModel: nextValue })}
                     models={availableModels}
                   />
+
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium text-[var(--theme-text)]">Phase → Profile Routing</span>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {CONDUCTOR_PHASE_KEYS.map((phaseKey) => (
+                        <PhaseProfileSelector
+                          key={phaseKey}
+                          phase={phaseKey}
+                          value={conductor.conductorSettings.phaseProfiles[phaseKey]}
+                          options={availableProfiles}
+                          onChange={(nextValue) => updatePhaseProfile(phaseKey, nextValue)}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-[var(--theme-muted-2)]">
+                      Optional. Use this when Research/Build/Review/Deploy should run under different Hermes profiles.
+                    </p>
+                  </div>
 
                   <div className="space-y-2">
                     <span className="text-sm font-medium text-[var(--theme-text)]">Project Directory</span>

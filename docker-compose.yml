@@ -82,7 +82,7 @@ services:
       # Must match API_SERVER_KEY on the hermes-agent side when that is set
       HERMES_API_TOKEN: ${API_SERVER_KEY:-}
     ports:
-      - '3000:3000'
+      - '3456:3000'
 
 volumes:
   hermes-data:

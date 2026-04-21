@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
+import {
+  fetchSessions,
+  type GatewaySession,
+} from '@/lib/gateway-api'
+import {
+  buildPhaseProfileRoutingInstructions,
+  normalizePhaseProfiles,
+  type ConductorPhaseProfiles,
+} from '@/lib/conductor-phase-profiles'
 
 type HistoryMessagePart = {
   type?: string
@@ -25,6 +33,7 @@ export type ConductorSettings = {
   projectsDir: string
   maxParallel: number
   supervised: boolean
+  phaseProfiles: ConductorPhaseProfiles
 }
 
 const ACTIVE_MISSION_STORAGE_KEY = 'conductor:active-mission'
@@ -35,6 +44,7 @@ const DEFAULT_CONDUCTOR_SETTINGS: ConductorSettings = {
   projectsDir: '',
   maxParallel: 1,
   supervised: false,
+  phaseProfiles: normalizePhaseProfiles(null),
 }
 
 type PersistedMission = {
@@ -282,6 +292,7 @@ function loadConductorSettings(): ConductorSettings {
       projectsDir: typeof parsed.projectsDir === 'string' ? parsed.projectsDir : DEFAULT_CONDUCTOR_SETTINGS.projectsDir,
       maxParallel: Math.min(5, Math.max(1, typeof parsed.maxParallel === 'number' && Number.isFinite(parsed.maxParallel) ? Math.round(parsed.maxParallel) : DEFAULT_CONDUCTOR_SETTINGS.maxParallel)),
       supervised: typeof parsed.supervised === 'boolean' ? parsed.supervised : DEFAULT_CONDUCTOR_SETTINGS.supervised,
+      phaseProfiles: normalizePhaseProfiles(parsed.phaseProfiles),
     }
   } catch {
     return DEFAULT_CONDUCTOR_SETTINGS

@@ -23,6 +23,11 @@ import {
   dashboardFetch,
   ensureGatewayProbed,
 } from '../../server/gateway-capabilities'
+import {
+  buildPhaseProfileRoutingInstructions,
+  normalizePhaseProfiles,
+  type ConductorPhaseProfiles,
+} from '../../lib/conductor-phase-profiles'
 
 let cachedSkill: string | null = null
 
@@ -33,6 +38,7 @@ type ConductorSpawnBody = {
   projectsDir?: unknown
   maxParallel?: unknown
   supervised?: unknown
+  phaseProfiles?: unknown
 }
 
 // Resolve the workspace root from this module's location so we find the
@@ -79,7 +85,7 @@ function readMaxParallel(value: unknown): number {
   return Math.min(5, Math.max(1, Math.round(value)))
 }
 
-function buildOrchestratorPrompt(
+export function buildOrchestratorPrompt(
   goal: string,
   skill: string,
   options: {
@@ -88,11 +94,16 @@ function buildOrchestratorPrompt(
     projectsDir: string
     maxParallel: number
     supervised: boolean
+    phaseProfiles: ConductorPhaseProfiles
   },
 ): string {
   const outputBase = options.projectsDir || '/tmp'
   const outputPrefix =
     outputBase === '/tmp' ? '/tmp/dispatch-<slug>' : `${outputBase}/dispatch-<slug>`
+
+  const phaseRoutingInstructions = buildPhaseProfileRoutingInstructions(
+    options.phaseProfiles,
+  )
 
   return [
     'You are a mission orchestrator. Execute this mission autonomously.',
@@ -121,6 +132,9 @@ function buildOrchestratorPrompt(
         ]),
     ...(options.supervised
       ? ['', 'Supervised mode is enabled. Require approval before each task.']
+      : []),
+    ...(phaseRoutingInstructions.length > 0
+      ? ['', ...phaseRoutingInstructions]
       : []),
     '',
     '## Critical Rules',
@@ -215,6 +229,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
             projectsDir,
             maxParallel,
             supervised,
+            phaseProfiles: normalizePhaseProfiles(body.phaseProfiles),
           })
 
           const jobName = `conductor-${Date.now()}`
