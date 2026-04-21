@@ -40,6 +40,18 @@ export type WorkItemRecord = {
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
   notes: Array<string>
+  history: Array<{
+    id: string
+    action: 'launch' | 'status-change' | 'note'
+    status?: WorkItemStatus
+    phase?: WorkItemPhase
+    note: string
+    missionId?: string
+    sessionKey?: string
+    sessionKeyPrefix?: string
+    profile?: string
+    createdAt: string
+  }>
   createdAt: string
   updatedAt: string
 }

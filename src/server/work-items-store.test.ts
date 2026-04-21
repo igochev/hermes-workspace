@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  appendWorkItemHistoryEntry,
   createWorkItem,
   deleteWorkItem,
   deleteWorkItemsForProject,
@@ -56,6 +57,7 @@ describe('work-items-store', () => {
       'Page renders project cards',
     ])
     expect(workItem.notes).toEqual(['Initial Phase 1 placeholder'])
+    expect(workItem.history).toEqual([])
     expect(workItem.sessionKeys).toEqual([])
     expect(workItem.artifactPaths).toEqual([])
 
@@ -97,6 +99,22 @@ describe('work-items-store', () => {
     expect(updated?.sessionKeys).toEqual(['session-1'])
 
     expect(deleteWorkItem(removeTwo.id)).toBe(true)
+    const withHistory = appendWorkItemHistoryEntry(removeOne.id, {
+      action: 'launch',
+      status: 'active',
+      phase: 'review',
+      note: 'Launched into review phase',
+      missionId: 'job-123',
+      sessionKey: 'cron_job-123_pending',
+      sessionKeyPrefix: 'cron_job-123_',
+      profile: 'reviewer',
+    })
+    expect(withHistory?.history.at(-1)).toMatchObject({
+      action: 'launch',
+      missionId: 'job-123',
+      sessionKey: 'cron_job-123_pending',
+      profile: 'reviewer',
+    })
     expect(deleteWorkItemsForProject('project-delete')).toBe(1)
     expect(listWorkItems({ projectId: 'project-delete' })).toEqual([])
     expect(listWorkItems({ projectId: 'project-keep' }).map((item) => item.id)).toEqual([

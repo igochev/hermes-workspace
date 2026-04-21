@@ -18,6 +18,7 @@ import {
   WORK_ITEM_PRIORITY_LABELS,
   WORK_ITEM_STATUS_LABELS,
 } from '@/lib/projects-api'
+import { launchWorkItem } from '@/lib/work-item-launch-api'
 
 export function WorkItemDetailScreen({
   projectId,
@@ -32,6 +33,27 @@ export function WorkItemDetailScreen({
     queryKey,
     queryFn: () => fetchWorkItem(workItemId),
     refetchInterval: 30_000,
+  })
+
+  const launchMutation = useMutation({
+    mutationFn: () =>
+      launchWorkItem(workItemId, {
+        phase: workItem?.phase ?? 'build',
+      }),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey })
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      toast(
+        result.launch.profile
+          ? `Launched ${result.launch.phase} via Conductor (${result.launch.profile})`
+          : `Launched ${result.launch.phase} via Conductor`,
+      )
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to launch work item', {
+        type: 'error',
+      })
+    },
   })
 
   const deleteMutation = useMutation({
@@ -120,13 +142,12 @@ export function WorkItemDetailScreen({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  toast('Phase 2 will launch this work item into Conductor.')
-                }}
-                className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                onClick={() => launchMutation.mutate()}
+                disabled={launchMutation.isPending}
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 <HugeiconsIcon icon={PlayIcon} size={14} />
-                Launch Placeholder
+                {launchMutation.isPending ? 'Launching…' : 'Launch via Conductor'}
               </button>
               <button
                 type="button"
@@ -148,6 +169,7 @@ export function WorkItemDetailScreen({
                 <Detail label="Repo Snapshot" value={workItem.repoPathSnapshot} />
                 <Detail label="Mission ID" value={workItem.missionId || '—'} />
                 <Detail label="Assigned Profile" value={workItem.assignedProfile || '—'} />
+                <Detail label="Launch Sessions" value={workItem.sessionKeys.join(', ') || '—'} />
                 <Detail label="Created" value={workItem.createdAt} />
                 <Detail label="Updated" value={workItem.updatedAt} />
               </dl>
@@ -211,6 +233,38 @@ export function WorkItemDetailScreen({
                   }
                 />
               </div>
+            </Panel>
+
+            <Panel title="Phase History">
+              {workItem.history.length === 0 ? (
+                <EmptyCopy>No phase history recorded yet.</EmptyCopy>
+              ) : (
+                <ul className="space-y-2">
+                  {workItem.history
+                    .slice()
+                    .reverse()
+                    .map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="rounded-2xl border border-primary-200 bg-white px-3 py-3 text-sm text-primary-800"
+                      >
+                        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wide text-primary-500">
+                          <span>{entry.action}</span>
+                          {entry.phase ? <span>{WORK_ITEM_PHASE_LABELS[entry.phase]}</span> : null}
+                          {entry.status ? <span>{WORK_ITEM_STATUS_LABELS[entry.status]}</span> : null}
+                          {entry.profile ? <span>{entry.profile}</span> : null}
+                        </div>
+                        <div className="mt-2 font-medium text-primary-900">{entry.note}</div>
+                        <div className="mt-2 space-y-1 text-xs text-primary-500">
+                          {entry.missionId ? <div>Mission: {entry.missionId}</div> : null}
+                          {entry.sessionKey ? <div>Session: {entry.sessionKey}</div> : null}
+                          {entry.sessionKeyPrefix ? <div>Session Prefix: {entry.sessionKeyPrefix}</div> : null}
+                          <div>{entry.createdAt}</div>
+                        </div>
+                      </li>
+                    ))}
+                </ul>
+              )}
             </Panel>
 
             <Panel title="Artifacts">

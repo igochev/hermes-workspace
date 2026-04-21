@@ -7,6 +7,19 @@ export type WorkItemStatus = 'inbox' | 'ready' | 'active' | 'blocked' | 'done' |
 export type WorkItemPhase = 'research' | 'build' | 'review' | 'deploy'
 export type WorkItemPriority = 'high' | 'medium' | 'low'
 
+export type WorkItemHistoryEntry = {
+  id: string
+  action: 'launch' | 'status-change' | 'note'
+  status?: WorkItemStatus
+  phase?: WorkItemPhase
+  note: string
+  missionId?: string
+  sessionKey?: string
+  sessionKeyPrefix?: string
+  profile?: string
+  createdAt: string
+}
+
 export type WorkItemRecord = {
   id: string
   projectId: string
@@ -24,6 +37,7 @@ export type WorkItemRecord = {
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
   notes: Array<string>
+  history: Array<WorkItemHistoryEntry>
   createdAt: string
   updatedAt: string
 }
@@ -49,9 +63,12 @@ type CreateWorkItemInput = {
   artifactPaths?: Array<string>
   acceptanceCriteria?: Array<string>
   notes?: Array<string>
+  history?: Array<WorkItemHistoryEntry>
 }
 
 type UpdateWorkItemInput = Partial<Omit<WorkItemRecord, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>>
+
+type AppendWorkItemHistoryInput = Omit<WorkItemHistoryEntry, 'id' | 'createdAt'>
 
 type ListWorkItemsFilters = {
   projectId?: string
@@ -135,6 +152,35 @@ function normalizePriority(value: unknown): WorkItemPriority {
   return value === 'high' || value === 'low' ? value : 'medium'
 }
 
+function asHistoryArray(value: unknown): Array<WorkItemHistoryEntry> {
+  return Array.isArray(value)
+    ? value
+        .filter((entry): entry is Partial<WorkItemHistoryEntry> => Boolean(entry) && typeof entry === 'object')
+        .map((entry, index) => ({
+          id:
+            typeof entry.id === 'string' && entry.id.trim().length > 0
+              ? entry.id.trim()
+              : `history-${index}`,
+          action:
+            entry.action === 'launch' || entry.action === 'status-change' || entry.action === 'note'
+              ? entry.action
+              : 'note',
+          status: normalizeStatus(entry.status),
+          phase: normalizePhase(entry.phase),
+          note: typeof entry.note === 'string' ? entry.note.trim() : '',
+          missionId: asOptionalString(entry.missionId),
+          sessionKey: asOptionalString(entry.sessionKey),
+          sessionKeyPrefix: asOptionalString(entry.sessionKeyPrefix),
+          profile: asOptionalString(entry.profile),
+          createdAt:
+            typeof entry.createdAt === 'string' && entry.createdAt.trim().length > 0
+              ? entry.createdAt
+              : new Date(0).toISOString(),
+        }))
+        .filter((entry) => entry.note.length > 0)
+    : []
+}
+
 function normalizeWorkItem(
   workItem: Partial<WorkItemRecord> &
     Pick<WorkItemRecord, 'id' | 'projectId' | 'title' | 'repoPathSnapshot' | 'createdAt' | 'updatedAt'>,
@@ -156,6 +202,7 @@ function normalizeWorkItem(
     artifactPaths: asStringArray(workItem.artifactPaths),
     acceptanceCriteria: asStringArray(workItem.acceptanceCriteria),
     notes: asStringArray(workItem.notes),
+    history: asHistoryArray(workItem.history),
     createdAt: workItem.createdAt,
     updatedAt: workItem.updatedAt,
   }
@@ -199,6 +246,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     artifactPaths: input.artifactPaths,
     acceptanceCriteria: input.acceptanceCriteria,
     notes: input.notes,
+    history: input.history,
     createdAt: now,
     updatedAt: now,
   })
@@ -247,4 +295,29 @@ export function deleteWorkItemsForProject(projectId: string): number {
   if (deletedCount === 0) return 0
   writeWorkItemsFile({ workItems: nextWorkItems.map((item) => normalizeWorkItem(item)) })
   return deletedCount
+}
+
+export function appendWorkItemHistoryEntry(
+  workItemId: string,
+  entry: AppendWorkItemHistoryInput,
+): WorkItemRecord | null {
+  const workItem = getWorkItem(workItemId)
+  if (!workItem) return null
+  return updateWorkItem(workItemId, {
+    history: [
+      ...workItem.history,
+      {
+        id: randomUUID(),
+        action: entry.action,
+        status: entry.status,
+        phase: entry.phase,
+        note: entry.note,
+        missionId: entry.missionId,
+        sessionKey: entry.sessionKey,
+        sessionKeyPrefix: entry.sessionKeyPrefix,
+        profile: entry.profile,
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  })
 }

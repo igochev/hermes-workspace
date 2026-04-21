@@ -100,6 +100,7 @@ import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-ta
 import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
 import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
+import { Route as ApiWorkItemsWorkItemIdLaunchRouteImport } from './routes/api/work-items.$workItemId.launch'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 
@@ -559,6 +560,12 @@ const ProjectsProjectIdWorkItemsWorkItemIdRoute =
     path: '/work-items/$workItemId',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
+const ApiWorkItemsWorkItemIdLaunchRoute =
+  ApiWorkItemsWorkItemIdLaunchRouteImport.update({
+    id: '/launch',
+    path: '/launch',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -662,9 +669,10 @@ export interface FileRoutesByFullPath {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
-  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRoute
+  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRoutesByTo {
@@ -756,9 +764,10 @@ export interface FileRoutesByTo {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
-  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRoute
+  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRoutesById {
@@ -852,9 +861,10 @@ export interface FileRoutesById {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
-  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRoute
+  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRouteTypes {
@@ -952,6 +962,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/launch'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1046,6 +1057,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/launch'
     | '/projects/$projectId/work-items/$workItemId'
   id:
     | '__root__'
@@ -1141,6 +1153,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/launch'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesById: FileRoutesById
 }
@@ -1859,6 +1872,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdWorkItemsWorkItemIdRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/api/work-items/$workItemId/launch': {
+      id: '/api/work-items/$workItemId/launch'
+      path: '/launch'
+      fullPath: '/api/work-items/$workItemId/launch'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdLaunchRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -2004,12 +2024,26 @@ const ApiSkillsRouteWithChildren = ApiSkillsRoute._addFileChildren(
   ApiSkillsRouteChildren,
 )
 
+interface ApiWorkItemsWorkItemIdRouteChildren {
+  ApiWorkItemsWorkItemIdLaunchRoute: typeof ApiWorkItemsWorkItemIdLaunchRoute
+}
+
+const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
+  {
+    ApiWorkItemsWorkItemIdLaunchRoute: ApiWorkItemsWorkItemIdLaunchRoute,
+  }
+
+const ApiWorkItemsWorkItemIdRouteWithChildren =
+  ApiWorkItemsWorkItemIdRoute._addFileChildren(
+    ApiWorkItemsWorkItemIdRouteChildren,
+  )
+
 interface ApiWorkItemsRouteChildren {
-  ApiWorkItemsWorkItemIdRoute: typeof ApiWorkItemsWorkItemIdRoute
+  ApiWorkItemsWorkItemIdRoute: typeof ApiWorkItemsWorkItemIdRouteWithChildren
 }
 
 const ApiWorkItemsRouteChildren: ApiWorkItemsRouteChildren = {
-  ApiWorkItemsWorkItemIdRoute: ApiWorkItemsWorkItemIdRoute,
+  ApiWorkItemsWorkItemIdRoute: ApiWorkItemsWorkItemIdRouteWithChildren,
 }
 
 const ApiWorkItemsRouteWithChildren = ApiWorkItemsRoute._addFileChildren(
