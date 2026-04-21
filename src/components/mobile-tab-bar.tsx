@@ -79,6 +79,13 @@ const TABS: Array<TabItem> = [
     match: (p) => p.startsWith('/jobs'),
   },
   {
+    id: 'projects',
+    label: 'Projects',
+    icon: File01Icon,
+    to: '/projects',
+    match: (p) => p === '/projects' || p.startsWith('/projects/'),
+  },
+  {
     id: 'memory',
     label: 'Memory',
     icon: BrainIcon,

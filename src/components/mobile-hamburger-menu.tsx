@@ -53,6 +53,13 @@ const NAV_ITEMS = [
     match: (p: string) => p.startsWith('/jobs'),
   },
   {
+    id: 'projects',
+    label: 'Projects',
+    icon: File01Icon,
+    to: '/projects',
+    match: (p: string) => p === '/projects' || p.startsWith('/projects/'),
+  },
+  {
     id: 'conductor',
     label: 'Conductor',
     icon: Rocket01Icon,

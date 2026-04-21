@@ -1,0 +1,250 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { randomUUID } from 'node:crypto'
+
+export type WorkItemStatus = 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
+export type WorkItemPhase = 'research' | 'build' | 'review' | 'deploy'
+export type WorkItemPriority = 'high' | 'medium' | 'low'
+
+export type WorkItemRecord = {
+  id: string
+  projectId: string
+  title: string
+  description: string
+  status: WorkItemStatus
+  phase?: WorkItemPhase
+  priority: WorkItemPriority
+  assignedProfile?: string
+  repoPathSnapshot: string
+  missionId?: string
+  sessionKeys: Array<string>
+  branchName?: string
+  prUrl?: string
+  artifactPaths: Array<string>
+  acceptanceCriteria: Array<string>
+  notes: Array<string>
+  createdAt: string
+  updatedAt: string
+}
+
+type WorkItemsFile = {
+  workItems: Array<WorkItemRecord>
+}
+
+type CreateWorkItemInput = {
+  id?: string
+  projectId: string
+  title: string
+  description?: string
+  status?: WorkItemStatus
+  phase?: WorkItemPhase
+  priority?: WorkItemPriority
+  assignedProfile?: string
+  repoPathSnapshot: string
+  missionId?: string
+  sessionKeys?: Array<string>
+  branchName?: string
+  prUrl?: string
+  artifactPaths?: Array<string>
+  acceptanceCriteria?: Array<string>
+  notes?: Array<string>
+}
+
+type UpdateWorkItemInput = Partial<Omit<WorkItemRecord, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>>
+
+type ListWorkItemsFilters = {
+  projectId?: string
+  status?: WorkItemStatus
+  phase?: WorkItemPhase
+}
+
+function getHermesHome(): string {
+  return process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
+}
+
+function getWorkItemsFile(): string {
+  return path.join(getHermesHome(), 'work-items.json')
+}
+
+function ensureWorkItemsFile(): void {
+  const hermesHome = getHermesHome()
+  const workItemsFile = getWorkItemsFile()
+  fs.mkdirSync(hermesHome, { recursive: true })
+  if (!fs.existsSync(workItemsFile)) {
+    fs.writeFileSync(
+      workItemsFile,
+      JSON.stringify({ workItems: [] }, null, 2) + '\n',
+      'utf-8',
+    )
+  }
+}
+
+function readWorkItemsFile(): WorkItemsFile {
+  const workItemsFile = getWorkItemsFile()
+  ensureWorkItemsFile()
+  try {
+    const raw = fs.readFileSync(workItemsFile, 'utf-8').trim()
+    if (!raw) return { workItems: [] }
+    const parsed = JSON.parse(raw) as Partial<WorkItemsFile>
+    return { workItems: Array.isArray(parsed.workItems) ? parsed.workItems : [] }
+  } catch {
+    return { workItems: [] }
+  }
+}
+
+function writeWorkItemsFile(data: WorkItemsFile): void {
+  const workItemsFile = getWorkItemsFile()
+  ensureWorkItemsFile()
+  fs.writeFileSync(workItemsFile, JSON.stringify(data, null, 2) + '\n', 'utf-8')
+}
+
+function asOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
+}
+
+function asStringArray(value: unknown): Array<string> {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : []
+}
+
+function normalizeStatus(value: unknown): WorkItemStatus {
+  return value === 'ready' ||
+    value === 'active' ||
+    value === 'blocked' ||
+    value === 'done' ||
+    value === 'cancelled'
+    ? value
+    : 'inbox'
+}
+
+function normalizePhase(value: unknown): WorkItemPhase | undefined {
+  return value === 'research' ||
+    value === 'build' ||
+    value === 'review' ||
+    value === 'deploy'
+    ? value
+    : undefined
+}
+
+function normalizePriority(value: unknown): WorkItemPriority {
+  return value === 'high' || value === 'low' ? value : 'medium'
+}
+
+function normalizeWorkItem(
+  workItem: Partial<WorkItemRecord> &
+    Pick<WorkItemRecord, 'id' | 'projectId' | 'title' | 'repoPathSnapshot' | 'createdAt' | 'updatedAt'>,
+): WorkItemRecord {
+  return {
+    id: workItem.id,
+    projectId: workItem.projectId.trim(),
+    title: workItem.title.trim(),
+    description: typeof workItem.description === 'string' ? workItem.description : '',
+    status: normalizeStatus(workItem.status),
+    phase: normalizePhase(workItem.phase),
+    priority: normalizePriority(workItem.priority),
+    assignedProfile: asOptionalString(workItem.assignedProfile),
+    repoPathSnapshot: workItem.repoPathSnapshot.trim(),
+    missionId: asOptionalString(workItem.missionId),
+    sessionKeys: asStringArray(workItem.sessionKeys),
+    branchName: asOptionalString(workItem.branchName),
+    prUrl: asOptionalString(workItem.prUrl),
+    artifactPaths: asStringArray(workItem.artifactPaths),
+    acceptanceCriteria: asStringArray(workItem.acceptanceCriteria),
+    notes: asStringArray(workItem.notes),
+    createdAt: workItem.createdAt,
+    updatedAt: workItem.updatedAt,
+  }
+}
+
+export function listWorkItems(filters: ListWorkItemsFilters = {}): Array<WorkItemRecord> {
+  let workItems = readWorkItemsFile().workItems.map((workItem) => normalizeWorkItem(workItem))
+  if (filters.projectId) {
+    workItems = workItems.filter((workItem) => workItem.projectId === filters.projectId)
+  }
+  if (filters.status) {
+    workItems = workItems.filter((workItem) => workItem.status === filters.status)
+  }
+  if (filters.phase) {
+    workItems = workItems.filter((workItem) => workItem.phase === filters.phase)
+  }
+  return workItems.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+export function getWorkItem(workItemId: string): WorkItemRecord | null {
+  return listWorkItems().find((workItem) => workItem.id === workItemId) ?? null
+}
+
+export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
+  const file = readWorkItemsFile()
+  const now = new Date().toISOString()
+  const workItem = normalizeWorkItem({
+    id: typeof input.id === 'string' && input.id.trim() ? input.id : randomUUID(),
+    projectId: input.projectId,
+    title: input.title,
+    description: input.description,
+    status: input.status,
+    phase: input.phase,
+    priority: input.priority,
+    assignedProfile: input.assignedProfile,
+    repoPathSnapshot: input.repoPathSnapshot,
+    missionId: input.missionId,
+    sessionKeys: input.sessionKeys,
+    branchName: input.branchName,
+    prUrl: input.prUrl,
+    artifactPaths: input.artifactPaths,
+    acceptanceCriteria: input.acceptanceCriteria,
+    notes: input.notes,
+    createdAt: now,
+    updatedAt: now,
+  })
+  file.workItems.push(workItem)
+  writeWorkItemsFile({ workItems: file.workItems.map((item) => normalizeWorkItem(item)) })
+  return workItem
+}
+
+export function updateWorkItem(workItemId: string, updates: UpdateWorkItemInput): WorkItemRecord | null {
+  const file = readWorkItemsFile()
+  const currentIndex = file.workItems.findIndex((workItem) => workItem.id === workItemId)
+  if (currentIndex === -1) return null
+
+  const current = normalizeWorkItem(file.workItems[currentIndex])
+  const next = normalizeWorkItem({
+    ...current,
+    ...updates,
+    id: current.id,
+    projectId: current.projectId,
+    title: typeof updates.title === 'string' && updates.title.trim() ? updates.title : current.title,
+    repoPathSnapshot:
+      typeof updates.repoPathSnapshot === 'string' && updates.repoPathSnapshot.trim()
+        ? updates.repoPathSnapshot
+        : current.repoPathSnapshot,
+    createdAt: current.createdAt,
+    updatedAt: new Date().toISOString(),
+  })
+
+  file.workItems[currentIndex] = next
+  writeWorkItemsFile({ workItems: file.workItems.map((item) => normalizeWorkItem(item)) })
+  return next
+}
+
+export function deleteWorkItem(workItemId: string): boolean {
+  const file = readWorkItemsFile()
+  const nextWorkItems = file.workItems.filter((workItem) => workItem.id !== workItemId)
+  if (nextWorkItems.length === file.workItems.length) return false
+  writeWorkItemsFile({ workItems: nextWorkItems.map((item) => normalizeWorkItem(item)) })
+  return true
+}
+
+export function deleteWorkItemsForProject(projectId: string): number {
+  const file = readWorkItemsFile()
+  const nextWorkItems = file.workItems.filter((workItem) => workItem.projectId !== projectId)
+  const deletedCount = file.workItems.length - nextWorkItems.length
+  if (deletedCount === 0) return 0
+  writeWorkItemsFile({ workItems: nextWorkItems.map((item) => normalizeWorkItem(item)) })
+  return deletedCount
+}

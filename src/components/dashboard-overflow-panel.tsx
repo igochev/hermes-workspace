@@ -32,6 +32,7 @@ const HERMES_ITEMS: Array<OverflowItem> = [
   { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
   { icon: PuzzleIcon, label: 'Skills', to: '/skills' },
   { icon: UserGroupIcon, label: 'Profiles', to: '/profiles' },
+  { icon: File01Icon, label: 'Projects', to: '/projects' },
   { icon: Settings01Icon, label: 'Settings', to: '/settings' },
 ]
 
