@@ -34,6 +34,9 @@ export type WorkItemRecord = {
   assignedProfile?: string
   repoPathSnapshot: string
   missionId?: string
+  missionJobId?: string
+  missionJobName?: string
+  missionSessionKeyPrefix?: string
   missionLink?: string
   missionState?: 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
   missionLastRunAt?: string

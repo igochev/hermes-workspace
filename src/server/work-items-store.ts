@@ -33,6 +33,9 @@ export type WorkItemRecord = {
   assignedProfile?: string
   repoPathSnapshot: string
   missionId?: string
+  missionJobId?: string
+  missionJobName?: string
+  missionSessionKeyPrefix?: string
   missionLink?: string
   missionState?: WorkItemMissionState
   missionLastRunAt?: string
@@ -63,6 +66,9 @@ type CreateWorkItemInput = {
   assignedProfile?: string
   repoPathSnapshot: string
   missionId?: string
+  missionJobId?: string
+  missionJobName?: string
+  missionSessionKeyPrefix?: string
   missionLink?: string
   missionState?: WorkItemMissionState
   missionLastRunAt?: string
@@ -206,6 +212,9 @@ function normalizeWorkItem(
     assignedProfile: asOptionalString(workItem.assignedProfile),
     repoPathSnapshot: workItem.repoPathSnapshot.trim(),
     missionId: asOptionalString(workItem.missionId),
+    missionJobId: asOptionalString((workItem as Partial<WorkItemRecord>).missionJobId),
+    missionJobName: asOptionalString((workItem as Partial<WorkItemRecord>).missionJobName),
+    missionSessionKeyPrefix: asOptionalString((workItem as Partial<WorkItemRecord>).missionSessionKeyPrefix),
     missionLink: asOptionalString(workItem.missionLink),
     missionState:
       workItem.missionState === 'scheduled' ||
@@ -261,6 +270,9 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     assignedProfile: input.assignedProfile,
     repoPathSnapshot: input.repoPathSnapshot,
     missionId: input.missionId,
+    missionJobId: input.missionJobId,
+    missionJobName: input.missionJobName,
+    missionSessionKeyPrefix: input.missionSessionKeyPrefix,
     missionLink: input.missionLink,
     missionState: input.missionState,
     missionLastRunAt: input.missionLastRunAt,

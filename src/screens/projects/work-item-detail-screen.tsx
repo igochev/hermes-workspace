@@ -220,6 +220,9 @@ export function WorkItemDetailScreen({
                 <Detail label="Project" value={project?.name || 'Unknown project'} />
                 <Detail label="Repo Snapshot" value={workItem.repoPathSnapshot} />
                 <Detail label="Mission ID" value={workItem.missionId || '—'} />
+                <Detail label="Hermes Job ID" value={workItem.missionJobId || '—'} />
+                <Detail label="Hermes Job Name" value={workItem.missionJobName || '—'} />
+                <Detail label="Session Prefix" value={workItem.missionSessionKeyPrefix || '—'} />
                 <Detail label="Mission Link" value={workItem.missionLink || '—'} />
                 <Detail label="Mission State" value={workItem.missionState || 'unknown'} />
                 <Detail label="Mission Last Run" value={workItem.missionLastRunAt || '—'} />
@@ -286,6 +289,21 @@ export function WorkItemDetailScreen({
                 />
                 <EvidenceRow
                   icon={PlayIcon}
+                  label="Hermes Job ID"
+                  value={workItem.missionJobId || 'No job ID recorded'}
+                />
+                <EvidenceRow
+                  icon={PlayIcon}
+                  label="Hermes Job Name"
+                  value={workItem.missionJobName || 'No job name recorded'}
+                />
+                <EvidenceRow
+                  icon={PlayIcon}
+                  label="Session Prefix"
+                  value={workItem.missionSessionKeyPrefix || 'No session prefix recorded'}
+                />
+                <EvidenceRow
+                  icon={PlayIcon}
                   label="Mission State"
                   value={workItem.missionState || 'unknown'}
                 />
@@ -309,6 +327,37 @@ export function WorkItemDetailScreen({
                   }
                 />
               </div>
+            </Panel>
+
+            <Panel title="Execution Activity">
+              <div className="space-y-3 text-sm text-primary-700">
+                <Detail label="Latest Session Key" value={syncMutation.data?.execution.latestSessionKey || '—'} />
+                <Detail label="Latest Run ID" value={syncMutation.data?.execution.latestRun?.id || '—'} />
+                <Detail label="Latest Run Status" value={syncMutation.data?.execution.latestRun?.status || '—'} />
+                <Detail label="Latest Run Started" value={syncMutation.data?.execution.latestRun?.startedAt || '—'} />
+                <Detail label="Latest Run Finished" value={syncMutation.data?.execution.latestRun?.finishedAt || '—'} />
+                <Detail label="Known Runs" value={String(syncMutation.data?.execution.jobRuns.length ?? 0)} />
+              </div>
+              {syncMutation.data?.execution.jobRuns && syncMutation.data.execution.jobRuns.length > 0 ? (
+                <ul className="mt-4 space-y-2">
+                  {syncMutation.data.execution.jobRuns.slice(0, 5).map((run) => (
+                    <li key={run.id} className="rounded-2xl border border-primary-200 bg-white px-3 py-3 text-sm text-primary-800">
+                      <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wide text-primary-500">
+                        <span>{run.status}</span>
+                        <span>{run.id}</span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs text-primary-500">
+                        <div>Started: {run.startedAt || '—'}</div>
+                        <div>Finished: {run.finishedAt || '—'}</div>
+                        {run.chatSessionKey ? <div>Session: {run.chatSessionKey}</div> : null}
+                        {run.error ? <div>Error: {run.error}</div> : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="mt-4"><EmptyCopy>No Hermes job runs available yet. Use Sync Execution after launch.</EmptyCopy></div>
+              )}
             </Panel>
 
             <Panel title="Phase History">

@@ -121,8 +121,11 @@ describe('work-item-launch', () => {
     expect(result.workItem.status).toBe('active')
     expect(result.workItem.phase).toBe('build')
     expect(result.workItem.missionId).toBe('job-123')
+    expect(result.workItem.missionJobId).toBe('job-123')
+    expect(result.workItem.missionJobName).toBe('work-item-build-demo')
+    expect(result.workItem.missionSessionKeyPrefix).toBe('cron_job-123_')
     expect(result.workItem.missionLink).toBe('/jobs?jobId=job-123')
-    expect(result.workItem.missionState).toBeUndefined()
+    expect(result.workItem.missionState).toBe('scheduled')
     expect(result.workItem.sessionKeys).toContain('cron_job-123_pending')
     expect(result.workItem.history.at(-1)).toMatchObject({
       action: 'launch',
@@ -136,7 +139,11 @@ describe('work-item-launch', () => {
 
     const persisted = getWorkItem(workItem.id)
     expect(persisted?.missionId).toBe('job-123')
+    expect(persisted?.missionJobId).toBe('job-123')
+    expect(persisted?.missionJobName).toBe('work-item-build-demo')
+    expect(persisted?.missionSessionKeyPrefix).toBe('cron_job-123_')
     expect(persisted?.missionLink).toBe('/jobs?jobId=job-123')
+    expect(persisted?.missionState).toBe('scheduled')
     expect(persisted?.history.at(-1)?.action).toBe('launch')
   })
 })

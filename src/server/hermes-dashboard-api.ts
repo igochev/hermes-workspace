@@ -262,6 +262,10 @@ export async function deleteCronJob(id: string): Promise<{ ok: boolean }> {
   })
 }
 
+export async function getCronRuns(id: string, limit = 20): Promise<Array<Record<string, unknown>>> {
+  return dashboardJson(`/api/cron/jobs/${encodeURIComponent(id)}/runs?limit=${limit}`)
+}
+
 export async function getAnalytics(days = 7): Promise<Record<string, unknown>> {
   return dashboardJson(`/api/analytics/usage?days=${days}`)
 }

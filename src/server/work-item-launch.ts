@@ -130,7 +130,11 @@ export async function launchWorkItemIntoConductor(
     status: 'active',
     phase,
     missionId: launch.jobId,
+    missionJobId: launch.jobId,
+    missionJobName: launch.jobName,
+    missionSessionKeyPrefix: launch.sessionKeyPrefix,
     missionLink,
+    missionState: 'scheduled',
     sessionKeys,
     repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
   })

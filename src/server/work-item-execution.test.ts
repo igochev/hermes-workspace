@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getHermesJobById, listHermesJobs } = vi.hoisted(() => ({
+const { getHermesJobById, listHermesJobs, getHermesJobRuns } = vi.hoisted(() => ({
   getHermesJobById: vi.fn(),
   listHermesJobs: vi.fn(),
+  getHermesJobRuns: vi.fn(),
 }))
 
 vi.mock('./hermes-jobs', () => ({
   getHermesJobById,
   listHermesJobs,
+  getHermesJobRuns,
 }))
 
 import { createProject } from './projects-store'
@@ -28,6 +30,7 @@ describe('work-item-execution', () => {
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     getHermesJobById.mockReset()
     listHermesJobs.mockReset()
+    getHermesJobRuns.mockReset()
   })
 
   afterEach(async () => {
@@ -68,6 +71,15 @@ describe('work-item-execution', () => {
         next_run_at: null,
       },
     ])
+    getHermesJobRuns.mockResolvedValue([
+      {
+        id: 'run-123',
+        status: 'success',
+        startedAt: '2026-04-21T21:35:00Z',
+        finishedAt: '2026-04-21T21:36:00Z',
+        chatSessionKey: 'cron_job-123_20260421_213500',
+      },
+    ])
 
     const result = await syncWorkItemExecutionState(workItem.id)
 
@@ -75,6 +87,9 @@ describe('work-item-execution', () => {
     expect(result.execution.state).toBe('succeeded')
     expect(result.execution.transitionApplied).toBe('build->review')
     expect(result.workItem.missionId).toBe('job-123')
+    expect(result.workItem.missionJobId).toBe('job-123')
+    expect(result.workItem.missionJobName).toBe('work-item-build-demo')
+    expect(result.workItem.missionSessionKeyPrefix).toBe('cron_job-123_')
     expect(result.workItem.missionLink).toBe('/jobs?jobId=job-123')
     expect(result.workItem.missionState).toBe('succeeded')
     expect(result.workItem.status).toBe('active')
@@ -96,6 +111,9 @@ describe('work-item-execution', () => {
     const persisted = getWorkItem(workItem.id)
     expect(persisted?.phase).toBe('review')
     expect(persisted?.missionId).toBe('job-123')
+    expect(persisted?.missionJobId).toBe('job-123')
+    expect(persisted?.missionJobName).toBe('work-item-build-demo')
+    expect(persisted?.missionSessionKeyPrefix).toBe('cron_job-123_')
   })
 
   it('blocks a work item and records error details when the mission fails', async () => {
@@ -126,6 +144,16 @@ describe('work-item-execution', () => {
       next_run_at: null,
     })
     listHermesJobs.mockResolvedValue([])
+    getHermesJobRuns.mockResolvedValue([
+      {
+        id: 'run-999',
+        status: 'error',
+        startedAt: '2026-04-21T21:36:00Z',
+        finishedAt: '2026-04-21T21:37:00Z',
+        error: 'Worker failed verification',
+        chatSessionKey: 'cron_job-999_20260421_213600',
+      },
+    ])
 
     const result = await syncWorkItemExecutionState(workItem.id)
 
@@ -133,6 +161,8 @@ describe('work-item-execution', () => {
     expect(result.execution.transitionApplied).toBe('active->blocked')
     expect(result.workItem.status).toBe('blocked')
     expect(result.workItem.phase).toBe('build')
+    expect(result.workItem.missionJobId).toBe('job-999')
+    expect(result.workItem.missionJobName).toBe('work-item-build-demo')
     expect(result.workItem.missionState).toBe('failed')
     expect(result.workItem.missionLastError).toBe('Worker failed verification')
     expect(result.workItem.history.at(-1)).toMatchObject({

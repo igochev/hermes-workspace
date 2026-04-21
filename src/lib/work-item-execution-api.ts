@@ -6,6 +6,9 @@ export type WorkItemExecutionPayload = {
   workItem: {
     id: string
     missionId?: string
+    missionJobId?: string
+    missionJobName?: string
+    missionSessionKeyPrefix?: string
     missionLink?: string
     missionState?: WorkItemExecutionState
     missionLastRunAt?: string
@@ -26,6 +29,29 @@ export type WorkItemExecutionPayload = {
       last_error?: string | null
       next_run_at?: string | null
     } | null
+    jobRuns: Array<{
+      id: string
+      status: string
+      startedAt: string | null
+      finishedAt: string | null
+      durationMs?: number
+      error?: string
+      deliverySummary?: string
+      chatSessionKey?: string
+      output?: unknown
+    }>
+    latestRun: {
+      id: string
+      status: string
+      startedAt: string | null
+      finishedAt: string | null
+      durationMs?: number
+      error?: string
+      deliverySummary?: string
+      chatSessionKey?: string
+      output?: unknown
+    } | null
+    latestSessionKey: string | null
     transitionApplied: null | 'build->review' | 'active->blocked'
   }
 }

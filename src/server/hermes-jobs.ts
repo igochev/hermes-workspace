@@ -1,4 +1,5 @@
-import { getCronJobs, type CronJob } from './hermes-dashboard-api'
+import { type CronRun } from '../components/cron-manager/cron-types'
+import { getCronJobs, getCronRuns, type CronJob } from './hermes-dashboard-api'
 
 export type HermesJobInfo = Pick<
   CronJob,
@@ -21,4 +22,8 @@ export async function listHermesJobs(): Promise<Array<HermesJobInfo>> {
 export async function getHermesJobById(jobId: string): Promise<HermesJobInfo | null> {
   const jobs = await listHermesJobs()
   return jobs.find((job) => job.id === jobId) ?? null
+}
+
+export async function getHermesJobRuns(jobId: string): Promise<Array<CronRun>> {
+  return getCronRuns(jobId)
 }
