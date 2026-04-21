@@ -20,11 +20,15 @@ export type ProfileDetail = {
   name: string
   path: string
   active: boolean
+  model?: string
+  provider?: string
   config: Record<string, unknown>
   envPath?: string
   hasEnv: boolean
   sessionsDir?: string
   skillsDir?: string
+  soulPath?: string
+  systemPrompt?: string
 }
 
 function getHermesRoot(): string {
@@ -56,6 +60,15 @@ function validateProfileName(name: string): string {
 
 function safeReadText(filePath: string): string {
   return fs.readFileSync(filePath, 'utf-8')
+}
+
+function safeReadOptionalText(filePath: string): string | undefined {
+  if (!fs.existsSync(filePath)) return undefined
+  try {
+    return safeReadText(filePath)
+  } catch {
+    return undefined
+  }
 }
 
 function readYamlConfig(configPath: string): Record<string, unknown> {
@@ -213,15 +226,22 @@ export function readProfile(name: string): ProfileDetail {
   const envPath = path.join(profilePath, '.env')
   const sessionsDir = path.join(profilePath, 'sessions')
   const skillsDir = path.join(profilePath, 'skills')
+  const soulPath = path.join(profilePath, 'SOUL.md')
+  const config = readYamlConfig(configPath)
+  const systemPrompt = safeReadOptionalText(soulPath)?.trim()
   return {
     name: normalized,
     path: profilePath,
     active: normalized === active,
-    config: readYamlConfig(configPath),
+    model: typeof config.model === 'string' ? config.model : undefined,
+    provider: typeof config.provider === 'string' ? config.provider : undefined,
+    config,
     envPath: fs.existsSync(envPath) ? envPath : undefined,
     hasEnv: fs.existsSync(envPath),
     sessionsDir: fs.existsSync(sessionsDir) ? sessionsDir : undefined,
     skillsDir: fs.existsSync(skillsDir) ? skillsDir : undefined,
+    soulPath: fs.existsSync(soulPath) ? soulPath : undefined,
+    systemPrompt,
   }
 }
 

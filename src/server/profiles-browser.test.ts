@@ -3,9 +3,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { listProfiles } from './profiles-browser'
+import { listProfiles, readProfile } from './profiles-browser'
 
-describe('listProfiles', () => {
+describe('profiles-browser', () => {
   let tempHome: string
 
   beforeEach(() => {
@@ -35,5 +35,30 @@ describe('listProfiles', () => {
     expect(names).toContain('jarvis')
     expect(profiles.find((profile) => profile.name === 'default')?.active).toBe(false)
     expect(profiles.find((profile) => profile.name === 'jarvis')?.active).toBe(true)
+  })
+
+  it('reads provider, model, and SOUL prompt from profile files', () => {
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const profileRoot = path.join(hermesRoot, 'profiles', 'builder')
+
+    fs.mkdirSync(profileRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(profileRoot, 'config.yaml'),
+      'provider: copilot\nmodel: gpt-5.4\n',
+      'utf-8',
+    )
+    fs.writeFileSync(
+      path.join(profileRoot, 'SOUL.md'),
+      'You are Builder.\n\nShip working code.',
+      'utf-8',
+    )
+
+    const profile = readProfile('builder')
+
+    expect(profile.provider).toBe('copilot')
+    expect(profile.model).toBe('gpt-5.4')
+    expect(profile.soulPath).toBe(path.join(profileRoot, 'SOUL.md'))
+    expect(profile.systemPrompt).toBe('You are Builder.\n\nShip working code.')
+    expect(profile.config).toEqual({ provider: 'copilot', model: 'gpt-5.4' })
   })
 })
