@@ -7,6 +7,7 @@ import {
   type WorkItemPhase,
   type WorkItemRecord,
 } from './work-items-store'
+import { requestWorkItemReviewApproval } from './work-item-approvals'
 import { getHermesJobById, listHermesJobs, type HermesJobInfo } from './hermes-jobs'
 import { buildMissionLink } from './conductor-launch'
 
@@ -117,6 +118,10 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
         profile: updated.assignedProfile,
       })
       if (!updated) throw new Error('Failed to append success history entry')
+      requestWorkItemReviewApproval(updated.id, {
+        requestedBy: 'system',
+        notes: 'Execution succeeded; awaiting review approval.',
+      })
       transitionApplied = 'build->review'
     }
   } else if (state === 'failed') {

@@ -12,6 +12,7 @@ vi.mock('./hermes-jobs', () => ({
 
 import { createProject } from './projects-store'
 import { createWorkItem, getWorkItem, type WorkItemRecord } from './work-items-store'
+import { listWorkItemApprovals } from './work-item-approvals'
 import { syncWorkItemExecutionState } from './work-item-execution'
 
 describe('work-item-execution', () => {
@@ -84,6 +85,13 @@ describe('work-item-execution', () => {
       status: 'active',
       missionId: 'job-123',
     })
+    expect(listWorkItemApprovals(workItem.id)).toMatchObject([
+      {
+        workItemId: workItem.id,
+        phase: 'review',
+        status: 'pending',
+      },
+    ])
 
     const persisted = getWorkItem(workItem.id)
     expect(persisted?.phase).toBe('review')

@@ -44,6 +44,21 @@ export type WorkItemRecord = {
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
   notes: Array<string>
+  approvals?: Array<{
+    id: string
+    workItemId: string
+    projectId: string
+    phase: 'review' | 'deploy'
+    status: 'pending' | 'approved' | 'changes_requested' | 'rejected'
+    requestedBy: string
+    requestedAt: string
+    resolvedBy?: string
+    resolvedAt?: string
+    notes?: string
+    resolutionNotes?: string
+    createdAt: string
+    updatedAt: string
+  }>
   history: Array<{
     id: string
     action: 'launch' | 'status-change' | 'note'
@@ -100,6 +115,8 @@ export type WorkItemDetailResponse = {
   workItem: WorkItemRecord
   project: ProjectRecord | null
 }
+
+export type WorkItemApprovalDecision = 'approved' | 'changes_requested' | 'rejected'
 
 async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T

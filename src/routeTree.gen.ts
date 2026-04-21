@@ -68,6 +68,7 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiWorkItemsWorkItemIdRouteImport } from './routes/api/work-items.$workItemId'
+import { Route as ApiWorkItemApprovalsApprovalIdRouteImport } from './routes/api/work-item-approvals.$approvalId'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
 import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
 import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
@@ -101,6 +102,7 @@ import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-pro
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
 import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
 import { Route as ApiWorkItemsWorkItemIdLaunchRouteImport } from './routes/api/work-items.$workItemId.launch'
+import { Route as ApiWorkItemsWorkItemIdApprovalsRouteImport } from './routes/api/work-items.$workItemId.approvals'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 
@@ -399,6 +401,12 @@ const ApiWorkItemsWorkItemIdRoute = ApiWorkItemsWorkItemIdRouteImport.update({
   path: '/$workItemId',
   getParentRoute: () => ApiWorkItemsRoute,
 } as any)
+const ApiWorkItemApprovalsApprovalIdRoute =
+  ApiWorkItemApprovalsApprovalIdRouteImport.update({
+    id: '/api/work-item-approvals/$approvalId',
+    path: '/api/work-item-approvals/$approvalId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSkillsUninstallRoute = ApiSkillsUninstallRouteImport.update({
   id: '/uninstall',
   path: '/uninstall',
@@ -566,6 +574,12 @@ const ApiWorkItemsWorkItemIdLaunchRoute =
     path: '/launch',
     getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
   } as any)
+const ApiWorkItemsWorkItemIdApprovalsRoute =
+  ApiWorkItemsWorkItemIdApprovalsRouteImport.update({
+    id: '/approvals',
+    path: '/approvals',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -669,9 +683,11 @@ export interface FileRoutesByFullPath {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -764,9 +780,11 @@ export interface FileRoutesByTo {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -861,9 +879,11 @@ export interface FileRoutesById {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -959,9 +979,11 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesByTo: FileRoutesByTo
@@ -1054,9 +1076,11 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
     | '/projects/$projectId/work-items/$workItemId'
   id:
@@ -1150,9 +1174,11 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesById: FileRoutesById
@@ -1231,6 +1257,7 @@ export interface RootRouteChildren {
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
+  ApiWorkItemApprovalsApprovalIdRoute: typeof ApiWorkItemApprovalsApprovalIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1648,6 +1675,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkItemsWorkItemIdRouteImport
       parentRoute: typeof ApiWorkItemsRoute
     }
+    '/api/work-item-approvals/$approvalId': {
+      id: '/api/work-item-approvals/$approvalId'
+      path: '/api/work-item-approvals/$approvalId'
+      fullPath: '/api/work-item-approvals/$approvalId'
+      preLoaderRoute: typeof ApiWorkItemApprovalsApprovalIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/skills/uninstall': {
       id: '/api/skills/uninstall'
       path: '/uninstall'
@@ -1879,6 +1913,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkItemsWorkItemIdLaunchRouteImport
       parentRoute: typeof ApiWorkItemsWorkItemIdRoute
     }
+    '/api/work-items/$workItemId/approvals': {
+      id: '/api/work-items/$workItemId/approvals'
+      path: '/approvals'
+      fullPath: '/api/work-items/$workItemId/approvals'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdApprovalsRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -2025,11 +2066,13 @@ const ApiSkillsRouteWithChildren = ApiSkillsRoute._addFileChildren(
 )
 
 interface ApiWorkItemsWorkItemIdRouteChildren {
+  ApiWorkItemsWorkItemIdApprovalsRoute: typeof ApiWorkItemsWorkItemIdApprovalsRoute
   ApiWorkItemsWorkItemIdLaunchRoute: typeof ApiWorkItemsWorkItemIdLaunchRoute
 }
 
 const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
   {
+    ApiWorkItemsWorkItemIdApprovalsRoute: ApiWorkItemsWorkItemIdApprovalsRoute,
     ApiWorkItemsWorkItemIdLaunchRoute: ApiWorkItemsWorkItemIdLaunchRoute,
   }
 
@@ -2124,6 +2167,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
+  ApiWorkItemApprovalsApprovalIdRoute: ApiWorkItemApprovalsApprovalIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

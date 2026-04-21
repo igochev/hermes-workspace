@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProject } from '../../server/projects-store'
+import { listWorkItemApprovals } from '../../server/work-item-approvals'
 import { syncWorkItemExecutionState } from '../../server/work-item-execution'
 import {
   deleteWorkItem,
@@ -46,7 +47,10 @@ function buildWorkItemPayload(workItemId: string) {
   const workItem = getWorkItem(workItemId)
   if (!workItem) return null
   return {
-    workItem,
+    workItem: {
+      ...workItem,
+      approvals: listWorkItemApprovals(workItem.id).slice().reverse(),
+    },
     project: getProject(workItem.projectId),
   }
 }

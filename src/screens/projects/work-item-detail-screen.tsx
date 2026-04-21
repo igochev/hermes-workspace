@@ -14,10 +14,12 @@ import { toast } from '@/components/ui/toast'
 import {
   deleteWorkItem,
   fetchWorkItem,
+  type WorkItemApprovalDecision,
   WORK_ITEM_PHASE_LABELS,
   WORK_ITEM_PRIORITY_LABELS,
   WORK_ITEM_STATUS_LABELS,
 } from '@/lib/projects-api'
+import { resolveWorkItemApproval } from '@/lib/work-item-approvals-api'
 import { launchWorkItem } from '@/lib/work-item-launch-api'
 import { syncWorkItemExecution, type WorkItemExecutionPayload } from '@/lib/work-item-execution-api'
 
@@ -73,6 +75,25 @@ export function WorkItemDetailScreen({
     },
     onError: (error) => {
       toast(error instanceof Error ? error.message : 'Failed to sync execution state', {
+        type: 'error',
+      })
+    },
+  })
+
+  const approvalMutation = useMutation({
+    mutationFn: ({ decision, notes }: { decision: WorkItemApprovalDecision; notes?: string }) =>
+      resolveWorkItemApproval(workItem.approvals?.[0]?.id || '', {
+        decision,
+        resolvedBy: 'D3n13r',
+        notes,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey })
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      toast('Approval decision recorded')
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to resolve approval', {
         type: 'error',
       })
     },
@@ -319,6 +340,56 @@ export function WorkItemDetailScreen({
                       </li>
                     ))}
                 </ul>
+              )}
+            </Panel>
+
+            <Panel title="Approvals">
+              {!workItem.approvals || workItem.approvals.length === 0 ? (
+                <EmptyCopy>No approvals recorded yet.</EmptyCopy>
+              ) : (
+                <div className="space-y-3">
+                  {workItem.approvals.map((approval) => (
+                    <div
+                      key={approval.id}
+                      className="rounded-2xl border border-primary-200 bg-white px-3 py-3 text-sm text-primary-800"
+                    >
+                      <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wide text-primary-500">
+                        <span>{approval.phase}</span>
+                        <span>{approval.status}</span>
+                        <span>requested by {approval.requestedBy}</span>
+                      </div>
+                      {approval.notes ? (
+                        <div className="mt-2 font-medium text-primary-900">{approval.notes}</div>
+                      ) : null}
+                      <div className="mt-2 space-y-1 text-xs text-primary-500">
+                        <div>Requested: {approval.requestedAt}</div>
+                        {approval.resolvedAt ? <div>Resolved: {approval.resolvedAt}</div> : null}
+                        {approval.resolvedBy ? <div>Resolver: {approval.resolvedBy}</div> : null}
+                        {approval.resolutionNotes ? <div>Resolution Notes: {approval.resolutionNotes}</div> : null}
+                      </div>
+                      {approval.status === 'pending' ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => approvalMutation.mutate({ decision: 'approved' })}
+                            disabled={approvalMutation.isPending}
+                            className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => approvalMutation.mutate({ decision: 'changes_requested' })}
+                            disabled={approvalMutation.isPending}
+                            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-60"
+                          >
+                            Request Changes
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               )}
             </Panel>
 
