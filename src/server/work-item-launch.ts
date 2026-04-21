@@ -12,7 +12,11 @@ import {
   type WorkItemPhase,
   type WorkItemRecord,
 } from './work-items-store'
-import { launchConductorMission, type ConductorLaunchResult } from './conductor-launch'
+import {
+  buildMissionLink,
+  launchConductorMission,
+  type ConductorLaunchResult,
+} from './conductor-launch'
 
 export type WorkItemLaunchRequest = {
   phase?: unknown
@@ -61,10 +65,6 @@ function buildAcceptanceCriteriaBlock(workItem: WorkItemRecord): string[] {
 function buildNotesBlock(workItem: WorkItemRecord): string[] {
   if (workItem.notes.length === 0) return []
   return ['Operator notes:', ...workItem.notes.map((item) => `- ${item}`)]
-}
-
-function buildMissionLink(jobId: string): string {
-  return `/jobs?jobId=${encodeURIComponent(jobId)}`
 }
 
 export function buildWorkItemLaunchGoal(params: {

@@ -20,6 +20,8 @@ export type WorkItemHistoryEntry = {
   createdAt: string
 }
 
+export type WorkItemMissionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
+
 export type WorkItemRecord = {
   id: string
   projectId: string
@@ -32,6 +34,9 @@ export type WorkItemRecord = {
   repoPathSnapshot: string
   missionId?: string
   missionLink?: string
+  missionState?: WorkItemMissionState
+  missionLastRunAt?: string
+  missionLastError?: string
   sessionKeys: Array<string>
   branchName?: string
   prUrl?: string
@@ -59,6 +64,9 @@ type CreateWorkItemInput = {
   repoPathSnapshot: string
   missionId?: string
   missionLink?: string
+  missionState?: WorkItemMissionState
+  missionLastRunAt?: string
+  missionLastError?: string
   sessionKeys?: Array<string>
   branchName?: string
   prUrl?: string
@@ -199,6 +207,16 @@ function normalizeWorkItem(
     repoPathSnapshot: workItem.repoPathSnapshot.trim(),
     missionId: asOptionalString(workItem.missionId),
     missionLink: asOptionalString(workItem.missionLink),
+    missionState:
+      workItem.missionState === 'scheduled' ||
+      workItem.missionState === 'running' ||
+      workItem.missionState === 'succeeded' ||
+      workItem.missionState === 'failed' ||
+      workItem.missionState === 'unknown'
+        ? workItem.missionState
+        : undefined,
+    missionLastRunAt: asOptionalString(workItem.missionLastRunAt),
+    missionLastError: asOptionalString(workItem.missionLastError),
     sessionKeys: asStringArray(workItem.sessionKeys),
     branchName: asOptionalString(workItem.branchName),
     prUrl: asOptionalString(workItem.prUrl),
@@ -244,6 +262,9 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     repoPathSnapshot: input.repoPathSnapshot,
     missionId: input.missionId,
     missionLink: input.missionLink,
+    missionState: input.missionState,
+    missionLastRunAt: input.missionLastRunAt,
+    missionLastError: input.missionLastError,
     sessionKeys: input.sessionKeys,
     branchName: input.branchName,
     prUrl: input.prUrl,

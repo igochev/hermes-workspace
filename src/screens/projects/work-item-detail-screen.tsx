@@ -19,6 +19,7 @@ import {
   WORK_ITEM_STATUS_LABELS,
 } from '@/lib/projects-api'
 import { launchWorkItem } from '@/lib/work-item-launch-api'
+import { syncWorkItemExecution, type WorkItemExecutionPayload } from '@/lib/work-item-execution-api'
 
 export function WorkItemDetailScreen({
   projectId,
@@ -51,6 +52,27 @@ export function WorkItemDetailScreen({
     },
     onError: (error) => {
       toast(error instanceof Error ? error.message : 'Failed to launch work item', {
+        type: 'error',
+      })
+    },
+  })
+
+  const syncMutation = useMutation({
+    mutationFn: () => syncWorkItemExecution(workItemId),
+    onSuccess: async (result: WorkItemExecutionPayload) => {
+      queryClient.setQueryData(queryKey, {
+        workItem: result.workItem,
+        project: result.project,
+      })
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      toast(
+        result.execution.transitionApplied
+          ? `Execution synced: ${result.execution.transitionApplied}`
+          : `Execution synced: ${result.execution.state}`,
+      )
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to sync execution state', {
         type: 'error',
       })
     },
@@ -142,6 +164,15 @@ export function WorkItemDetailScreen({
               </button>
               <button
                 type="button"
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                className="inline-flex items-center gap-1 rounded-full border border-primary-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100 disabled:opacity-60"
+              >
+                <HugeiconsIcon icon={RefreshIcon} size={14} />
+                {syncMutation.isPending ? 'Syncing…' : 'Sync Execution'}
+              </button>
+              <button
+                type="button"
                 onClick={() => launchMutation.mutate()}
                 disabled={launchMutation.isPending}
                 className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
@@ -169,6 +200,9 @@ export function WorkItemDetailScreen({
                 <Detail label="Repo Snapshot" value={workItem.repoPathSnapshot} />
                 <Detail label="Mission ID" value={workItem.missionId || '—'} />
                 <Detail label="Mission Link" value={workItem.missionLink || '—'} />
+                <Detail label="Mission State" value={workItem.missionState || 'unknown'} />
+                <Detail label="Mission Last Run" value={workItem.missionLastRunAt || '—'} />
+                <Detail label="Mission Last Error" value={workItem.missionLastError || '—'} />
                 <Detail label="Assigned Profile" value={workItem.assignedProfile || '—'} />
                 <Detail label="Launch Sessions" value={workItem.sessionKeys.join(', ') || '—'} />
                 <Detail label="Created" value={workItem.createdAt} />
@@ -228,6 +262,21 @@ export function WorkItemDetailScreen({
                   icon={PlayIcon}
                   label="Mission Link"
                   value={workItem.missionLink || 'No mission link recorded'}
+                />
+                <EvidenceRow
+                  icon={PlayIcon}
+                  label="Mission State"
+                  value={workItem.missionState || 'unknown'}
+                />
+                <EvidenceRow
+                  icon={PlayIcon}
+                  label="Mission Last Run"
+                  value={workItem.missionLastRunAt || 'No run recorded'}
+                />
+                <EvidenceRow
+                  icon={PlayIcon}
+                  label="Mission Last Error"
+                  value={workItem.missionLastError || 'No errors recorded'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}

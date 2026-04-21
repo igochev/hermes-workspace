@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { launchConductorMission } = vi.hoisted(() => ({
+const { launchConductorMission, buildMissionLink } = vi.hoisted(() => ({
   launchConductorMission: vi.fn(),
+  buildMissionLink: (jobId: string) => `/jobs?jobId=${encodeURIComponent(jobId)}`,
 }))
 
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
+  buildMissionLink,
 }))
 
 import { createProject } from './projects-store'
@@ -120,6 +122,7 @@ describe('work-item-launch', () => {
     expect(result.workItem.phase).toBe('build')
     expect(result.workItem.missionId).toBe('job-123')
     expect(result.workItem.missionLink).toBe('/jobs?jobId=job-123')
+    expect(result.workItem.missionState).toBeUndefined()
     expect(result.workItem.sessionKeys).toContain('cron_job-123_pending')
     expect(result.workItem.history.at(-1)).toMatchObject({
       action: 'launch',

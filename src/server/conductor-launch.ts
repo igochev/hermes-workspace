@@ -75,8 +75,16 @@ function nowPlusSecondsIso(seconds: number): string {
   return t.toISOString().replace(/\.\d{3}Z$/, 'Z')
 }
 
+export function buildMissionLink(jobId: string): string {
+  return `/jobs?jobId=${encodeURIComponent(jobId)}`
+}
+
 function readOptionalString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function asOptionalString(value: string): string | undefined {
+  return value.length > 0 ? value : undefined
 }
 
 function readMaxParallel(value: unknown): number {
@@ -131,6 +139,24 @@ export function buildOrchestratorPrompt(
   ].join('\n')
 }
 
+export function extractCreatedJobRef(payload: unknown): { id?: string; name?: string } {
+  if (!payload || typeof payload !== 'object') return {}
+  const direct = payload as { id?: unknown; name?: unknown; job?: { id?: unknown; name?: unknown } }
+  if (typeof direct.id === 'string' || typeof direct.name === 'string') {
+    return {
+      id: asOptionalString(typeof direct.id === 'string' ? direct.id.trim() : ''),
+      name: asOptionalString(typeof direct.name === 'string' ? direct.name.trim() : ''),
+    }
+  }
+  if (direct.job && typeof direct.job === 'object') {
+    return {
+      id: asOptionalString(typeof direct.job.id === 'string' ? direct.job.id.trim() : ''),
+      name: asOptionalString(typeof direct.job.name === 'string' ? direct.job.name.trim() : ''),
+    }
+  }
+  return {}
+}
+
 async function createHermesJob(payload: {
   name: string
   schedule: string
@@ -157,16 +183,16 @@ async function createHermesJob(payload: {
       })
 
   const text = await response.text()
-  let data: { job?: { id?: string; name?: string }; error?: string } = {}
+  let data: { error?: string } & Record<string, unknown> = {}
   try {
-    data = JSON.parse(text)
+    data = JSON.parse(text) as { error?: string } & Record<string, unknown>
   } catch {
     return { error: text || `HTTP ${response.status}` }
   }
   if (!response.ok || data.error) {
     return { error: data.error || `HTTP ${response.status}` }
   }
-  return { id: data.job?.id, name: data.job?.name }
+  return extractCreatedJobRef(data)
 }
 
 export async function launchConductorMission(options: ConductorLaunchOptions): Promise<ConductorLaunchResult> {

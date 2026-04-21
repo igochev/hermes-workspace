@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProject } from '../../server/projects-store'
+import { syncWorkItemExecutionState } from '../../server/work-item-execution'
 import {
   deleteWorkItem,
   getWorkItem,
@@ -56,6 +57,23 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
       GET: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+
+        const sync = new URL(request.url).searchParams.get('syncExecution') === 'true'
+        if (sync) {
+          try {
+            const result = await syncWorkItemExecutionState(params.workItemId)
+            return jsonResponse({
+              workItem: result.workItem,
+              project: result.project,
+              execution: result.execution,
+            })
+          } catch (error) {
+            return jsonResponse(
+              { error: error instanceof Error ? error.message : 'Failed to sync work item execution' },
+              500,
+            )
+          }
         }
 
         const payload = buildWorkItemPayload(params.workItemId)
