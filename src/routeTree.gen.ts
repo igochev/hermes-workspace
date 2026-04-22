@@ -24,13 +24,16 @@ import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as SettingsMcpRouteImport } from './routes/settings/mcp'
+import { Route as ProjectsApprovalsRouteImport } from './routes/projects/approvals'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiWorkItemsRouteImport } from './routes/api/work-items'
+import { Route as ApiWorkItemApprovalsRouteImport } from './routes/api/work-item-approvals'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
@@ -67,6 +70,7 @@ import { Route as ApiConductorSpawnRouteImport } from './routes/api/conductor-sp
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
+import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
 import { Route as ApiWorkItemsWorkItemIdRouteImport } from './routes/api/work-items.$workItemId'
 import { Route as ApiWorkItemApprovalsApprovalIdRouteImport } from './routes/api/work-item-approvals.$approvalId'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
@@ -101,6 +105,7 @@ import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-ta
 import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
 import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
+import { Route as ApiWorkItemsWorkItemIdLifecycleRouteImport } from './routes/api/work-items.$workItemId.lifecycle'
 import { Route as ApiWorkItemsWorkItemIdLaunchRouteImport } from './routes/api/work-items.$workItemId.launch'
 import { Route as ApiWorkItemsWorkItemIdApprovalsRouteImport } from './routes/api/work-items.$workItemId.approvals'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
@@ -181,6 +186,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SettingsRoute,
 } as any)
+const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectsRoute,
+} as any)
 const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/chat/',
   path: '/chat/',
@@ -195,6 +205,11 @@ const SettingsMcpRoute = SettingsMcpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
   getParentRoute: () => SettingsRoute,
+} as any)
+const ProjectsApprovalsRoute = ProjectsApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => ProjectsRoute,
 } as any)
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/$projectId',
@@ -214,6 +229,11 @@ const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
 const ApiWorkItemsRoute = ApiWorkItemsRouteImport.update({
   id: '/api/work-items',
   path: '/api/work-items',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkItemApprovalsRoute = ApiWorkItemApprovalsRouteImport.update({
+  id: '/api/work-item-approvals',
+  path: '/api/work-item-approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
@@ -396,6 +416,11 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
   path: '/api/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectsProjectIdRoute,
+} as any)
 const ApiWorkItemsWorkItemIdRoute = ApiWorkItemsWorkItemIdRouteImport.update({
   id: '/$workItemId',
   path: '/$workItemId',
@@ -403,9 +428,9 @@ const ApiWorkItemsWorkItemIdRoute = ApiWorkItemsWorkItemIdRouteImport.update({
 } as any)
 const ApiWorkItemApprovalsApprovalIdRoute =
   ApiWorkItemApprovalsApprovalIdRouteImport.update({
-    id: '/api/work-item-approvals/$approvalId',
-    path: '/api/work-item-approvals/$approvalId',
-    getParentRoute: () => rootRouteImport,
+    id: '/$approvalId',
+    path: '/$approvalId',
+    getParentRoute: () => ApiWorkItemApprovalsRoute,
   } as any)
 const ApiSkillsUninstallRoute = ApiSkillsUninstallRouteImport.update({
   id: '/uninstall',
@@ -568,6 +593,12 @@ const ProjectsProjectIdWorkItemsWorkItemIdRoute =
     path: '/work-items/$workItemId',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
+const ApiWorkItemsWorkItemIdLifecycleRoute =
+  ApiWorkItemsWorkItemIdLifecycleRouteImport.update({
+    id: '/lifecycle',
+    path: '/lifecycle',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
 const ApiWorkItemsWorkItemIdLaunchRoute =
   ApiWorkItemsWorkItemIdLaunchRouteImport.update({
     id: '/launch',
@@ -644,13 +675,16 @@ export interface FileRoutesByFullPath {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/projects/approvals': typeof ProjectsApprovalsRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
+  '/projects/': typeof ProjectsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
@@ -685,10 +719,12 @@ export interface FileRoutesByFullPath {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
+  '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRoutesByTo {
@@ -701,7 +737,6 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/profiles': typeof ProfilesRoute
-  '/projects': typeof ProjectsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
@@ -741,13 +776,15 @@ export interface FileRoutesByTo {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/projects/approvals': typeof ProjectsApprovalsRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
+  '/projects': typeof ProjectsIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
@@ -782,10 +819,12 @@ export interface FileRoutesByTo {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
+  '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRoutesById {
@@ -840,13 +879,16 @@ export interface FileRoutesById {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/projects/approvals': typeof ProjectsApprovalsRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
+  '/projects/': typeof ProjectsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
@@ -881,10 +923,12 @@ export interface FileRoutesById {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
+  '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRouteTypes {
@@ -940,13 +984,16 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/work-item-approvals'
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/projects/$projectId'
+    | '/projects/approvals'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat/'
+    | '/projects/'
     | '/settings/'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
@@ -981,10 +1028,12 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
+    | '/projects/$projectId/'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
+    | '/api/work-items/$workItemId/lifecycle'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -997,7 +1046,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/profiles'
-    | '/projects'
     | '/skills'
     | '/tasks'
     | '/terminal'
@@ -1037,13 +1085,15 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/work-item-approvals'
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
-    | '/projects/$projectId'
+    | '/projects/approvals'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat'
+    | '/projects'
     | '/settings'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
@@ -1078,10 +1128,12 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
+    | '/projects/$projectId'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
+    | '/api/work-items/$workItemId/lifecycle'
     | '/projects/$projectId/work-items/$workItemId'
   id:
     | '__root__'
@@ -1135,13 +1187,16 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/work-item-approvals'
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/projects/$projectId'
+    | '/projects/approvals'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat/'
+    | '/projects/'
     | '/settings/'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
@@ -1176,10 +1231,12 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
+    | '/projects/$projectId/'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
+    | '/api/work-items/$workItemId/lifecycle'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesById: FileRoutesById
 }
@@ -1234,6 +1291,7 @@ export interface RootRouteChildren {
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
+  ApiWorkItemApprovalsRoute: typeof ApiWorkItemApprovalsRouteWithChildren
   ApiWorkItemsRoute: typeof ApiWorkItemsRouteWithChildren
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
@@ -1257,7 +1315,6 @@ export interface RootRouteChildren {
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
-  ApiWorkItemApprovalsApprovalIdRoute: typeof ApiWorkItemApprovalsApprovalIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1367,6 +1424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/projects/': {
+      id: '/projects/'
+      path: '/'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof ProjectsIndexRouteImport
+      parentRoute: typeof ProjectsRoute
+    }
     '/chat/': {
       id: '/chat/'
       path: '/chat'
@@ -1387,6 +1451,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/mcp'
       preLoaderRoute: typeof SettingsMcpRouteImport
       parentRoute: typeof SettingsRoute
+    }
+    '/projects/approvals': {
+      id: '/projects/approvals'
+      path: '/approvals'
+      fullPath: '/projects/approvals'
+      preLoaderRoute: typeof ProjectsApprovalsRouteImport
+      parentRoute: typeof ProjectsRoute
     }
     '/projects/$projectId': {
       id: '/projects/$projectId'
@@ -1414,6 +1485,13 @@ declare module '@tanstack/react-router' {
       path: '/api/work-items'
       fullPath: '/api/work-items'
       preLoaderRoute: typeof ApiWorkItemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-item-approvals': {
+      id: '/api/work-item-approvals'
+      path: '/api/work-item-approvals'
+      fullPath: '/api/work-item-approvals'
+      preLoaderRoute: typeof ApiWorkItemApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/terminal-stream': {
@@ -1668,6 +1746,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects/$projectId/': {
+      id: '/projects/$projectId/'
+      path: '/'
+      fullPath: '/projects/$projectId/'
+      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
     '/api/work-items/$workItemId': {
       id: '/api/work-items/$workItemId'
       path: '/$workItemId'
@@ -1677,10 +1762,10 @@ declare module '@tanstack/react-router' {
     }
     '/api/work-item-approvals/$approvalId': {
       id: '/api/work-item-approvals/$approvalId'
-      path: '/api/work-item-approvals/$approvalId'
+      path: '/$approvalId'
       fullPath: '/api/work-item-approvals/$approvalId'
       preLoaderRoute: typeof ApiWorkItemApprovalsApprovalIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiWorkItemApprovalsRoute
     }
     '/api/skills/uninstall': {
       id: '/api/skills/uninstall'
@@ -1906,6 +1991,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdWorkItemsWorkItemIdRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/api/work-items/$workItemId/lifecycle': {
+      id: '/api/work-items/$workItemId/lifecycle'
+      path: '/lifecycle'
+      fullPath: '/api/work-items/$workItemId/lifecycle'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdLifecycleRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
     '/api/work-items/$workItemId/launch': {
       id: '/api/work-items/$workItemId/launch'
       path: '/launch'
@@ -1938,10 +2030,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface ProjectsProjectIdRouteChildren {
+  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdWorkItemsWorkItemIdRoute: typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 
 const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
+  ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
   ProjectsProjectIdWorkItemsWorkItemIdRoute:
     ProjectsProjectIdWorkItemsWorkItemIdRoute,
 }
@@ -1951,10 +2045,14 @@ const ProjectsProjectIdRouteWithChildren =
 
 interface ProjectsRouteChildren {
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
+  ProjectsApprovalsRoute: typeof ProjectsApprovalsRoute
+  ProjectsIndexRoute: typeof ProjectsIndexRoute
 }
 
 const ProjectsRouteChildren: ProjectsRouteChildren = {
   ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
+  ProjectsApprovalsRoute: ProjectsApprovalsRoute,
+  ProjectsIndexRoute: ProjectsIndexRoute,
 }
 
 const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
@@ -2065,15 +2163,28 @@ const ApiSkillsRouteWithChildren = ApiSkillsRoute._addFileChildren(
   ApiSkillsRouteChildren,
 )
 
+interface ApiWorkItemApprovalsRouteChildren {
+  ApiWorkItemApprovalsApprovalIdRoute: typeof ApiWorkItemApprovalsApprovalIdRoute
+}
+
+const ApiWorkItemApprovalsRouteChildren: ApiWorkItemApprovalsRouteChildren = {
+  ApiWorkItemApprovalsApprovalIdRoute: ApiWorkItemApprovalsApprovalIdRoute,
+}
+
+const ApiWorkItemApprovalsRouteWithChildren =
+  ApiWorkItemApprovalsRoute._addFileChildren(ApiWorkItemApprovalsRouteChildren)
+
 interface ApiWorkItemsWorkItemIdRouteChildren {
   ApiWorkItemsWorkItemIdApprovalsRoute: typeof ApiWorkItemsWorkItemIdApprovalsRoute
   ApiWorkItemsWorkItemIdLaunchRoute: typeof ApiWorkItemsWorkItemIdLaunchRoute
+  ApiWorkItemsWorkItemIdLifecycleRoute: typeof ApiWorkItemsWorkItemIdLifecycleRoute
 }
 
 const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
   {
     ApiWorkItemsWorkItemIdApprovalsRoute: ApiWorkItemsWorkItemIdApprovalsRoute,
     ApiWorkItemsWorkItemIdLaunchRoute: ApiWorkItemsWorkItemIdLaunchRoute,
+    ApiWorkItemsWorkItemIdLifecycleRoute: ApiWorkItemsWorkItemIdLifecycleRoute,
   }
 
 const ApiWorkItemsWorkItemIdRouteWithChildren =
@@ -2144,6 +2255,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
+  ApiWorkItemApprovalsRoute: ApiWorkItemApprovalsRouteWithChildren,
   ApiWorkItemsRoute: ApiWorkItemsRouteWithChildren,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
@@ -2167,7 +2279,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
-  ApiWorkItemApprovalsApprovalIdRoute: ApiWorkItemApprovalsApprovalIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -61,6 +61,14 @@ export const Route = createFileRoute('/api/projects')({
                 : undefined,
             description:
               typeof body.description === 'string' ? body.description : undefined,
+            phaseProfiles:
+              body.phaseProfiles && typeof body.phaseProfiles === 'object' && !Array.isArray(body.phaseProfiles)
+                ? body.phaseProfiles
+                : undefined,
+            reviewAutoApproval:
+              body.reviewAutoApproval && typeof body.reviewAutoApproval === 'object' && !Array.isArray(body.reviewAutoApproval)
+                ? body.reviewAutoApproval
+                : undefined,
           })
 
           return jsonResponse({ project: toProjectSummary(project) }, 201)

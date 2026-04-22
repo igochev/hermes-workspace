@@ -35,6 +35,10 @@ describe('projects-store', () => {
       repoPath: '/repos/mission-control',
       description: 'Primary Hermes Mission Control repo',
       defaultBranch: 'main',
+      phaseProfiles: {
+        research: 'researcher',
+        build: 'builder',
+      },
     })
 
     expect(project.name).toBe('Mission Control')
@@ -42,6 +46,16 @@ describe('projects-store', () => {
     expect(project.repoPath).toBe('/repos/mission-control')
     expect(project.description).toBe('Primary Hermes Mission Control repo')
     expect(project.defaultBranch).toBe('main')
+    expect(project.phaseProfiles).toEqual({
+      research: 'researcher',
+      build: 'builder',
+      review: '',
+      deploy: '',
+    })
+    expect(project.reviewAutoApproval).toEqual({
+      enabled: false,
+      maxPriority: 'low',
+    })
     expect(project.createdAt).toMatch(/T/)
     expect(project.updatedAt).toBe(project.createdAt)
 
@@ -67,6 +81,15 @@ describe('projects-store', () => {
       description: 'Project detail copy',
       repoUrl: 'https://github.com/igochev/hermes-workspace',
       defaultBranch: 'develop',
+      phaseProfiles: {
+        research: 'researcher',
+        build: 'project-builder',
+        review: 'reviewer',
+      },
+      reviewAutoApproval: {
+        enabled: true,
+        maxPriority: 'medium',
+      },
     })
 
     expect(updated).not.toBeNull()
@@ -75,6 +98,16 @@ describe('projects-store', () => {
     expect(updated?.description).toBe('Project detail copy')
     expect(updated?.repoUrl).toBe('https://github.com/igochev/hermes-workspace')
     expect(updated?.defaultBranch).toBe('develop')
+    expect(updated?.phaseProfiles).toEqual({
+      research: 'researcher',
+      build: 'project-builder',
+      review: 'reviewer',
+      deploy: '',
+    })
+    expect(updated?.reviewAutoApproval).toEqual({
+      enabled: true,
+      maxPriority: 'medium',
+    })
     expect(updated?.updatedAt >= updated!.createdAt).toBe(true)
 
     expect(deleteProject(first.id)).toBe(true)

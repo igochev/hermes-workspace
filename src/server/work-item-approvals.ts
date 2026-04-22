@@ -9,6 +9,7 @@ import {
   getWorkItem,
   updateWorkItem,
   type WorkItemPhase,
+  type WorkItemPriority,
 } from './work-items-store'
 
 export type WorkItemApprovalPhase = 'review' | 'deploy'
@@ -28,6 +29,22 @@ export type WorkItemApprovalRecord = {
   resolutionNotes?: string
   createdAt: string
   updatedAt: string
+}
+
+export type ApprovalInboxEntry = {
+  approvalId: string
+  workItemId: string
+  workItemTitle: string
+  projectId: string
+  projectName: string
+  phase: WorkItemApprovalPhase
+  status: WorkItemApprovalStatus
+  requestedBy: string
+  requestedAt: string
+  resolvedBy?: string
+  resolvedAt?: string
+  notes?: string
+  resolutionNotes?: string
 }
 
 type WorkItemApprovalsFile = {
@@ -128,6 +145,51 @@ export function getWorkItemApproval(approvalId: string): WorkItemApprovalRecord 
   return listWorkItemApprovals().find((approval) => approval.id === approvalId) ?? null
 }
 
+function priorityRank(priority: WorkItemPriority): number {
+  if (priority === 'high') return 3
+  if (priority === 'medium') return 2
+  return 1
+}
+
+function shouldAutoApproveReview(workItemId: string): boolean {
+  const workItem = getWorkItem(workItemId)
+  if (!workItem) return false
+  const project = getProject(workItem.projectId)
+  if (!project?.reviewAutoApproval.enabled) return false
+  return priorityRank(workItem.priority) <= priorityRank(project.reviewAutoApproval.maxPriority)
+}
+
+export function listApprovalInboxEntries(): Array<ApprovalInboxEntry> {
+  return listWorkItemApprovals()
+    .map((approval) => {
+      const workItem = getWorkItem(approval.workItemId)
+      const project = getProject(approval.projectId)
+      if (!workItem || !project) return null
+      return {
+        approvalId: approval.id,
+        workItemId: workItem.id,
+        workItemTitle: workItem.title,
+        projectId: project.id,
+        projectName: project.name,
+        phase: approval.phase,
+        status: approval.status,
+        requestedBy: approval.requestedBy,
+        requestedAt: approval.requestedAt,
+        resolvedBy: approval.resolvedBy,
+        resolvedAt: approval.resolvedAt,
+        notes: approval.notes,
+        resolutionNotes: approval.resolutionNotes,
+      } satisfies ApprovalInboxEntry
+    })
+    .filter((entry): entry is ApprovalInboxEntry => Boolean(entry))
+    .sort((a, b) => {
+      const aPending = a.status === 'pending' ? 1 : 0
+      const bPending = b.status === 'pending' ? 1 : 0
+      if (aPending !== bPending) return bPending - aPending
+      return b.requestedAt.localeCompare(a.requestedAt)
+    })
+}
+
 function updateWorkItemApproval(
   approvalId: string,
   updates: Partial<Omit<WorkItemApprovalRecord, 'id' | 'workItemId' | 'projectId' | 'createdAt' | 'requestedAt'>>,
@@ -169,15 +231,19 @@ export function requestWorkItemReviewApproval(
   if (existing) return existing
 
   const now = new Date().toISOString()
+  const autoApproved = shouldAutoApproveReview(workItem.id)
   const approval = normalizeApproval({
     id: randomUUID(),
     workItemId: workItem.id,
     projectId: workItem.projectId,
     phase: 'review',
-    status: 'pending',
+    status: autoApproved ? 'approved' : 'pending',
     requestedBy: input.requestedBy?.trim() || 'system',
     requestedAt: now,
+    resolvedBy: autoApproved ? 'policy' : undefined,
+    resolvedAt: autoApproved ? now : undefined,
     notes: input.notes,
+    resolutionNotes: autoApproved ? 'Auto-approved by project review policy.' : undefined,
     createdAt: now,
     updatedAt: now,
   })
@@ -185,6 +251,24 @@ export function requestWorkItemReviewApproval(
   const file = readApprovalsFile()
   file.approvals.push(approval)
   writeApprovalsFile({ approvals: file.approvals.map((entry) => normalizeApproval(entry)) })
+
+  if (autoApproved) {
+    const updatedWorkItem = updateWorkItem(workItem.id, {
+      status: 'done',
+      phase: undefined,
+    })
+    if (!updatedWorkItem) throw new Error('Failed to update work item after auto-approval')
+    appendWorkItemHistoryEntry(updatedWorkItem.id, {
+      action: 'status-change',
+      status: 'done',
+      phase: undefined,
+      note: 'Review auto-approved by policy; work item completed.',
+      missionId: updatedWorkItem.missionId,
+      sessionKey: updatedWorkItem.sessionKeys.at(-1),
+      profile: updatedWorkItem.assignedProfile,
+    })
+    return approval
+  }
 
   appendWorkItemHistoryEntry(workItem.id, {
     action: 'note',

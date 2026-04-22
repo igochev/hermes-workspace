@@ -35,6 +35,63 @@ function asOptionalString(value: string): string | undefined {
   return value.length > 0 ? value : undefined
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+}
+
+function readArrayOfStrings(value: unknown): Array<string> {
+  if (!Array.isArray(value)) return []
+  return value
+    .flatMap((entry) => {
+      if (typeof entry === 'string') return [entry.trim()]
+      const record = asRecord(entry)
+      if (!record) return []
+      return [
+        readOptionalString(record.path),
+        readOptionalString(record.file),
+        readOptionalString(record.outputPath),
+        readOptionalString(record.url),
+      ]
+    })
+    .filter(Boolean)
+}
+
+function extractRunEvidence(run: CronRun | null): {
+  branchName?: string
+  prUrl?: string
+  artifactPaths?: Array<string>
+} {
+  const output = asRecord(run?.output)
+  if (!output) return {}
+
+  const artifactPaths = Array.from(
+    new Set(
+      [
+        ...readArrayOfStrings(output.artifactPaths),
+        ...readArrayOfStrings(output.artifacts),
+        ...readArrayOfStrings(output.paths),
+      ].filter(Boolean),
+    ),
+  )
+
+  const branchName =
+    readOptionalString(output.branchName) ||
+    readOptionalString(output.branch) ||
+    readOptionalString(output.gitBranch)
+  const prUrl =
+    readOptionalString(output.prUrl) ||
+    readOptionalString(output.pullRequestUrl) ||
+    readOptionalString(output.prURL)
+
+  return {
+    branchName: branchName || undefined,
+    prUrl: prUrl || undefined,
+    artifactPaths: artifactPaths.length > 0 ? artifactPaths : undefined,
+  }
+}
+
 function deriveExecutionState(job: HermesJobInfo | null): SyncedExecutionState {
   if (!job) return 'unknown'
   if (job.last_status === 'ok') return 'succeeded'
@@ -126,6 +183,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
     (jobRuns.find((run) => typeof run.chatSessionKey === 'string' && run.chatSessionKey.trim().length > 0)
       ?.chatSessionKey ??
       null)
+  const runEvidence = extractRunEvidence(latestRun)
 
   if (latestSessionKey && !updated.sessionKeys.includes(latestSessionKey)) {
     updated = updateWorkItem(updated.id, {
@@ -133,6 +191,23 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       ...missionFields,
     })
     if (!updated) throw new Error('Failed to persist latest execution session key')
+  }
+
+  if (
+    runEvidence.branchName ||
+    runEvidence.prUrl ||
+    (runEvidence.artifactPaths && runEvidence.artifactPaths.length > 0)
+  ) {
+    updated = updateWorkItem(updated.id, {
+      branchName: runEvidence.branchName ?? updated.branchName,
+      prUrl: runEvidence.prUrl ?? updated.prUrl,
+      artifactPaths:
+        runEvidence.artifactPaths && runEvidence.artifactPaths.length > 0
+          ? Array.from(new Set([...updated.artifactPaths, ...runEvidence.artifactPaths]))
+          : updated.artifactPaths,
+      ...missionFields,
+    })
+    if (!updated) throw new Error('Failed to persist Hermes execution evidence')
   }
 
   let transitionApplied: WorkItemExecutionSyncResult['execution']['transitionApplied'] = null

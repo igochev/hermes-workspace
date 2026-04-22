@@ -49,12 +49,17 @@ function normalizeLaunchPhase(value: unknown, fallback?: WorkItemPhase): WorkIte
 
 function resolveLaunchProfile(
   workItem: WorkItemRecord,
+  project: ProjectRecord,
   phase: WorkItemPhase,
-  phaseProfiles: ConductorPhaseProfiles,
+  requestPhaseProfiles: ConductorPhaseProfiles,
 ): string | null {
   const explicit = readOptionalString(workItem.assignedProfile)
   if (explicit) return explicit
-  return getMappedPhaseProfile(phaseProfiles, phase as ConductorPhaseKey)
+
+  const projectProfile = getMappedPhaseProfile(project.phaseProfiles, phase as ConductorPhaseKey)
+  if (projectProfile) return projectProfile
+
+  return getMappedPhaseProfile(requestPhaseProfiles, phase as ConductorPhaseKey)
 }
 
 function buildAcceptanceCriteriaBlock(workItem: WorkItemRecord): string[] {
@@ -65,6 +70,23 @@ function buildAcceptanceCriteriaBlock(workItem: WorkItemRecord): string[] {
 function buildNotesBlock(workItem: WorkItemRecord): string[] {
   if (workItem.notes.length === 0) return []
   return ['Operator notes:', ...workItem.notes.map((item) => `- ${item}`)]
+}
+
+function buildPhaseOutcomeBlock(phase: WorkItemPhase): string[] {
+  if (phase === 'research') {
+    return [
+      'Primary outcome for this research/planning launch:',
+      '- turn the idea/request into a grounded plan',
+      '- draft acceptance criteria',
+      '- identify open questions, constraints, and recommended next build slice',
+      '- If acceptance criteria are incomplete, propose them explicitly in the output',
+    ]
+  }
+
+  return [
+    'Primary outcome for this launch:',
+    '- execute the requested phase with concrete repo-grounded outputs',
+  ]
 }
 
 export function buildWorkItemLaunchGoal(params: {
@@ -86,6 +108,8 @@ export function buildWorkItemLaunchGoal(params: {
     '',
     'Description:',
     workItem.description || 'No additional description provided.',
+    '',
+    ...buildPhaseOutcomeBlock(phase),
     '',
     ...buildAcceptanceCriteriaBlock(workItem),
     ...(workItem.notes.length > 0 ? ['', ...buildNotesBlock(workItem)] : []),
@@ -109,15 +133,18 @@ export async function launchWorkItemIntoConductor(
 
   const phaseProfiles = normalizePhaseProfiles(request.phaseProfiles)
   const phase = normalizeLaunchPhase(request.phase, workItem.phase)
-  const profile = resolveLaunchProfile(workItem, phase, phaseProfiles)
+  const profile = resolveLaunchProfile(workItem, project, phase, phaseProfiles)
   const goal = buildWorkItemLaunchGoal({ workItem, project, phase, profile })
 
   const launch = await launchConductorMission({
     goal,
-    orchestratorModel: request.orchestratorModel,
-    workerModel: request.workerModel,
-    projectsDir: request.projectsDir,
-    maxParallel: request.maxParallel,
+    orchestratorModel: readOptionalString(request.orchestratorModel),
+    workerModel: readOptionalString(request.workerModel),
+    projectsDir: readOptionalString(request.projectsDir),
+    maxParallel:
+      typeof request.maxParallel === 'number' && Number.isFinite(request.maxParallel)
+        ? request.maxParallel
+        : undefined,
     supervised: request.supervised === true,
     phaseProfiles,
     name: `work-item-${phase}-${project.slug}-${workItem.id.slice(0, 8)}`,

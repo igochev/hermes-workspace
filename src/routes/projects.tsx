@@ -1,13 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
-import { ProjectsScreen } from '@/screens/projects/projects-screen'
+import { Outlet, createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/projects')({
   ssr: false,
-  component: ProjectsRoute,
+  component: ProjectsLayoutRoute,
 })
 
-function ProjectsRoute() {
-  usePageTitle('Projects')
-  return <ProjectsScreen />
+export function ProjectsLayoutFrame({ children }: { children?: React.ReactNode }) {
+  return <div data-projects-layout className="min-h-full">{children ?? <Outlet />}</div>
+}
+
+function ProjectsLayoutRoute() {
+  return <ProjectsLayoutFrame />
 }

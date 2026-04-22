@@ -6,6 +6,7 @@ import path from 'node:path'
 import { createProject } from './projects-store'
 import { createWorkItem, getWorkItem } from './work-items-store'
 import {
+  listApprovalInboxEntries,
   listWorkItemApprovals,
   requestWorkItemReviewApproval,
   resolveWorkItemApprovalDecision,
@@ -123,6 +124,88 @@ describe('work-item-approvals', () => {
       status: 'active',
       phase: 'build',
       note: 'Review requested changes; returned work item to build.',
+    })
+  })
+
+  it('lists approvals inbox entries with project and work item context, pending first', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+    })
+    const older = createWorkItem({
+      projectId: project.id,
+      title: 'Older review item',
+      status: 'active',
+      phase: 'review',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+    })
+    const newer = createWorkItem({
+      projectId: project.id,
+      title: 'Newer review item',
+      status: 'active',
+      phase: 'review',
+      priority: 'medium',
+      repoPathSnapshot: project.repoPath,
+    })
+
+    const firstApproval = requestWorkItemReviewApproval(older.id, { requestedBy: 'operator' })
+    const secondApproval = requestWorkItemReviewApproval(newer.id, { requestedBy: 'operator' })
+    resolveWorkItemApprovalDecision(firstApproval.id, {
+      decision: 'approved',
+      resolvedBy: 'D3n13r',
+    })
+
+    const entries = listApprovalInboxEntries()
+
+    expect(entries).toHaveLength(2)
+    expect(entries[0]).toMatchObject({
+      approvalId: secondApproval.id,
+      projectName: 'Mission Control Demo',
+      workItemTitle: 'Newer review item',
+      status: 'pending',
+    })
+    expect(entries[1]).toMatchObject({
+      approvalId: firstApproval.id,
+      workItemTitle: 'Older review item',
+      status: 'approved',
+    })
+  })
+
+  it('auto-approves review work items when the project policy allows the priority', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      reviewAutoApproval: {
+        enabled: true,
+        maxPriority: 'low',
+      },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Low-risk review item',
+      status: 'active',
+      phase: 'review',
+      priority: 'low',
+      repoPathSnapshot: project.repoPath,
+    })
+
+    const approval = requestWorkItemReviewApproval(workItem.id, {
+      requestedBy: 'operator',
+      notes: 'Safe to auto-approve',
+    })
+
+    expect(approval.status).toBe('approved')
+    expect(approval.resolvedBy).toBe('policy')
+    expect(approval.resolutionNotes).toBe('Auto-approved by project review policy.')
+    expect(getWorkItem(workItem.id)).toMatchObject({
+      status: 'done',
+      phase: undefined,
+    })
+    expect(getWorkItem(workItem.id)?.history.at(-1)).toMatchObject({
+      action: 'status-change',
+      status: 'done',
+      note: 'Review auto-approved by policy; work item completed.',
     })
   })
 })

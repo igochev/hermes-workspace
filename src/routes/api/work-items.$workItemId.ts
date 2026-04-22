@@ -68,7 +68,10 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
           try {
             const result = await syncWorkItemExecutionState(params.workItemId)
             return jsonResponse({
-              workItem: result.workItem,
+              workItem: {
+                ...result.workItem,
+                approvals: listWorkItemApprovals(result.workItem.id).slice().reverse(),
+              },
               project: result.project,
               execution: result.execution,
             })

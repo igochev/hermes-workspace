@@ -3,6 +3,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
+import { normalizePhaseProfiles, type ConductorPhaseProfiles } from '../lib/conductor-phase-profiles'
+
+export type ReviewAutoApprovalPolicy = {
+  enabled: boolean
+  maxPriority: 'low' | 'medium' | 'high'
+}
+
 export type ProjectRecord = {
   id: string
   name: string
@@ -11,6 +18,8 @@ export type ProjectRecord = {
   repoUrl?: string
   defaultBranch?: string
   description?: string
+  phaseProfiles: ConductorPhaseProfiles
+  reviewAutoApproval: ReviewAutoApprovalPolicy
   createdAt: string
   updatedAt: string
 }
@@ -26,6 +35,8 @@ type CreateProjectInput = {
   repoUrl?: string
   defaultBranch?: string
   description?: string
+  phaseProfiles?: unknown
+  reviewAutoApproval?: unknown
 }
 
 type UpdateProjectInput = Partial<Omit<ProjectRecord, 'id' | 'createdAt' | 'updatedAt'>>
@@ -74,6 +85,17 @@ function asOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
 }
 
+function normalizeReviewAutoApprovalPolicy(value: unknown): ReviewAutoApprovalPolicy {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return {
+    enabled: candidate.enabled === true,
+    maxPriority:
+      candidate.maxPriority === 'medium' || candidate.maxPriority === 'high'
+        ? candidate.maxPriority
+        : 'low',
+  }
+}
+
 function slugifyProjectName(name: string): string {
   const normalized = name
     .trim()
@@ -97,7 +119,13 @@ function uniqueSlug(baseSlug: string, projects: Array<ProjectRecord>, excludeId?
   return `${baseSlug}-${index}`
 }
 
-function normalizeProject(project: Partial<ProjectRecord> & Pick<ProjectRecord, 'id' | 'name' | 'slug' | 'repoPath' | 'createdAt' | 'updatedAt'>): ProjectRecord {
+function normalizeProject(
+  project: (Omit<Partial<ProjectRecord>, 'phaseProfiles' | 'reviewAutoApproval'> & {
+    phaseProfiles?: unknown
+    reviewAutoApproval?: unknown
+  }) &
+    Pick<ProjectRecord, 'id' | 'name' | 'slug' | 'repoPath' | 'createdAt' | 'updatedAt'>,
+): ProjectRecord {
   return {
     id: project.id,
     name: project.name.trim(),
@@ -106,6 +134,10 @@ function normalizeProject(project: Partial<ProjectRecord> & Pick<ProjectRecord, 
     repoUrl: asOptionalString(project.repoUrl),
     defaultBranch: asOptionalString(project.defaultBranch),
     description: asOptionalString(project.description),
+    phaseProfiles: normalizePhaseProfiles((project as Partial<ProjectRecord>).phaseProfiles),
+    reviewAutoApproval: normalizeReviewAutoApprovalPolicy(
+      (project as Partial<ProjectRecord>).reviewAutoApproval,
+    ),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   }
@@ -131,6 +163,8 @@ export function createProject(input: CreateProjectInput): ProjectRecord {
     repoUrl: input.repoUrl,
     defaultBranch: input.defaultBranch,
     description: input.description,
+    phaseProfiles: input.phaseProfiles,
+    reviewAutoApproval: input.reviewAutoApproval,
     createdAt: now,
     updatedAt: now,
   })
@@ -161,6 +195,12 @@ export function updateProject(projectId: string, updates: UpdateProjectInput): P
       typeof updates.repoPath === 'string' && updates.repoPath.trim().length > 0
         ? updates.repoPath.trim()
         : current.repoPath,
+    phaseProfiles:
+      updates.phaseProfiles !== undefined ? updates.phaseProfiles : current.phaseProfiles,
+    reviewAutoApproval:
+      updates.reviewAutoApproval !== undefined
+        ? updates.reviewAutoApproval
+        : current.reviewAutoApproval,
     createdAt: current.createdAt,
     updatedAt: new Date().toISOString(),
   })

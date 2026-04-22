@@ -2,6 +2,17 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  fetchProjects,
+  fetchWorkItems,
+  WORK_ITEM_PHASE_LABELS,
+  type ProjectSummary,
+  type WorkItemRecord,
+} from '@/lib/projects-api'
+import {
+  fetchApprovalInbox,
+  type ApprovalInboxEntry,
+} from '@/lib/work-item-approvals-api'
+import {
   Area,
   AreaChart,
   CartesianGrid,
@@ -22,6 +33,42 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Moon02Icon, Sun02Icon } from '@hugeicons/core-free-icons'
 
 // ── Helpers ──────────────────────────────────────────────────────
+
+type MissionControlSummary = {
+  projects: number
+  workItems: number
+  pendingApprovals: number
+  blockedWorkItems: number
+  runningMissions: number
+}
+
+type MissionControlQueueEntry = {
+  id: string
+  title: string
+  subtitle: string
+  detail: string
+  href: string
+}
+
+type MissionControlQueues = {
+  approvals: Array<MissionControlQueueEntry>
+  blocked: Array<MissionControlQueueEntry>
+  running: Array<MissionControlQueueEntry>
+}
+
+export const DASHBOARD_MISSION_CONTROL_QUERY_KEY = ['dashboard', 'mission-control'] as const
+export const DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS: Record<keyof MissionControlSummary, string> = {
+  projects: 'Projects',
+  workItems: 'Work items',
+  pendingApprovals: 'Pending approvals',
+  blockedWorkItems: 'Blocked work',
+  runningMissions: 'Running missions',
+}
+export const DASHBOARD_MISSION_CONTROL_QUEUE_TITLES: Record<keyof MissionControlQueues, string> = {
+  approvals: 'Pending approvals',
+  blocked: 'Blocked work',
+  running: 'Running missions',
+}
 
 function timeAgo(ts: number): string {
   const diff = Date.now() / 1000 - ts
@@ -48,6 +95,68 @@ function themeColor(name: string, fallback: string): string {
 function alpha(color: string, amount: number): string {
   const pct = Math.max(0, Math.min(100, Math.round(amount * 100)))
   return `color-mix(in srgb, ${color} ${pct}%, transparent)`
+}
+
+export function buildDashboardMissionControlSummary(
+  projects: Array<ProjectSummary>,
+  workItems: Array<WorkItemRecord>,
+  approvals: Array<ApprovalInboxEntry>,
+): MissionControlSummary {
+  return {
+    projects: projects.length,
+    workItems: workItems.length,
+    pendingApprovals: approvals.filter((approval) => approval.status === 'pending').length,
+    blockedWorkItems: workItems.filter((workItem) => workItem.status === 'blocked').length,
+    runningMissions: workItems.filter((workItem) => workItem.missionState === 'running').length,
+  }
+}
+
+export function buildDashboardMissionControlQueues(
+  projects: Array<ProjectSummary>,
+  workItems: Array<WorkItemRecord>,
+  approvals: Array<ApprovalInboxEntry>,
+): MissionControlQueues {
+  const projectNames = new Map(projects.map((project) => [project.id, project.name]))
+
+  return {
+    approvals: approvals
+      .filter((approval) => approval.status === 'pending')
+      .sort((left, right) => Date.parse(right.requestedAt) - Date.parse(left.requestedAt))
+      .slice(0, 5)
+      .map((approval) => ({
+        id: approval.approvalId,
+        title: approval.workItemTitle,
+        subtitle: approval.projectName || projectNames.get(approval.projectId) || 'Unknown project',
+        detail: `${approval.phase === 'deploy' ? 'Deploy' : 'Review'} approval · requested ${approval.requestedAt}`,
+        href: `/projects/${approval.projectId}/work-items/${approval.workItemId}`,
+      })),
+    blocked: workItems
+      .filter((workItem) => workItem.status === 'blocked')
+      .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+      .slice(0, 5)
+      .map((workItem) => ({
+        id: workItem.id,
+        title: workItem.title,
+        subtitle: projectNames.get(workItem.projectId) || 'Unknown project',
+        detail: workItem.missionLastError || 'Operator follow-up needed before this work can continue.',
+        href: `/projects/${workItem.projectId}/work-items/${workItem.id}`,
+      })),
+    running: workItems
+      .filter((workItem) => workItem.missionState === 'running')
+      .sort(
+        (left, right) =>
+          Date.parse(right.missionLastRunAt ?? right.updatedAt) -
+          Date.parse(left.missionLastRunAt ?? left.updatedAt),
+      )
+      .slice(0, 5)
+      .map((workItem) => ({
+        id: workItem.id,
+        title: workItem.title,
+        subtitle: projectNames.get(workItem.projectId) || 'Unknown project',
+        detail: `${workItem.phase ? WORK_ITEM_PHASE_LABELS[workItem.phase] : 'Mission'} running`,
+        href: `/projects/${workItem.projectId}/work-items/${workItem.id}`,
+      })),
+  }
 }
 
 function readDashboardPalette() {
@@ -245,6 +354,59 @@ function MetricTile({
         >
           {icon}
         </div>
+      </div>
+    </GlassCard>
+  )
+}
+
+function MissionControlQueueCard({
+  title,
+  entries,
+  accentColor,
+  emptyCopy,
+  onOpenAll,
+  onOpenEntry,
+}: {
+  title: string
+  entries: Array<MissionControlQueueEntry>
+  accentColor: string
+  emptyCopy: string
+  onOpenAll: () => void
+  onOpenEntry: (href: string) => void
+}) {
+  return (
+    <GlassCard
+      title={title}
+      titleRight={
+        <button
+          type="button"
+          className="text-[10px] text-muted hover:text-neutral-300 transition-colors"
+          onClick={onOpenAll}
+        >
+          View all →
+        </button>
+      }
+      accentColor={accentColor}
+      className="h-full"
+      noPadding
+    >
+      <div className="py-2">
+        {entries.length === 0 ? (
+          <div className="px-5 py-10 text-center text-xs text-muted">{emptyCopy}</div>
+        ) : (
+          entries.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => onOpenEntry(entry.href)}
+              className="w-full px-5 py-3 text-left transition-colors hover:bg-[var(--theme-card2)]"
+            >
+              <div className="text-sm font-semibold text-ink">{entry.title}</div>
+              <div className="mt-1 text-xs font-medium text-[var(--theme-text)]">{entry.subtitle}</div>
+              <div className="mt-1 text-[11px] text-muted">{entry.detail}</div>
+            </button>
+          ))
+        )}
       </div>
     </GlassCard>
   )
@@ -702,6 +864,29 @@ export function DashboardScreen() {
 
   const sessions = (sessionsQuery.data ?? []) as HermesSession[]
 
+  const missionProjectsQuery = useQuery({
+    queryKey: [...DASHBOARD_MISSION_CONTROL_QUERY_KEY, 'projects'],
+    queryFn: fetchProjects,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  })
+  const missionWorkItemsQuery = useQuery({
+    queryKey: [...DASHBOARD_MISSION_CONTROL_QUERY_KEY, 'work-items'],
+    queryFn: () => fetchWorkItems(),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  })
+  const missionApprovalsQuery = useQuery({
+    queryKey: [...DASHBOARD_MISSION_CONTROL_QUERY_KEY, 'approvals'],
+    queryFn: fetchApprovalInbox,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  })
+
+  const missionProjects = missionProjectsQuery.data ?? []
+  const missionWorkItems = missionWorkItemsQuery.data ?? []
+  const missionApprovals = missionApprovalsQuery.data ?? []
+
   const stats = useMemo(() => {
     let totalMessages = 0,
       totalToolCalls = 0,
@@ -738,6 +923,14 @@ export function DashboardScreen() {
 
   const costEstimate = `~$${((stats.totalTokens / 1_000_000) * 5).toFixed(2)}`
   const palette = useDashboardPalette()
+  const missionControlSummary = useMemo(
+    () => buildDashboardMissionControlSummary(missionProjects, missionWorkItems, missionApprovals),
+    [missionApprovals, missionProjects, missionWorkItems],
+  )
+  const missionControlQueues = useMemo(
+    () => buildDashboardMissionControlQueues(missionProjects, missionWorkItems, missionApprovals),
+    [missionApprovals, missionProjects, missionWorkItems],
+  )
 
   const updateSettings = useSettingsStore((state) => state.updateSettings)
   const [isDark, setIsDark] = useState(() => {
@@ -802,6 +995,19 @@ export function DashboardScreen() {
         </p>
         <div className="mt-1 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
           <QuickAction
+            label="Projects"
+            icon="🗂️"
+            accentColor={palette.warning}
+            onClick={() => navigate({ to: '/projects' })}
+          />
+          <QuickAction
+            label="Approvals"
+            icon="✅"
+            accentColor={palette.danger}
+            onClick={() => navigate({ to: '/projects/approvals' })}
+            badge={missionControlSummary.pendingApprovals > 0 ? String(missionControlSummary.pendingApprovals) : undefined}
+          />
+          <QuickAction
             label="New Chat"
             icon="💬"
             accentColor={palette.accent}
@@ -833,6 +1039,96 @@ export function DashboardScreen() {
             onClick={() => navigate({ to: '/settings' })}
           />
         </div>
+      </div>
+
+      {/* ── Mission Control Overview ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {(Object.keys(DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS) as Array<keyof MissionControlSummary>).map((key) => {
+          const accentColor =
+            key === 'pendingApprovals'
+              ? palette.warning
+              : key === 'blockedWorkItems'
+                ? palette.danger
+                : key === 'runningMissions'
+                  ? palette.accent
+                  : palette.accentSecondary
+          return (
+            <MetricTile
+              key={key}
+              label={DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS[key]}
+              value={String(missionControlSummary[key])}
+              icon={
+                key === 'projects'
+                  ? '🗂️'
+                  : key === 'workItems'
+                    ? '📋'
+                    : key === 'pendingApprovals'
+                      ? '✅'
+                      : key === 'blockedWorkItems'
+                        ? '⛔'
+                        : '🚀'
+              }
+              accentColor={accentColor}
+              sub={
+                key === 'pendingApprovals'
+                  ? 'Operator decisions waiting now'
+                  : key === 'blockedWorkItems'
+                    ? 'Needs follow-up before work can continue'
+                    : key === 'runningMissions'
+                      ? 'Execution currently in flight'
+                      : undefined
+              }
+            />
+          )
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <MissionControlQueueCard
+          title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.approvals}
+          entries={missionControlQueues.approvals}
+          accentColor={palette.warning}
+          emptyCopy="No pending approvals in the operator queue."
+          onOpenAll={() => navigate({ to: '/projects/approvals' })}
+          onOpenEntry={(href) => {
+            const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
+            if (!match) return
+            navigate({
+              to: '/projects/$projectId/work-items/$workItemId',
+              params: { projectId: match[1], workItemId: match[2] },
+            })
+          }}
+        />
+        <MissionControlQueueCard
+          title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.blocked}
+          entries={missionControlQueues.blocked}
+          accentColor={palette.danger}
+          emptyCopy="No blocked work items right now."
+          onOpenAll={() => navigate({ to: '/projects' })}
+          onOpenEntry={(href) => {
+            const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
+            if (!match) return
+            navigate({
+              to: '/projects/$projectId/work-items/$workItemId',
+              params: { projectId: match[1], workItemId: match[2] },
+            })
+          }}
+        />
+        <MissionControlQueueCard
+          title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.running}
+          entries={missionControlQueues.running}
+          accentColor={palette.accent}
+          emptyCopy="No running missions at the moment."
+          onOpenAll={() => navigate({ to: '/projects' })}
+          onOpenEntry={(href) => {
+            const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
+            if (!match) return
+            navigate({
+              to: '/projects/$projectId/work-items/$workItemId',
+              params: { projectId: match[1], workItemId: match[2] },
+            })
+          }}
+        />
       </div>
 
       {/* ── Metrics Row ── */}

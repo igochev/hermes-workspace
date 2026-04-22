@@ -2,13 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   deleteProject,
-  getProject,
   updateProject,
 } from '../../server/projects-store'
-import {
-  deleteWorkItemsForProject,
-  listWorkItems,
-} from '../../server/work-items-store'
+import { buildProjectDetailPayload } from '../../server/project-detail'
+import { deleteWorkItemsForProject } from '../../server/work-items-store'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -18,18 +15,7 @@ function jsonResponse(data: unknown, status = 200) {
 }
 
 function buildProjectPayload(projectId: string) {
-  const project = getProject(projectId)
-  if (!project) return null
-  const workItems = listWorkItems({ projectId })
-  return {
-    project: {
-      ...project,
-      workItemCount: workItems.length,
-      activeWorkItemCount: workItems.filter((item) => item.status === 'active').length,
-      doneWorkItemCount: workItems.filter((item) => item.status === 'done').length,
-    },
-    workItems,
-  }
+  return buildProjectDetailPayload(projectId)
 }
 
 export const Route = createFileRoute('/api/projects/$projectId')({
@@ -67,6 +53,18 @@ export const Route = createFileRoute('/api/projects/$projectId')({
               body.description === null || typeof body.description === 'string'
                 ? (body.description ?? undefined)
                 : undefined,
+            phaseProfiles:
+              body.phaseProfiles === null
+                ? { research: '', build: '', review: '', deploy: '' }
+                : body.phaseProfiles && typeof body.phaseProfiles === 'object' && !Array.isArray(body.phaseProfiles)
+                  ? body.phaseProfiles
+                  : undefined,
+            reviewAutoApproval:
+              body.reviewAutoApproval === null
+                ? { enabled: false, maxPriority: 'low' }
+                : body.reviewAutoApproval && typeof body.reviewAutoApproval === 'object' && !Array.isArray(body.reviewAutoApproval)
+                  ? body.reviewAutoApproval
+                  : undefined,
           })
 
           if (!project) return jsonResponse({ error: 'Project not found' }, 404)

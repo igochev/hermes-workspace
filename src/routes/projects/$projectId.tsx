@@ -1,14 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
-import { ProjectDetailScreen } from '@/screens/projects/project-detail-screen'
+import { Outlet, createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/projects/$projectId')({
   ssr: false,
-  component: ProjectDetailRoute,
+  component: ProjectDetailLayoutRoute,
 })
 
-function ProjectDetailRoute() {
-  const { projectId } = Route.useParams()
-  usePageTitle('Project Detail')
-  return <ProjectDetailScreen projectId={projectId} />
+export function ProjectDetailLayoutFrame({ children }: { children?: React.ReactNode }) {
+  return <div data-project-detail-layout className="min-h-full">{children ?? <Outlet />}</div>
+}
+
+function ProjectDetailLayoutRoute() {
+  return <ProjectDetailLayoutFrame />
 }

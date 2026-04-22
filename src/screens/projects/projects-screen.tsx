@@ -27,6 +27,15 @@ import { cn } from '@/lib/utils'
 
 export const PROJECTS_QUERY_KEY = ['mission-control', 'projects'] as const
 
+export const PROJECTS_PANEL_CLASS =
+  'rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-sm backdrop-blur-xl'
+
+export const PROJECTS_CARD_CLASS =
+  'group rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[var(--theme-accent)] hover:shadow-lg'
+
+export const PROJECTS_STAT_PILL_CLASS =
+  'inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)]'
+
 const EMPTY_PROJECT_FORM: CreateProjectInput = {
   name: '',
   repoPath: '',
@@ -99,23 +108,23 @@ export function ProjectsScreen() {
   return (
     <div className="min-h-full bg-surface text-ink">
       <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
-        <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-5 backdrop-blur-xl">
+        <header className={PROJECTS_PANEL_CLASS}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white/70 px-3 py-1 text-xs font-medium text-primary-700">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-text)]">
                 <HugeiconsIcon icon={Folder01Icon} size={14} />
                 Mission Control
               </div>
               <div>
                 <h1 className="text-2xl font-medium text-ink">Projects</h1>
-                <p className="mt-2 max-w-3xl text-sm text-primary-600">
+                <p className="mt-2 max-w-3xl text-sm text-[var(--theme-muted)]">
                   Canonical project and work-item control plane for Hermes Workspace.
                   Phase 1 is file-backed and merge-safe by design.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-primary-600">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--theme-muted)]">
               <StatPill label="Projects" value={projects.length} />
               <StatPill label="Work items" value={groupedCounts.total} />
               <StatPill label="Active" value={groupedCounts.active} />
@@ -123,11 +132,17 @@ export function ProjectsScreen() {
               <button
                 type="button"
                 onClick={() => void projectsQuery.refetch()}
-                className="inline-flex items-center gap-1 rounded-full border border-primary-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100"
+                className={`${PROJECTS_STAT_PILL_CLASS} transition-colors hover:bg-[var(--theme-card2)]/80`}
               >
                 <HugeiconsIcon icon={RefreshIcon} size={14} />
                 Refresh
               </button>
+              <Link
+                to="/projects/approvals"
+                className={PROJECTS_STAT_PILL_CLASS}
+              >
+                Approvals Inbox
+              </Link>
               <button
                 type="button"
                 onClick={() => setShowCreate((value) => !value)}
@@ -140,7 +155,7 @@ export function ProjectsScreen() {
           </div>
 
           {showCreate ? (
-            <div className="mt-5 grid gap-3 rounded-2xl border border-primary-200 bg-white/70 p-4 md:grid-cols-2">
+            <div className="mt-5 grid gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4 md:grid-cols-2">
               <div className="space-y-1 md:col-span-1">
                 <label className="text-xs font-medium uppercase tracking-wide text-primary-500">
                   Name
@@ -244,36 +259,36 @@ export function ProjectsScreen() {
                   key={project.id}
                   to="/projects/$projectId"
                   params={{ projectId: project.id }}
-                  className="group rounded-2xl border border-primary-200 bg-white/80 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent-200 hover:shadow-lg"
+                  className={PROJECTS_CARD_CLASS}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1 min-w-0">
-                      <p className="text-xs font-medium uppercase tracking-wide text-primary-500">
+                      <p className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
                         {project.slug}
                       </p>
-                      <h2 className="truncate text-lg font-semibold text-primary-900">
+                      <h2 className="truncate text-lg font-semibold text-ink">
                         {project.name}
                       </h2>
                     </div>
                     <HugeiconsIcon
                       icon={ArrowRight01Icon}
                       size={18}
-                      className="text-primary-400 transition-transform group-hover:translate-x-0.5"
+                      className="text-[var(--theme-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--theme-text)]"
                     />
                   </div>
 
-                  <p className="mt-3 line-clamp-2 min-h-10 text-sm text-primary-600">
+                  <p className="mt-3 line-clamp-2 min-h-10 text-sm text-[var(--theme-muted)]">
                     {project.description || 'No project description yet.'}
                   </p>
 
-                  <dl className="mt-4 space-y-2 text-sm text-primary-700">
+                  <dl className="mt-4 space-y-2 text-sm text-[var(--theme-text)]">
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-primary-500">
+                      <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
                         Repo Path
                       </dt>
                       <dd className="truncate font-medium">{project.repoPath}</dd>
                     </div>
-                    <div className="flex flex-wrap gap-2 text-xs text-primary-600">
+                    <div className="flex flex-wrap gap-2 text-xs text-[var(--theme-muted)]">
                       <span className="rounded-full border border-primary-200 bg-primary-50 px-2 py-1">
                         {buildProjectStatsLine(project)}
                       </span>
@@ -323,8 +338,8 @@ export function ProjectsScreen() {
 
 function StatPill({ label, value }: { label: string; value: number }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-primary-200 bg-white/80 px-3 py-1.5">
-      <span className="font-semibold text-primary-900">{value}</span>
+    <span className={PROJECTS_STAT_PILL_CLASS}>
+      <span className="font-semibold text-ink">{value}</span>
       <span>{label}</span>
     </span>
   )
@@ -332,14 +347,14 @@ function StatPill({ label, value }: { label: string; value: number }) {
 
 function EmptyProjectsState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-primary-200 bg-primary-50/60 p-8 text-center">
+    <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-8 text-center">
       <div className="max-w-lg space-y-4">
-        <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-600 shadow-sm">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-text)] shadow-sm">
           <HugeiconsIcon icon={Folder01Icon} size={24} strokeWidth={1.7} />
         </div>
         <div>
-          <h2 className="text-xl font-semibold text-primary-900">No projects yet</h2>
-          <p className="mt-2 text-sm text-primary-600">
+          <h2 className="text-xl font-semibold text-ink">No projects yet</h2>
+          <p className="mt-2 text-sm text-[var(--theme-muted)]">
             Create your first Mission Control project to start tracking canonical work items.
           </p>
         </div>

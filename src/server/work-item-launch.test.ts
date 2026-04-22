@@ -81,6 +81,56 @@ describe('work-item-launch', () => {
     expect(goal).toContain('User approved Phase 2')
   })
 
+  it('uses planning-oriented launch guidance for research-phase work items', () => {
+    const goal = buildWorkItemLaunchGoal({
+      project: {
+        id: 'project-1',
+        name: 'Mission Control',
+        slug: 'mission-control',
+        repoPath: '/repos/mission-control',
+        repoUrl: 'https://github.com/example/mission-control',
+        defaultBranch: 'main',
+        description: 'workspace evolution',
+        phaseProfiles: {
+          research: 'researcher',
+          build: 'builder',
+          review: 'reviewer',
+          deploy: 'deployer',
+        },
+        reviewAutoApproval: {
+          enabled: false,
+          maxPriority: 'low',
+        },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      workItem: {
+        id: 'work-item-2',
+        projectId: 'project-1',
+        title: 'Turn operator idea into a plan',
+        description: 'Capture the idea, clarify it, and prepare a build-ready plan.',
+        status: 'inbox',
+        phase: 'research',
+        priority: 'medium',
+        repoPathSnapshot: '/repos/mission-control',
+        sessionKeys: [],
+        artifactPaths: [],
+        acceptanceCriteria: [],
+        notes: ['Started as an idea-capture request.'],
+        history: [],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      phase: 'research',
+      profile: 'researcher',
+    })
+
+    expect(goal).toContain('Launch phase: research')
+    expect(goal).toContain('Primary outcome for this research/planning launch:')
+    expect(goal).toContain('draft acceptance criteria')
+    expect(goal).toContain('If acceptance criteria are incomplete, propose them explicitly')
+  })
+
   it('launches a work item into conductor and records mission linkage history', async () => {
     const project = createProject({
       name: 'Mission Control Demo',
@@ -145,5 +195,42 @@ describe('work-item-launch', () => {
     expect(persisted?.missionLink).toBe('/jobs?jobId=job-123')
     expect(persisted?.missionState).toBe('scheduled')
     expect(persisted?.history.at(-1)?.action).toBe('launch')
+  })
+
+  it('prefers project phase routing over global defaults when the work item has no explicit profile', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+      phaseProfiles: {
+        build: 'project-builder',
+        review: 'project-reviewer',
+      },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Use project-level build routing',
+      status: 'ready',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-456_pending',
+      sessionKeyPrefix: 'cron_job-456_',
+      jobId: 'job-456',
+      jobName: 'work-item-build-demo-project-routing',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'build',
+      phaseProfiles: { build: 'global-builder' },
+    })
+
+    expect(result.launch.profile).toBe('project-builder')
+    expect(result.workItem.history.at(-1)?.profile).toBe('project-builder')
   })
 })

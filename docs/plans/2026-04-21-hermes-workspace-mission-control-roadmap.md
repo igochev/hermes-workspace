@@ -52,6 +52,39 @@ Based on current source inspection in the fork:
 ### Strategic design decision
 Do **not** replace the Workspace cockpit. Keep it. Add an authoritative Mission Control layer beneath it.
 
+## 2026-04-22 implementation snapshot
+
+The roadmap below is still directionally correct, but the codebase is no longer at the early Phase 1 starting point.
+
+### Completed / verified in the live local runtime
+- Canonical Mission Control data model is in place with file-backed persistence for projects, work items, approvals, and execution metadata.
+- `/projects`, `/projects/$projectId`, and `/projects/$projectId/work-items/$workItemId` exist and are live.
+- Work items can launch into Conductor through the centralized `src/server/work-item-launch.ts` helper.
+- Work-item execution sync, mission/session linkage, approval persistence, and approval resolution flows are implemented.
+- An operator-facing approvals inbox now exists at `/projects/approvals`.
+- The project board has already been upgraded with:
+  - workflow-oriented column ordering (`Inbox → Ready → Active → Blocked → Done → Cancelled`)
+  - operator signal chips on cards
+  - deterministic urgency sorting inside columns
+  - board filters (`All`, `Needs attention`, `Execution`, `Approvals`)
+  - urgency summary counters with clickable shortcuts
+- The New Work Item form has already been improved with:
+  - readable dark-mode native selects
+  - `Assigned Profile` as a real dropdown backed by `/api/profiles/list`
+  - `Auto` profile routing aligned with phase → profile policy
+
+### Current product conclusion
+The canonical workflow should now be treated as:
+1. capture work as a **Work Item** first
+2. use **Researcher** as the default planning/research profile
+3. use **Builder** for implementation after planning
+4. keep **Conductor** as the execution engine, not the system of record
+5. let planning draft acceptance criteria instead of forcing them up front for idea capture
+
+### Immediate continuation pointer
+For the exact current state, validated runtime details, and the prioritized next slices after this snapshot, continue from:
+- `docs/plans/2026-04-22-hermes-workspace-mission-control-continuation-handoff.md`
+
 ---
 
 # Target architecture

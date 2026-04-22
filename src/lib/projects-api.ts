@@ -1,6 +1,18 @@
 const PROJECTS_BASE = '/api/projects'
 const WORK_ITEMS_BASE = '/api/work-items'
 
+export type PhaseProfiles = {
+  research: string
+  build: string
+  review: string
+  deploy: string
+}
+
+export type ReviewAutoApprovalPolicy = {
+  enabled: boolean
+  maxPriority: 'low' | 'medium' | 'high'
+}
+
 export type ProjectRecord = {
   id: string
   name: string
@@ -9,6 +21,8 @@ export type ProjectRecord = {
   repoUrl?: string
   defaultBranch?: string
   description?: string
+  phaseProfiles: PhaseProfiles
+  reviewAutoApproval: ReviewAutoApprovalPolicy
   createdAt: string
   updatedAt: string
 }
@@ -84,6 +98,8 @@ export type CreateProjectInput = {
   repoUrl?: string
   defaultBranch?: string
   description?: string
+  phaseProfiles?: Partial<PhaseProfiles>
+  reviewAutoApproval?: Partial<ReviewAutoApprovalPolicy>
 }
 
 export type UpdateProjectInput = Partial<CreateProjectInput>

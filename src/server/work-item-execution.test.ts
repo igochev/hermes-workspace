@@ -172,4 +172,66 @@ describe('work-item-execution', () => {
       missionId: 'job-999',
     })
   })
+
+  it('extracts branch, pr, and artifact evidence from the latest Hermes run output', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Persist execution evidence',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'job-222',
+      missionState: 'running',
+    })
+
+    getHermesJobById.mockResolvedValue({
+      id: 'job-222',
+      name: 'work-item-build-demo-evidence',
+      state: 'running',
+      last_status: null,
+      last_run_at: '2026-04-22T00:01:00Z',
+      last_error: null,
+      next_run_at: null,
+    })
+    listHermesJobs.mockResolvedValue([])
+    getHermesJobRuns.mockResolvedValue([
+      {
+        id: 'run-222',
+        status: 'running',
+        startedAt: '2026-04-22T00:01:00Z',
+        finishedAt: null,
+        chatSessionKey: 'cron_job-222_20260422_000100',
+        output: {
+          branchName: 'feature/phase6-tracing',
+          prUrl: 'https://github.com/igochev/hermes-workspace/pull/42',
+          artifactPaths: ['/tmp/phase6/report.md', '/tmp/phase6/summary.json'],
+        },
+      },
+    ])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.latestSessionKey).toBe('cron_job-222_20260422_000100')
+    expect(result.workItem.branchName).toBe('feature/phase6-tracing')
+    expect(result.workItem.prUrl).toBe('https://github.com/igochev/hermes-workspace/pull/42')
+    expect(result.workItem.artifactPaths).toEqual([
+      '/tmp/phase6/report.md',
+      '/tmp/phase6/summary.json',
+    ])
+    expect(result.workItem.sessionKeys).toContain('cron_job-222_20260422_000100')
+
+    const persisted = getWorkItem(workItem.id)
+    expect(persisted?.branchName).toBe('feature/phase6-tracing')
+    expect(persisted?.prUrl).toBe('https://github.com/igochev/hermes-workspace/pull/42')
+    expect(persisted?.artifactPaths).toEqual([
+      '/tmp/phase6/report.md',
+      '/tmp/phase6/summary.json',
+    ])
+  })
 })

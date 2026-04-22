@@ -16,6 +16,7 @@ export type WorkItemExecutionPayload = {
     status: string
     phase?: string
     history: Array<Record<string, unknown>>
+    approvals?: Array<Record<string, unknown>>
   }
   project: Record<string, unknown> | null
   execution: {
@@ -56,6 +57,20 @@ export type WorkItemExecutionPayload = {
   }
 }
 
+export type WorkItemLifecycleAction = 'send_to_planning' | 'mark_ready' | 'request_review'
+
+export type WorkItemLifecyclePayload = {
+  workItem: Record<string, unknown>
+  project: Record<string, unknown> | null
+  approval?: Record<string, unknown>
+}
+
+async function readError(response: Response, fallback: string): Promise<Error> {
+  const body = await response.json().catch(() => ({}))
+  const message = typeof body?.error === 'string' ? body.error : fallback
+  return new Error(message)
+}
+
 export async function syncWorkItemExecution(workItemId: string): Promise<WorkItemExecutionPayload> {
   const response = await fetch(`${WORK_ITEMS_BASE}/${encodeURIComponent(workItemId)}?syncExecution=true`)
   if (!response.ok) {
@@ -63,4 +78,23 @@ export async function syncWorkItemExecution(workItemId: string): Promise<WorkIte
     throw new Error(typeof body?.error === 'string' ? body.error : 'Failed to sync work item execution')
   }
   return response.json() as Promise<WorkItemExecutionPayload>
+}
+
+export async function applyWorkItemLifecycleAction(
+  workItemId: string,
+  input: {
+    action: WorkItemLifecycleAction
+    actor?: string
+    notes?: string
+  },
+): Promise<WorkItemLifecyclePayload> {
+  const response = await fetch(`${WORK_ITEMS_BASE}/${encodeURIComponent(workItemId)}/lifecycle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw await readError(response, `Failed to apply work item lifecycle action: ${response.status}`)
+  }
+  return response.json() as Promise<WorkItemLifecyclePayload>
 }
