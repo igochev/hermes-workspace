@@ -62,6 +62,25 @@ function resolveLaunchProfile(
   return getMappedPhaseProfile(requestPhaseProfiles, phase as ConductorPhaseKey)
 }
 
+function buildLaunchPhaseProfiles(params: {
+  project: ProjectRecord
+  requestPhaseProfiles: ConductorPhaseProfiles
+  phase: WorkItemPhase
+  profile: string | null
+}): ConductorPhaseProfiles {
+  const projectPhaseProfiles = normalizePhaseProfiles(params.project.phaseProfiles)
+  const merged: ConductorPhaseProfiles = {
+    ...params.requestPhaseProfiles,
+    ...projectPhaseProfiles,
+  }
+
+  if (params.profile) {
+    merged[params.phase as ConductorPhaseKey] = params.profile
+  }
+
+  return merged
+}
+
 function buildAcceptanceCriteriaBlock(workItem: WorkItemRecord): string[] {
   if (workItem.acceptanceCriteria.length === 0) return ['Acceptance criteria: none recorded.']
   return ['Acceptance criteria:', ...workItem.acceptanceCriteria.map((item) => `- ${item}`)]
@@ -131,10 +150,16 @@ export async function launchWorkItemIntoConductor(
     throw new Error('Project repoPath is required before launching work')
   }
 
-  const phaseProfiles = normalizePhaseProfiles(request.phaseProfiles)
+  const requestPhaseProfiles = normalizePhaseProfiles(request.phaseProfiles)
   const phase = normalizeLaunchPhase(request.phase, workItem.phase)
-  const profile = resolveLaunchProfile(workItem, project, phase, phaseProfiles)
+  const profile = resolveLaunchProfile(workItem, project, phase, requestPhaseProfiles)
   const goal = buildWorkItemLaunchGoal({ workItem, project, phase, profile })
+  const launchPhaseProfiles = buildLaunchPhaseProfiles({
+    project,
+    requestPhaseProfiles,
+    phase,
+    profile,
+  })
 
   const launch = await launchConductorMission({
     goal,
@@ -146,7 +171,7 @@ export async function launchWorkItemIntoConductor(
         ? request.maxParallel
         : undefined,
     supervised: request.supervised === true,
-    phaseProfiles,
+    phaseProfiles: launchPhaseProfiles,
     name: `work-item-${phase}-${project.slug}-${workItem.id.slice(0, 8)}`,
     deliver: 'local',
   })

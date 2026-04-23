@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { extractCreatedJobRef } from './conductor-launch'
+import { buildOrchestratorPrompt, extractCreatedJobRef } from './conductor-launch'
 
 describe('conductor-launch', () => {
   it('extracts job id and name from dashboard-style direct job payloads', () => {
@@ -21,5 +21,26 @@ describe('conductor-launch', () => {
         },
       }),
     ).toEqual({ id: 'job-456', name: 'work-item-review-demo' })
+  })
+
+  it('renders ACP subprocess routing instructions for mapped research and build profiles', () => {
+    const prompt = buildOrchestratorPrompt('Ship the next slice', 'dispatch-skill', {
+      orchestratorModel: '',
+      workerModel: '',
+      projectsDir: '/tmp',
+      maxParallel: 1,
+      supervised: false,
+      phaseProfiles: {
+        research: 'researcher',
+        build: 'builder',
+        review: '',
+        deploy: '',
+      },
+    })
+
+    expect(prompt).toContain('research tasks → Hermes profile "researcher"')
+    expect(prompt).toContain('build tasks → Hermes profile "builder"')
+    expect(prompt).toContain('delegate_task using ACP subprocess transport')
+    expect(prompt).toContain('acp_args: ["-p", "<profile>", "--acp", "--stdio"]')
   })
 })

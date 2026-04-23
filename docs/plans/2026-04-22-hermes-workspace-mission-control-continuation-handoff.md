@@ -47,6 +47,12 @@
   - readable dark native selects
   - `Assigned Profile` dropdown instead of free text
   - `Auto` routing option based on phase → profile mapping
+- Live QA on 2026-04-23 confirmed:
+  - dashboard Mission Control tiles and operator queues render at `/dashboard`
+  - project workflow policy renders live at `/projects/46b401f9-9243-472f-b5b7-04bf34596906`
+  - approvals inbox is operational at `/projects/approvals`
+  - approving a pending review updates both the inbox and the work-item detail history/state
+  - the review-phase work item `2328ce63-9e7e-41bf-a796-93da2d12f82a` now resolves to `done` after approval
 
 ---
 
@@ -123,63 +129,60 @@ Completed and grounded in current code/docs:
 
 ---
 
-## 4. Current next prioritized slices
+## 4. Current slice status and next priority
 
-These are the slices that should be treated as the planned continuation queue unless the user reprioritizes.
+These are the grounded slice states after live QA and diff inspection on 2026-04-23.
 
 ### Slice 1 — Idea capture + Plan with Researcher workflow
-**Why first:** this is the highest-value gap between current implementation and intended Mission Control workflow.
+**Status:** complete and live-verified.
 
-**Outcome wanted:**
-- New Work Item creation should support quick idea/request capture without demanding full acceptance criteria up front.
-- A dedicated planning action should exist.
-- Planning should route to `researcher` by default.
-- Planning output should have a natural place to draft or enrich acceptance criteria and notes.
-- Lifecycle language should make sense for `inbox → planning/research → ready/build`.
-
-**Likely implementation surfaces:**
-- `src/screens/projects/project-detail-screen.tsx`
-- `src/screens/projects/work-item-detail-screen.tsx`
-- `src/server/work-item-launch.ts`
-- `src/server/work-item-execution.ts`
-- `src/lib/projects-api.ts`
-- related tests above
-
-**Concrete likely sub-slices:**
-1. simplify New Work Item form for idea capture
-2. add explicit `Plan with Researcher` action on work-item detail
-3. ensure launch copy/goal for research phase is planning-oriented
-4. add acceptance-criteria drafting/editing path after or around planning
-5. add explicit transition helpers such as `Mark Ready` / `Launch Build`
+**Grounded status:**
+- project/work-item workflow already reflects `inbox → research/planning → ready/build`
+- planning details surfaces exist for acceptance criteria and notes
+- defaults and helper copy align with Research-first intent
+- live QA on 2026-04-23 confirmed end-to-end project-level creation of a new work item from the UI, landing as `status=inbox` + `phase=research` with optional acceptance criteria/notes left empty
+- live QA also confirmed the fresh item can be continued from detail view through the planning-oriented workflow: `Send to Planning` moved it to `status=active` + `phase=research`, and `Mark Ready` advanced it to `status=ready` with `Launch Build` becoming available as the next execution control
 
 ### Slice 2 — Work-item lifecycle action clarity
-**Outcome wanted:**
-- clear state transition buttons matching the intended workflow, likely including:
-  - `Send to Planning`
-  - `Mark Ready`
-  - `Launch Build`
-  - `Request Review`
-  - `Launch Deploy`
-- actions should be server-owned, explicit, and consistent with approval rules
+**Status:** complete and verified.
+
+**Grounded status:**
+- server-owned lifecycle transitions exist
+- route/API support exists
+- explicit lifecycle labels and state-driven action helpers are covered by tests
+- live approval action resolved a review-phase work item into `done` and recorded history correctly
 
 ### Slice 3 — Work-item detail as true execution cockpit
-**Outcome wanted:**
-- stronger planning/build/review/deploy state visibility
-- clearer evidence grouping
-- cleaner action layout depending on current phase/status
-- reduced ambiguity between “launch”, “sync”, “approval”, and “done” pathways
+**Status:** complete and verified.
+
+**Grounded status:**
+- work-item detail shows operator workflow, execution controls, evidence, history, approvals, and artifacts
+- action layout changes based on current work state
+- live work-item verification confirmed approved review state is reflected in history and approvals sections
 
 ### Slice 4 — Project-level workflow policy refinement
-**Outcome wanted:**
-- clearer project-level routing/governance controls
-- possibly stronger surfacing of phase → profile routing and review auto-approval policy
-- make per-project workflow rules feel operational rather than hidden config
+**Status:** complete and verified.
+
+**Grounded status:**
+- workflow policy panel is live
+- project-level phase routing and review auto-approval controls render correctly
+- approvals inbox and review governance are operational in the running app
 
 ### Slice 5 — Dashboard/operator overview refinement
-**Outcome wanted:**
-- Mission Control dashboard surfacing what needs attention now
-- stronger blocked / pending approval / running work visibility
-- better top-level operational queues
+**Status:** complete and verified.
+
+**Grounded status:**
+- dashboard Mission Control summary tiles render live
+- operator queues for pending approvals, blocked work, and running missions render live
+- targeted dashboard tests pass
+
+### Next practical priority
+The next practical continuation step is no longer slices 2-5. The immediate queue is:
+1. continue a freshly created inbox/research item through planning-oriented actions from detail view for one more live Slice 1 workflow pass
+2. finish and verify the remaining unstaged Conductor/work-item launch routing updates in:
+   - `src/server/work-item-launch.ts`
+   - `src/server/work-item-launch.test.ts`
+   - `src/server/conductor-launch.test.ts`
 
 ---
 
@@ -234,8 +237,10 @@ When resuming this project in a new or compacted chat:
    - `src/screens/projects/work-item-detail-screen.tsx`
    - `src/server/work-item-launch.ts`
    - `src/server/work-item-execution.ts`
-4. start with **Slice 1 — Idea capture + Plan with Researcher workflow** unless D3n13r reprioritizes
-5. keep using the inspect → tests → patch → targeted tests → build → restart → live verify workflow
+4. re-check the current slice status in section 4 before choosing work; do not assume older slice ordering is still current
+5. if no reprioritization is given, start with the remaining live QA gap for **Slice 1 — Idea capture + Plan with Researcher workflow**
+6. after that, continue with the unstaged Conductor/work-item launch routing refinement
+7. keep using the inspect → tests → patch → targeted tests → build → restart → live verify workflow
 
 ---
 

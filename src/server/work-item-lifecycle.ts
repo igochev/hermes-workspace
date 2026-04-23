@@ -1,0 +1,118 @@
+import { getWorkItem, updateWorkItem, appendWorkItemHistoryEntry, type WorkItemRecord } from './work-items-store'
+import { requestWorkItemReviewApproval, type WorkItemApprovalRecord } from './work-item-approvals'
+
+export type WorkItemLifecycleAction = 'send_to_planning' | 'mark_ready' | 'request_review'
+
+export type ApplyWorkItemLifecycleTransitionInput = {
+  action: WorkItemLifecycleAction
+  actor?: string
+  notes?: string
+}
+
+export type ApplyWorkItemLifecycleTransitionResult = {
+  workItem: WorkItemRecord
+  approval?: WorkItemApprovalRecord
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
+}
+
+function assertActionAllowed(workItem: WorkItemRecord, action: WorkItemLifecycleAction): void {
+  if (action === 'send_to_planning') {
+    if (workItem.status === 'inbox' && workItem.phase === 'research') return
+    throw new Error('send_to_planning is only valid for inbox research work items')
+  }
+
+  if (action === 'mark_ready') {
+    if (workItem.status === 'active' && workItem.phase === 'research') return
+    throw new Error('mark_ready is only valid for active research work items')
+  }
+
+  if (workItem.status === 'active' && workItem.phase === 'build') return
+  throw new Error('request_review is only valid for active build work items')
+}
+
+export function applyWorkItemLifecycleTransition(
+  workItemId: string,
+  input: ApplyWorkItemLifecycleTransitionInput,
+): ApplyWorkItemLifecycleTransitionResult {
+  const workItem = getWorkItem(workItemId)
+  if (!workItem) throw new Error('Work item not found')
+
+  assertActionAllowed(workItem, input.action)
+
+  const actor = readOptionalString(input.actor)
+  const notes = readOptionalString(input.notes)
+
+  if (input.action === 'send_to_planning') {
+    const updated = updateWorkItem(workItem.id, {
+      status: 'active',
+      phase: 'research',
+    })
+    if (!updated) throw new Error('Failed to update work item lifecycle state')
+    const withHistory = appendWorkItemHistoryEntry(updated.id, {
+      action: 'status-change',
+      status: 'active',
+      phase: 'research',
+      note: notes ? `Sent to planning with Researcher: ${notes}` : 'Sent to planning with Researcher.',
+      missionId: updated.missionId,
+      sessionKey: updated.sessionKeys.at(-1),
+      sessionKeyPrefix: updated.missionSessionKeyPrefix,
+      profile: updated.assignedProfile,
+    })
+    if (!withHistory) throw new Error('Failed to record lifecycle history entry')
+    return { workItem: withHistory }
+  }
+
+  if (input.action === 'mark_ready') {
+    const updated = updateWorkItem(workItem.id, {
+      status: 'ready',
+      phase: undefined,
+    })
+    if (!updated) throw new Error('Failed to update work item lifecycle state')
+    const withHistory = appendWorkItemHistoryEntry(updated.id, {
+      action: 'status-change',
+      status: 'ready',
+      phase: undefined,
+      note: notes ? `Planning complete; marked ready for build: ${notes}` : 'Planning complete; marked ready for build.',
+      missionId: updated.missionId,
+      sessionKey: updated.sessionKeys.at(-1),
+      sessionKeyPrefix: updated.missionSessionKeyPrefix,
+      profile: updated.assignedProfile,
+    })
+    if (!withHistory) throw new Error('Failed to record lifecycle history entry')
+    return { workItem: withHistory }
+  }
+
+  let updated = updateWorkItem(workItem.id, {
+    status: 'active',
+    phase: 'review',
+  })
+  if (!updated) throw new Error('Failed to update work item lifecycle state')
+
+  updated = appendWorkItemHistoryEntry(updated.id, {
+    action: 'status-change',
+    status: 'active',
+    phase: 'review',
+    note: notes ? `Requested review; moved work item into review: ${notes}` : 'Requested review; moved work item into review.',
+    missionId: updated.missionId,
+    sessionKey: updated.sessionKeys.at(-1),
+    sessionKeyPrefix: updated.missionSessionKeyPrefix,
+    profile: updated.assignedProfile,
+  })
+  if (!updated) throw new Error('Failed to record lifecycle history entry')
+
+  const approval = requestWorkItemReviewApproval(updated.id, {
+    requestedBy: actor,
+    notes,
+  })
+
+  const refreshed = getWorkItem(updated.id)
+  if (!refreshed) throw new Error('Work item not found after lifecycle transition')
+
+  return {
+    workItem: refreshed,
+    approval,
+  }
+}

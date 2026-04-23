@@ -166,6 +166,11 @@ describe('work-item-launch', () => {
     })
 
     expect(launchConductorMission).toHaveBeenCalledTimes(1)
+    expect(launchConductorMission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phaseProfiles: expect.objectContaining({ build: 'builder' }),
+      }),
+    )
     expect(result.launch.jobId).toBe('job-123')
     expect(result.launch.profile).toBe('builder')
     expect(result.workItem.status).toBe('active')
@@ -230,7 +235,55 @@ describe('work-item-launch', () => {
       phaseProfiles: { build: 'global-builder' },
     })
 
+    expect(launchConductorMission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phaseProfiles: expect.objectContaining({
+          build: 'project-builder',
+          review: 'project-reviewer',
+        }),
+      }),
+    )
     expect(result.launch.profile).toBe('project-builder')
     expect(result.workItem.history.at(-1)?.profile).toBe('project-builder')
+  })
+
+  it('passes research routing through to the conductor spawn path', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Plan the next implementation slice',
+      status: 'ready',
+      phase: 'research',
+      priority: 'medium',
+      repoPathSnapshot: project.repoPath,
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-789_pending',
+      sessionKeyPrefix: 'cron_job-789_',
+      jobId: 'job-789',
+      jobName: 'work-item-research-demo-routing',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'research',
+      phaseProfiles: { research: 'researcher', build: 'builder' },
+    })
+
+    expect(launchConductorMission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phaseProfiles: expect.objectContaining({
+          research: 'researcher',
+        }),
+      }),
+    )
+    expect(result.launch.profile).toBe('researcher')
+    expect(result.workItem.history.at(-1)?.profile).toBe('researcher')
   })
 })
