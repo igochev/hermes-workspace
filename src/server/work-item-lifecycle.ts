@@ -1,7 +1,12 @@
 import { getWorkItem, updateWorkItem, appendWorkItemHistoryEntry, type WorkItemRecord } from './work-items-store'
-import { requestWorkItemReviewApproval, type WorkItemApprovalRecord } from './work-item-approvals'
+import { requestWorkItemApproval, requestWorkItemReviewApproval, type WorkItemApprovalRecord } from './work-item-approvals'
 
-export type WorkItemLifecycleAction = 'send_to_planning' | 'mark_ready' | 'request_review'
+export type WorkItemLifecycleAction =
+  | 'send_to_planning'
+  | 'mark_ready'
+  | 'request_review'
+  | 'request_deploy_approval'
+  | 'resume_build'
 
 export type ApplyWorkItemLifecycleTransitionInput = {
   action: WorkItemLifecycleAction
@@ -29,8 +34,18 @@ function assertActionAllowed(workItem: WorkItemRecord, action: WorkItemLifecycle
     throw new Error('mark_ready is only valid for active research work items')
   }
 
-  if (workItem.status === 'active' && workItem.phase === 'build') return
-  throw new Error('request_review is only valid for active build work items')
+  if (action === 'request_review') {
+    if (workItem.status === 'active' && workItem.phase === 'build') return
+    throw new Error('request_review is only valid for active build work items')
+  }
+
+  if (action === 'request_deploy_approval') {
+    if (workItem.status === 'active' && workItem.phase === 'deploy') return
+    throw new Error('request_deploy_approval is only valid for active deploy work items')
+  }
+
+  if (workItem.status === 'blocked' && workItem.phase === 'build') return
+  throw new Error('resume_build is only valid for blocked build work items')
 }
 
 export function applyWorkItemLifecycleTransition(
@@ -83,6 +98,44 @@ export function applyWorkItemLifecycleTransition(
     })
     if (!withHistory) throw new Error('Failed to record lifecycle history entry')
     return { workItem: withHistory }
+  }
+
+  if (input.action === 'resume_build') {
+    const updated = updateWorkItem(workItem.id, {
+      status: 'active',
+      phase: 'build',
+      missionState: 'unknown',
+      missionLastError: undefined,
+    })
+    if (!updated) throw new Error('Failed to update work item lifecycle state')
+    const withHistory = appendWorkItemHistoryEntry(updated.id, {
+      action: 'status-change',
+      status: 'active',
+      phase: 'build',
+      note: notes
+        ? `Resumed blocked build work for relaunch: ${notes}`
+        : 'Resumed blocked build work for relaunch.',
+      missionId: updated.missionId,
+      sessionKey: updated.sessionKeys.at(-1),
+      sessionKeyPrefix: updated.missionSessionKeyPrefix,
+      profile: updated.assignedProfile,
+    })
+    if (!withHistory) throw new Error('Failed to record lifecycle history entry')
+    return { workItem: withHistory }
+  }
+
+  if (input.action === 'request_deploy_approval') {
+    const approval = requestWorkItemApproval(workItem.id, {
+      requestedBy: actor,
+      notes,
+      phase: 'deploy',
+    })
+    const refreshed = getWorkItem(workItem.id)
+    if (!refreshed) throw new Error('Work item not found after lifecycle transition')
+    return {
+      workItem: refreshed,
+      approval,
+    }
   }
 
   let updated = updateWorkItem(workItem.id, {

@@ -202,6 +202,52 @@ describe('work-item-launch', () => {
     expect(persisted?.history.at(-1)?.action).toBe('launch')
   })
 
+  it('records relaunch history when blocked failed build work is launched again', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Recover failed build launch',
+      status: 'blocked',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      missionState: 'failed',
+      missionLastError: 'verification failed',
+      missionId: 'job-old',
+      missionJobId: 'job-old',
+      missionJobName: 'work-item-build-old',
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-777_pending',
+      sessionKeyPrefix: 'cron_job-777_',
+      jobId: 'job-777',
+      jobName: 'work-item-build-relaunch',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'build',
+      phaseProfiles: { build: 'builder' },
+    })
+
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('build')
+    expect(result.workItem.missionState).toBe('scheduled')
+    expect(result.workItem.missionLastError).toBeUndefined()
+    expect(result.workItem.history.at(-1)).toMatchObject({
+      action: 'launch',
+      note: 'Relaunched build via Conductor using profile builder after failure recovery.',
+      missionId: 'job-777',
+      profile: 'builder',
+    })
+  })
+
   it('prefers project phase routing over global defaults when the work item has no explicit profile', async () => {
     const project = createProject({
       name: 'Mission Control Demo',

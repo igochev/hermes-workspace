@@ -44,6 +44,25 @@ export type WorkItemApprovalResolutionPayload = {
   }
 }
 
+export async function requestWorkItemApproval(input: {
+  workItemId: string
+  phase?: 'review' | 'deploy'
+  requestedBy?: string
+  notes?: string
+}): Promise<{ approval: WorkItemApprovalRecord }> {
+  const response = await fetch(WORK_ITEM_APPROVALS_BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, `Failed to request work item approval: ${response.status}`)
+  }
+
+  return (await response.json()) as { approval: WorkItemApprovalRecord }
+}
+
 async function readError(response: Response, fallback: string): Promise<Error> {
   const body = await response.json().catch(() => ({}))
   const message = typeof body?.error === 'string' ? body.error : fallback

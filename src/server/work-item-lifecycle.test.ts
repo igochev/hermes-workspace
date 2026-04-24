@@ -127,6 +127,76 @@ describe('work-item-lifecycle', () => {
     ])
   })
 
+  it('requests deploy approval for active deploy work and creates a pending deploy approval', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Prepare deploy approval',
+      status: 'active',
+      phase: 'deploy',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+    })
+
+    const result = applyWorkItemLifecycleTransition(workItem.id, {
+      action: 'request_deploy_approval',
+      actor: 'D3n13r',
+      notes: 'Ready to deploy to production',
+    })
+
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('deploy')
+    expect(result.workItem.history.at(-1)).toMatchObject({
+      action: 'note',
+      note: 'Deploy approval requested: Ready to deploy to production',
+    })
+    expect(listWorkItemApprovals(workItem.id)).toMatchObject([
+      {
+        workItemId: workItem.id,
+        phase: 'deploy',
+        status: 'pending',
+        requestedBy: 'D3n13r',
+      },
+    ])
+  })
+
+  it('resumes blocked build work back into active build for relaunch', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Recover failed build',
+      status: 'blocked',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      missionState: 'failed',
+      missionLastError: 'Build failed on test suite',
+    })
+
+    const result = applyWorkItemLifecycleTransition(workItem.id, {
+      action: 'resume_build',
+      actor: 'D3n13r',
+      notes: 'Apply fix and relaunch',
+    })
+
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('build')
+    expect(result.workItem.missionState).toBe('unknown')
+    expect(result.workItem.missionLastError).toBeUndefined()
+    expect(result.workItem.history.at(-1)).toMatchObject({
+      action: 'status-change',
+      status: 'active',
+      phase: 'build',
+      note: 'Resumed blocked build work for relaunch: Apply fix and relaunch',
+    })
+  })
+
   it('rejects invalid transitions for the current work-item state', () => {
     const project = createProject({
       name: 'Mission Control Demo',

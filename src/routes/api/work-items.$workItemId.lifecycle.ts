@@ -16,7 +16,13 @@ function jsonResponse(data: unknown, status = 200) {
 }
 
 function isLifecycleAction(value: unknown): value is WorkItemLifecycleAction {
-  return value === 'send_to_planning' || value === 'mark_ready' || value === 'request_review'
+  return (
+    value === 'send_to_planning' ||
+    value === 'mark_ready' ||
+    value === 'request_review' ||
+    value === 'request_deploy_approval' ||
+    value === 'resume_build'
+  )
 }
 
 export const Route = createFileRoute('/api/work-items/$workItemId/lifecycle')({

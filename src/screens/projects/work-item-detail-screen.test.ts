@@ -38,17 +38,20 @@ describe('work item detail screen theme classes', () => {
   })
 
   it('uses workflow-specific launch labels instead of a generic conductor label', () => {
-    expect(getWorkItemPrimaryLaunchLabel('research')).toBe('Plan with Researcher')
-    expect(getWorkItemPrimaryLaunchLabel('build')).toBe('Launch Build')
-    expect(getWorkItemPrimaryLaunchLabel('review')).toBe('Launch Review')
-    expect(getWorkItemPrimaryLaunchLabel('deploy')).toBe('Launch Deploy')
-    expect(getWorkItemPrimaryLaunchLabel(undefined)).toBe('Launch Build')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: 'research', status: 'active' })).toBe('Plan with Researcher')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: 'build', status: 'active' })).toBe('Launch Build')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: 'build', status: 'blocked' })).toBe('Relaunch Build')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: 'review', status: 'active' })).toBe('Launch Review')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: 'deploy', status: 'active' })).toBe('Launch Deploy')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: undefined, status: 'ready' })).toBe('Launch Build')
   })
 
   it('exposes explicit lifecycle action labels for the intended operator workflow', () => {
     expect(getWorkItemLifecycleActionLabel('send_to_planning')).toBe('Send to Planning')
     expect(getWorkItemLifecycleActionLabel('mark_ready')).toBe('Mark Ready')
     expect(getWorkItemLifecycleActionLabel('request_review')).toBe('Request Review')
+    expect(getWorkItemLifecycleActionLabel('request_deploy_approval')).toBe('Request Deploy Approval')
+    expect(getWorkItemLifecycleActionLabel('resume_build')).toBe('Resume Build')
   })
 
   it('derives lifecycle actions from current status and phase', () => {
@@ -61,6 +64,10 @@ describe('work item detail screen theme classes', () => {
     expect(getAvailableWorkItemLifecycleActions({ status: 'active', phase: 'build' })).toEqual([
       'request_review',
     ])
+    expect(getAvailableWorkItemLifecycleActions({ status: 'active', phase: 'deploy' })).toEqual([
+      'request_deploy_approval',
+    ])
+    expect(getAvailableWorkItemLifecycleActions({ status: 'blocked', phase: 'build' })).toEqual(['resume_build'])
     expect(getAvailableWorkItemLifecycleActions({ status: 'ready', phase: undefined })).toEqual([])
   })
 
@@ -89,8 +96,11 @@ describe('work item detail screen theme classes', () => {
     expect(
       getWorkItemOperatorGuidance({ status: 'active', phase: 'build', missionState: 'running' }),
     ).toBe('Build mission is in flight. Sync execution for fresh evidence or request review once implementation is ready.')
+    expect(getWorkItemOperatorGuidance({ status: 'blocked', phase: 'build', missionState: 'failed' })).toBe(
+      'This work item is blocked by a failed build mission. Capture fixes, run Resume Build, and relaunch Build to continue delivery.',
+    )
     expect(getWorkItemExecutionSummary({ missionState: 'failed', latestRunStatus: 'failed' })).toBe(
-      'Mission failed — inspect the latest run, capture follow-up notes, and decide whether to relaunch or unblock the work item.',
+      'Mission failed — inspect the latest run, capture follow-up notes, run Resume Build, and relaunch Build when ready.',
     )
     expect(
       getWorkItemApprovalSummary([

@@ -15,6 +15,7 @@ describe('dashboard mission control helpers', () => {
     expect(DASHBOARD_MISSION_CONTROL_QUERY_KEY).toEqual(['dashboard', 'mission-control'])
     expect(DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS).toEqual({
       blockedWorkItems: 'Blocked work',
+      failedMissions: 'Failed missions',
       pendingApprovals: 'Pending approvals',
       projects: 'Projects',
       runningMissions: 'Running missions',
@@ -23,6 +24,7 @@ describe('dashboard mission control helpers', () => {
     expect(DASHBOARD_MISSION_CONTROL_QUEUE_TITLES).toEqual({
       approvals: 'Pending approvals',
       blocked: 'Blocked work',
+      failed: 'Failed missions',
       running: 'Running missions',
     })
   })
@@ -36,6 +38,7 @@ describe('dashboard mission control helpers', () => {
         ],
         [
           makeWorkItem({ id: 'blocked-1', projectId: 'project-1', status: 'blocked' }),
+          makeWorkItem({ id: 'failed-1', projectId: 'project-2', status: 'active', missionState: 'failed' }),
           makeWorkItem({ id: 'running-1', projectId: 'project-1', status: 'active', missionState: 'running' }),
           makeWorkItem({ id: 'quiet-1', projectId: 'project-2', status: 'ready' }),
         ],
@@ -46,10 +49,11 @@ describe('dashboard mission control helpers', () => {
       ),
     ).toEqual({
       blockedWorkItems: 1,
+      failedMissions: 1,
       pendingApprovals: 1,
       projects: 2,
       runningMissions: 1,
-      workItems: 3,
+      workItems: 4,
     })
   })
 
@@ -83,6 +87,28 @@ describe('dashboard mission control helpers', () => {
           missionLastRunAt: '2026-04-22T10:45:00.000Z',
           phase: 'build',
         }),
+        makeWorkItem({
+          id: 'failed-stale-high-attention',
+          projectId: 'project-1',
+          title: 'Failed release verification',
+          status: 'active',
+          missionState: 'failed',
+          missionLastError: 'Release verification failed',
+          updatedAt: '2026-04-22T10:20:00.000Z',
+          missionLastRunAt: '2026-04-22T10:20:00.000Z',
+          phase: 'deploy',
+        }),
+        makeWorkItem({
+          id: 'failed-recent-lower-attention',
+          projectId: 'project-2',
+          title: 'Failed build smoke test',
+          status: 'active',
+          missionState: 'failed',
+          missionLastError: 'Smoke test failed',
+          updatedAt: '2026-04-22T10:50:00.000Z',
+          missionLastRunAt: '2026-04-22T10:50:00.000Z',
+          phase: 'build',
+        }),
       ],
       [
         makeApproval({
@@ -104,6 +130,15 @@ describe('dashboard mission control helpers', () => {
           status: 'pending',
         }),
         makeApproval({
+          approvalId: 'approval-extra',
+          projectId: 'project-1',
+          projectName: 'Mission Control',
+          workItemId: 'review-extra',
+          workItemTitle: 'Review failed release follow-up',
+          requestedAt: '2026-04-22T10:35:00.000Z',
+          status: 'pending',
+        }),
+        makeApproval({
           approvalId: 'approval-done',
           projectId: 'project-2',
           workItemId: 'review-done',
@@ -112,11 +147,25 @@ describe('dashboard mission control helpers', () => {
       ],
     )
 
-    expect(queues.approvals.map((item) => item.id)).toEqual(['approval-new', 'approval-old'])
+    expect(queues.approvals.map((item) => item.id)).toEqual([
+      'approval-new',
+      'approval-extra',
+      'approval-old',
+    ])
     expect(queues.approvals[0]).toMatchObject({
       href: '/projects/project-1/work-items/review-new',
       subtitle: 'Mission Control',
       title: 'Review cockpit launch flow',
+    })
+    expect(queues.failed.map((item) => item.id)).toEqual([
+      'failed-stale-high-attention',
+      'failed-recent-lower-attention',
+    ])
+    expect(queues.failed[0]).toMatchObject({
+      href: '/projects/project-1/work-items/failed-stale-high-attention',
+      subtitle: 'Mission Control',
+      title: 'Failed release verification',
+      detail: 'Deploy failed · 5 attention signals across project',
     })
     expect(queues.blocked.map((item) => item.id)).toEqual(['blocked-new', 'blocked-old'])
     expect(queues.blocked[0]).toMatchObject({

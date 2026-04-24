@@ -137,6 +137,13 @@ export type WorkItemDetailResponse = {
 
 export type WorkItemApprovalDecision = 'approved' | 'changes_requested' | 'rejected'
 
+export type WorkItemLifecycleAction =
+  | 'send_to_planning'
+  | 'mark_ready'
+  | 'request_review'
+  | 'request_deploy_approval'
+  | 'resume_build'
+
 async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }

@@ -108,11 +108,21 @@ async function resolveJobForWorkItem(workItem: WorkItemRecord): Promise<HermesJo
   const candidateIds = Array.from(new Set([missionJobId, missionId].filter(Boolean)))
 
   for (const candidateId of candidateIds) {
-    const direct = await getHermesJobById(candidateId)
-    if (direct) return direct
+    try {
+      const direct = await getHermesJobById(candidateId)
+      if (direct) return direct
+    } catch {
+      continue
+    }
   }
 
-  const jobs = await listHermesJobs()
+  let jobs: Array<HermesJobInfo> = []
+  try {
+    jobs = await listHermesJobs()
+  } catch {
+    return null
+  }
+
   const candidateNames = Array.from(new Set([missionJobName, missionId].filter(Boolean)))
   return (
     jobs.find((job) => candidateNames.includes(readOptionalString(job.name))) ??
@@ -155,10 +165,13 @@ function transitionForSuccess(workItem: WorkItemRecord): { status: WorkItemRecor
 
 function transitionForFailure(workItem: WorkItemRecord, reason: string): { status: WorkItemRecord['status']; phase?: WorkItemPhase; note: string } | null {
   if (workItem.status === 'blocked') return null
+  const recoveryTail = ' Run Resume Build before relaunching the build mission.'
   return {
     status: 'blocked',
     phase: workItem.phase,
-    note: reason ? `Execution failed: ${reason}` : 'Execution failed; work item is now blocked.',
+    note: reason
+      ? `Execution failed: ${reason}.${recoveryTail}`
+      : `Execution failed; work item is now blocked.${recoveryTail}`,
   }
 }
 
@@ -169,7 +182,12 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
   const project = getProject(workItem.projectId)
   if (!project) throw new Error('Project not found')
 
-  const job = await resolveJobForWorkItem(workItem)
+  let job: HermesJobInfo | null = null
+  try {
+    job = await resolveJobForWorkItem(workItem)
+  } catch {
+    job = null
+  }
   const state = deriveExecutionState(job)
   const missionFields = applyMissionFields(workItem, job, state)
   let updated = updateWorkItem(workItem.id, missionFields)

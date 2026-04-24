@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { isAuthenticated } from '../../server/auth-middleware'
-import { listApprovalInboxEntries, resolveWorkItemApprovalDecision } from '../../server/work-item-approvals'
+import { listApprovalInboxEntries, requestWorkItemApproval, resolveWorkItemApprovalDecision } from '../../server/work-item-approvals'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -16,6 +16,33 @@ export const Route = createFileRoute('/api/work-item-approvals')({
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
         return jsonResponse({ approvals: listApprovalInboxEntries() })
+      },
+
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
+
+        try {
+          const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+          if (typeof body.workItemId !== 'string' || body.workItemId.trim().length === 0) {
+            return jsonResponse({ error: 'workItemId is required' }, 400)
+          }
+          const phase = body.phase === 'deploy' ? 'deploy' : 'review'
+          const approval = requestWorkItemApproval(body.workItemId, {
+            requestedBy: typeof body.requestedBy === 'string' ? body.requestedBy : undefined,
+            notes: typeof body.notes === 'string' ? body.notes : undefined,
+            phase,
+          })
+          return jsonResponse({ approval }, 201)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          const status =
+            message === 'Work item not found' || message === 'Project not found'
+              ? 404
+              : message.includes('must be in')
+                ? 409
+                : 500
+          return jsonResponse({ error: message }, status)
+        }
       },
 
       PATCH: async ({ request }) => {

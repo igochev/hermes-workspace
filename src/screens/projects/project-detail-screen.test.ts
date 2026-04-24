@@ -11,11 +11,14 @@ import {
   PROJECT_FORM_NATIVE_SELECT_STYLE,
   PROJECT_FORM_SELECT_CLASS,
   PROJECT_PHASE_ROUTING_POLICY_LABELS,
+  PROJECT_RECOVERY_HINT_CLASS,
   PROJECT_ROUTING_PRECEDENCE_LABELS,
   PROJECT_ROUTING_POLICY_EMPTY_VALUE,
   PROJECT_WORKFLOW_POLICY_PANEL_TITLE,
   PROJECT_WORKFLOW_POLICY_SAVE_LABEL,
   PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL,
+  PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING,
+  buildProjectDeployGovernanceSummary,
   PROJECT_URGENCY_SUMMARY_FILTERS,
   PROJECT_URGENCY_SUMMARY_LABELS,
   PROJECT_URGENCY_SUMMARY_SHORTCUT_LABELS,
@@ -47,6 +50,7 @@ describe('project detail screen board constants', () => {
     expect(PROJECT_BOARD_EMPTY_STATE_CLASS).toContain('bg-[var(--theme-card2)]')
     expect(PROJECT_BOARD_SIGNAL_CHIP_CLASS).toContain('bg-[var(--theme-card)]')
     expect(PROJECT_BOARD_SIGNAL_CHIP_CLASS).toContain('text-[var(--theme-text)]')
+    expect(PROJECT_RECOVERY_HINT_CLASS).toContain('text-amber')
   })
 
   it('offers operator-centric board filters for attention triage', () => {
@@ -109,6 +113,7 @@ describe('project detail screen board constants', () => {
     expect(PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL).toBe('Workflow Policy')
     expect(PROJECT_WORKFLOW_POLICY_PANEL_TITLE).toBe('Project Workflow Policy')
     expect(PROJECT_WORKFLOW_POLICY_SAVE_LABEL).toBe('Save Workflow Policy')
+    expect(PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING).toBe('Deploy governance')
     expect(PROJECT_ROUTING_POLICY_EMPTY_VALUE).toBe('Auto fallback')
     expect(PROJECT_ROUTING_PRECEDENCE_LABELS).toEqual([
       '1. Work item override',
@@ -139,6 +144,12 @@ describe('project detail screen board constants', () => {
     )
     expect(buildProjectReviewAutoApprovalSummary({ enabled: false, maxPriority: 'high' })).toBe(
       'Review auto-approval is disabled. Every review-phase work item will wait for an operator decision.',
+    )
+    expect(buildProjectDeployGovernanceSummary({ deploy: 'deployer' })).toBe(
+      'Deploy governance routes deploy launches to deployer and requires explicit deploy approval before done.',
+    )
+    expect(buildProjectDeployGovernanceSummary({ deploy: '' })).toBe(
+      'Deploy governance uses Auto fallback routing and requires explicit deploy approval before done.',
     )
   })
 

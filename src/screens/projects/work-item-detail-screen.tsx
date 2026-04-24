@@ -38,7 +38,12 @@ export const WORK_ITEM_DETAIL_ACCEPTANCE_CRITERIA_HELP_TEXT =
 export const WORK_ITEM_DETAIL_NOTES_HELP_TEXT =
   'Capture planning output, operator guidance, or open questions as one note per line.'
 
-export type WorkItemDetailLifecycleAction = 'send_to_planning' | 'mark_ready' | 'request_review'
+export type WorkItemDetailLifecycleAction =
+  | 'send_to_planning'
+  | 'mark_ready'
+  | 'request_review'
+  | 'request_deploy_approval'
+  | 'resume_build'
 
 export function stringifyWorkItemDetailListDraft(items: Array<string>): string {
   return items.join('\n')
@@ -62,6 +67,9 @@ export function getWorkItemOperatorGuidance(state: {
   phase: 'research' | 'build' | 'review' | 'deploy' | undefined
   missionState?: 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 }): string {
+  if (state.status === 'blocked' && state.phase === 'build' && state.missionState === 'failed') {
+    return 'This work item is blocked by a failed build mission. Capture fixes, run Resume Build, and relaunch Build to continue delivery.'
+  }
   if (state.status === 'blocked') {
     return 'This work item is blocked. Review the latest error or approval feedback, then update notes before relaunching.'
   }
@@ -84,7 +92,7 @@ export function getWorkItemOperatorGuidance(state: {
     return 'Review is active. Resolve pending approvals or send the work item back to build if changes are requested.'
   }
   if (state.status === 'active' && state.phase === 'deploy') {
-    return 'Deploy is active. Verify release evidence before declaring the work item done.'
+    return 'Deploy is active. Verify release evidence, then request deploy approval before completing the work item.'
   }
   if (state.status === 'done') {
     return 'This work item is complete. Review evidence and history if you need a release record.'
@@ -100,7 +108,7 @@ export function getWorkItemExecutionSummary(state: {
   latestRunStatus?: string | null
 }): string {
   if (state.missionState === 'failed' || state.latestRunStatus === 'failed') {
-    return 'Mission failed — inspect the latest run, capture follow-up notes, and decide whether to relaunch or unblock the work item.'
+    return 'Mission failed — inspect the latest run, capture follow-up notes, run Resume Build, and relaunch Build when ready.'
   }
   if (state.missionState === 'running') {
     return 'Mission is currently running — sync execution to refresh run data, session linkage, and delivery evidence.'
@@ -117,36 +125,46 @@ export function getWorkItemExecutionSummary(state: {
 export function getWorkItemApprovalSummary(
   approvals: Array<{ status?: string; phase?: string }>,
 ): string {
-  const pendingCount = approvals.filter((approval) => approval.status === 'pending').length
+  const pendingReviewCount = approvals.filter(
+    (approval) => approval.status === 'pending' && approval.phase !== 'deploy',
+  ).length
+  const pendingDeployCount = approvals.filter(
+    (approval) => approval.status === 'pending' && approval.phase === 'deploy',
+  ).length
   const changesRequestedCount = approvals.filter(
     (approval) => approval.status === 'changes_requested',
   ).length
-  const totalAttention = pendingCount + changesRequestedCount
+  const totalAttention = pendingReviewCount + pendingDeployCount + changesRequestedCount
 
   if (totalAttention === 0) {
     return 'No approvals are currently blocking this work item.'
   }
 
   const parts: Array<string> = []
-  if (pendingCount > 0) parts.push('pending review approval')
+  if (pendingReviewCount > 0) parts.push('pending review approval')
+  if (pendingDeployCount > 0) parts.push('pending deploy approval')
   if (changesRequestedCount > 0) parts.push('changes requested')
 
   return `${totalAttention} approvals need attention — ${parts.join(' and ')}.`
 }
 
-export function getWorkItemPrimaryLaunchLabel(
-  phase: 'research' | 'build' | 'review' | 'deploy' | undefined,
-): string {
-  if (phase === 'research') return 'Plan with Researcher'
-  if (phase === 'review') return 'Launch Review'
-  if (phase === 'deploy') return 'Launch Deploy'
+export function getWorkItemPrimaryLaunchLabel(state: {
+  phase: 'research' | 'build' | 'review' | 'deploy' | undefined
+  status: 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
+}): string {
+  if (state.phase === 'research') return 'Plan with Researcher'
+  if (state.phase === 'review') return 'Launch Review'
+  if (state.phase === 'deploy') return 'Launch Deploy'
+  if (state.phase === 'build' && state.status === 'blocked') return 'Relaunch Build'
   return 'Launch Build'
 }
 
 export function getWorkItemLifecycleActionLabel(action: WorkItemDetailLifecycleAction): string {
   if (action === 'send_to_planning') return 'Send to Planning'
   if (action === 'mark_ready') return 'Mark Ready'
-  return 'Request Review'
+  if (action === 'request_review') return 'Request Review'
+  if (action === 'request_deploy_approval') return 'Request Deploy Approval'
+  return 'Resume Build'
 }
 
 export function getAvailableWorkItemLifecycleActions(state: {
@@ -156,6 +174,8 @@ export function getAvailableWorkItemLifecycleActions(state: {
   if (state.status === 'inbox' && state.phase === 'research') return ['send_to_planning']
   if (state.status === 'active' && state.phase === 'research') return ['mark_ready']
   if (state.status === 'active' && state.phase === 'build') return ['request_review']
+  if (state.status === 'active' && state.phase === 'deploy') return ['request_deploy_approval']
+  if (state.status === 'blocked' && state.phase === 'build') return ['resume_build']
   return []
 }
 
@@ -318,7 +338,10 @@ export function WorkItemDetailScreen({
   const [isEditingPlanningDetails, setIsEditingPlanningDetails] = useState(false)
   const [acceptanceCriteriaDraft, setAcceptanceCriteriaDraft] = useState('')
   const [notesDraft, setNotesDraft] = useState('')
-  const primaryLaunchLabel = getWorkItemPrimaryLaunchLabel(workItem?.phase)
+  const primaryLaunchLabel = getWorkItemPrimaryLaunchLabel({
+    phase: workItem?.phase,
+    status: workItem?.status ?? 'ready',
+  })
   const lifecycleActions = workItem
     ? getAvailableWorkItemLifecycleActions({ status: workItem.status, phase: workItem.phase })
     : []

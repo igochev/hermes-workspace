@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   listWorkItemApprovals,
-  requestWorkItemReviewApproval,
+  requestWorkItemApproval,
 } from '../../server/work-item-approvals'
 
 function jsonResponse(data: unknown, status = 200) {
@@ -26,9 +26,11 @@ export const Route = createFileRoute('/api/work-items/$workItemId/approvals')({
 
         try {
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
-          const approval = requestWorkItemReviewApproval(params.workItemId, {
+          const phase = body.phase === 'deploy' ? 'deploy' : 'review'
+          const approval = requestWorkItemApproval(params.workItemId, {
             requestedBy: typeof body.requestedBy === 'string' ? body.requestedBy : undefined,
             notes: typeof body.notes === 'string' ? body.notes : undefined,
+            phase,
           })
           return jsonResponse({ approval }, 201)
         } catch (error) {

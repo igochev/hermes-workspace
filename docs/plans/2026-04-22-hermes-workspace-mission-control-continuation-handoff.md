@@ -29,9 +29,11 @@
 - Runtime repo in use: `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
 - Local systemd service in use: `hermes-workspace.service`
 - Serving locally on port `3456`
+- Branch state on 2026-04-24: `my-hermes-workspace-dev...origin/my-hermes-workspace-dev` with a clean working tree
 - Known verification project: `46b401f9-9243-472f-b5b7-04bf34596906`
 - Browser may show onboarding/mobile overlay first; use **Skip setup** if needed.
 - `jq` is unavailable in this environment; use Python for JSON/HTTP inspection.
+- Builder is now the main Hermes profile and should be treated as the default implementation/build role for Mission Control work.
 
 ### 1.3 Verified implemented capabilities
 - File-backed project/work-item Mission Control model exists.
@@ -47,12 +49,34 @@
   - readable dark native selects
   - `Assigned Profile` dropdown instead of free text
   - `Auto` routing option based on phase → profile mapping
+- Work-item detail now exposes workflow-specific launch labels:
+  - `Plan with Researcher`
+  - `Launch Build`
+  - `Launch Review`
+  - `Launch Deploy`
+- Work-item launches now persist and surface canonical Hermes mission linkage:
+  - `missionJobId`
+  - `missionJobName`
+  - `missionSessionKeyPrefix`
+  - `missionLink`
+  - `missionState`
+- Launch routing precedence is implemented and test-verified as:
+  1. explicit work-item profile override
+  2. project phase routing
+  3. request/global phase routing
 - Live QA on 2026-04-23 confirmed:
   - dashboard Mission Control tiles and operator queues render at `/dashboard`
   - project workflow policy renders live at `/projects/46b401f9-9243-472f-b5b7-04bf34596906`
   - approvals inbox is operational at `/projects/approvals`
   - approving a pending review updates both the inbox and the work-item detail history/state
   - the review-phase work item `2328ce63-9e7e-41bf-a796-93da2d12f82a` now resolves to `done` after approval
+- Targeted audit on 2026-04-24 re-verified the routing slice with passing tests:
+  - `src/server/work-item-launch.test.ts`
+  - `src/server/conductor-launch.test.ts`
+  - `src/server/work-item-phase5.test.ts`
+  - `src/screens/projects/work-item-detail-screen.test.ts`
+  - `src/screens/projects/project-detail-screen.test.ts`
+  - `src/screens/dashboard/dashboard-screen.test.ts`
 
 ---
 
@@ -176,13 +200,148 @@ These are the grounded slice states after live QA and diff inspection on 2026-04
 - operator queues for pending approvals, blocked work, and running missions render live
 - targeted dashboard tests pass
 
+### Slice 6A — Lifecycle beyond review (Phase 6 Task 1-5)
+**Status:** complete and verified on 2026-04-24.
+
+**Grounded status:**
+- RED→GREEN tests locked and passed for:
+  - `src/server/work-item-lifecycle.test.ts`
+  - `src/server/work-item-approvals.test.ts`
+  - `src/screens/projects/work-item-detail-screen.test.ts`
+  - `src/server/work-item-phase5.test.ts`
+- Server-owned lifecycle now explicitly supports deploy and recovery transitions:
+  - `request_deploy_approval` (active deploy -> pending deploy approval)
+  - `resume_build` (blocked build -> active build)
+- Approval resolution now treats deploy as a first-class governed phase:
+  - review approval advances to `status=active, phase=deploy`
+  - deploy approval is required to finalize `status=done`
+  - review changes/reject keeps return-to-build relaunch posture
+- Work-item detail UI helpers are phase-aware for deploy and recovery:
+  - lifecycle labels include `Request Deploy Approval` and `Resume Build`
+  - lifecycle action availability includes deploy approval + blocked-build resume
+  - blocked build launch CTA reads `Relaunch Build`
+  - approvals summary distinguishes pending review vs pending deploy approval
+- Live verification on `http://localhost:3456` confirmed end-to-end transition path on work item `bcc1ecd5-819b-4223-b8ec-bc74c84d01c4` via authenticated API calls from the running app context:
+  - `request_review` -> review approval pending
+  - review `approved` -> moved to deploy
+  - `request_deploy_approval` -> deploy approval pending
+  - deploy `approved` -> moved to done
+  - project board and approvals inbox reflected the resolved deploy/review decisions
+- Known runtime caveat during live QA: work-item detail route currently depends on `syncExecution=true` and can show `Work item not found` when `/api/work-items/:id?syncExecution=true` returns `{"error":"Dashboard index failed: 500"}`. This did not block lifecycle API verification and appears pre-existing to this slice.
+
+### Slice 6B — Operator recovery flows (Phase 6 Task 6-8)
+**Status:** complete and verified on 2026-04-24.
+
+**Grounded status:**
+- RED→GREEN tests locked and passed for recovery behavior across:
+  - `src/server/work-item-execution.test.ts`
+  - `src/server/work-item-lifecycle.test.ts`
+  - `src/server/work-item-launch.test.ts`
+  - `src/lib/projects-view-model.test.ts`
+  - `src/screens/projects/work-item-detail-screen.test.ts`
+  - `src/screens/projects/project-detail-screen.test.ts`
+- Server-safe recovery semantics are now explicit:
+  - `resume_build` clears stale failure state (`missionState` -> `unknown`, `missionLastError` -> `undefined`) before relaunch
+  - relaunching a blocked/failed item clears prior error payload and records recovery-specific launch history (`Relaunched ... after failure recovery`)
+  - failed execution history now includes direct operator guidance to run `Resume Build` before relaunch
+- UI/operator recovery affordances are now clearer:
+  - detail guidance and execution summary explicitly route failed builds to `Resume Build` + relaunch
+  - board signal chips now include `Recovery ready` for blocked+failed mission items
+  - project cards now render explicit recovery hints (e.g., `Recovery: Address review feedback and relaunch Build.`)
+- Live verification on `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906` confirmed:
+  - active card `Phase 4 approval flow demo` now displays the recovery hint text
+  - urgency/header counters still render correctly while recovery hinting is active
+
+### Slice 6C — Dashboard/operator-console escalation (Phase 6 Task 9-10)
+**Status:** complete and verified on 2026-04-24.
+
+**Grounded status:**
+- RED→GREEN tests now lock failed-mission and escalation ordering semantics in:
+  - `src/screens/dashboard/dashboard-screen.test.ts`
+- Mission Control dashboard escalation improvements are now in place:
+  - top-level summary includes `Failed missions`
+  - top-level queue column now includes dedicated `FAILED MISSIONS` queue with direct work-item links
+  - failed queue ordering favors project-level operator attention pressure (pending approvals + blocked/running/failed items), then recency
+- Additional targeted regression coverage passed:
+  - `src/screens/dashboard/dashboard-screen.test.ts`
+  - `src/screens/projects/project-detail-screen.test.ts`
+- Live verification at `http://localhost:3456/dashboard` confirmed:
+  - `FAILED MISSIONS` tile rendered with escalation guidance copy
+  - dedicated `FAILED MISSIONS` queue card rendered in the dashboard command-center row
+
+### Slice 6D — Governance visibility tightening (Phase 6 Task 11)
+**Status:** complete and verified on 2026-04-24.
+
+**Grounded status:**
+- RED→GREEN tests now lock deploy-governance visibility contract in:
+  - `src/screens/projects/project-detail-screen.test.ts`
+- Project workflow policy surface now explicitly includes deploy governance beside review governance:
+  - added dedicated `DEPLOY GOVERNANCE` block in workflow policy panel
+  - summary text now makes deploy approval gating explicit before done
+  - deploy routing summary reflects configured deploy profile vs auto fallback without adding persistence complexity
+- Targeted regression checks passed:
+  - `src/screens/projects/project-detail-screen.test.ts`
+  - `src/screens/dashboard/dashboard-screen.test.ts`
+- Live verification at `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906` confirmed:
+  - `Workflow Policy` panel now renders `DEPLOY GOVERNANCE`
+  - copy explicitly states deploy routing + explicit deploy approval requirement before done
+
+### Slice 6E — Docs closeout and post-phase queue (Phase 6 Task 12)
+**Status:** complete and verified on 2026-04-24.
+
+**Grounded status:**
+- Continuation/roadmap docs now explicitly capture shipped + live-verified outcomes for slices 6A, 6B, 6C, and 6D.
+- Phase 6 closure now records the exact post-phase queue instead of leaving Slice 6E as pending.
+- Closeout verification rerun passed:
+  - `pnpm vitest run src/screens/projects/project-detail-screen.test.ts src/screens/dashboard/dashboard-screen.test.ts`
+  - `pnpm build`
+  - `systemctl --user restart hermes-workspace.service` + `is-active` -> `active`
+- Live verification rerun passed:
+  - `http://localhost:3456/dashboard`
+  - `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906` (Workflow Policy includes explicit `DEPLOY GOVERNANCE` copy)
+
+### Post-Phase-6 hardening — syncExecution detail-path resilience (2026-04-24)
+**Status:** complete and verified on 2026-04-24.
+
+**Grounded status:**
+- Added RED→GREEN resilience coverage in `src/server/work-item-execution.test.ts`:
+  - `degrades to unknown execution state when Hermes dashboard index lookup fails`
+- Minimal server fallback implemented in `src/server/work-item-execution.ts`:
+  - `syncWorkItemExecutionState` now safely degrades to `execution.state = 'unknown'` when Hermes job lookup throws (e.g. `Dashboard index failed: 500`), instead of bubbling an API 500.
+- Targeted verification passed:
+  - `pnpm vitest run src/server/work-item-execution.test.ts src/server/work-item-phase5.test.ts src/screens/projects/work-item-detail-screen.test.ts`
+  - `pnpm build`
+  - `systemctl --user restart hermes-workspace.service` + `is-active` -> `active`
+- Live verification passed:
+  - `GET /api/work-items/d63d7e2f-1f31-43c1-8d40-cb6c9afed9bb?syncExecution=true` now returns `200` with `execution.state='unknown'` (no `error` payload)
+  - `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906/work-items/d63d7e2f-1f31-43c1-8d40-cb6c9afed9bb` loads normally (no `Work item not found`)
+  - `http://localhost:3456/projects/approvals`, `http://localhost:3456/dashboard`, and project board remain healthy after restart
+
+### Post-Phase-6 hardening — Hermes job lookup fallback expansion (2026-04-24)
+**Status:** complete and verified on 2026-04-24.
+
+**Grounded status:**
+- Added RED→GREEN coverage in `src/server/work-item-execution.test.ts`:
+  - `falls back to dashboard job list lookup when direct job-id lookup fails`
+- Hardened lookup flow in `src/server/work-item-execution.ts`:
+  - direct `getHermesJobById(...)` failures are now handled per-candidate and continue to fallback lookup instead of aborting the whole sync path
+  - `listHermesJobs()` failure still degrades safely to `null` (no route-level crash)
+- Targeted verification passed:
+  - `pnpm vitest run src/server/work-item-execution.test.ts`
+  - `pnpm vitest run src/server/work-item-execution.test.ts src/server/work-item-phase5.test.ts src/screens/projects/work-item-detail-screen.test.ts`
+  - `pnpm build`
+  - `systemctl --user restart hermes-workspace.service` + `is-active` -> `active`
+- Live verification passed:
+  - `GET /api/work-items/d63d7e2f-1f31-43c1-8d40-cb6c9afed9bb?syncExecution=true` returns `200`, no `error`
+  - `GET /api/work-items/a522005a-103b-4740-8c20-c6ee84c315d1?syncExecution=true` returns `200`, no `error`
+  - detail page, approvals inbox, and dashboard all load normally after restart
+
 ### Next practical priority
-The next practical continuation step is no longer slices 2-5. The immediate queue is:
-1. continue a freshly created inbox/research item through planning-oriented actions from detail view for one more live Slice 1 workflow pass
-2. finish and verify the remaining unstaged Conductor/work-item launch routing updates in:
-   - `src/server/work-item-launch.ts`
-   - `src/server/work-item-launch.test.ts`
-   - `src/server/conductor-launch.test.ts`
+Phase 6 and two post-phase hardening passes are complete. The immediate queue is:
+1. **Route-level fallback envelope for syncExecution edge failures**
+   - consider returning a non-fatal `executionSyncWarning` payload from `/api/work-items/:id` when sync throws unexpectedly, while preserving baseline work-item payload
+2. **Expand reliability regression coverage around API envelope behavior**
+   - add route-level tests to lock non-500 behavior for syncExecution dependency failures
 
 ---
 
@@ -222,10 +381,50 @@ These matter because the next slice should extend them rather than fight them:
   1. work-item explicit override
   2. project phase routing
   3. request/global phase profiles
-- `work-item-detail-screen.tsx` already has launch, sync, approval, and evidence surfaces, but still uses a generic `Launch via Conductor` action instead of workflow-specific planning/build/review/deploy actions.
+- `work-item-detail-screen.tsx` already exposes workflow-specific launch labels, planning-detail editing, lifecycle actions, approval handling, mission evidence, and execution sync.
 - `projects-view-model.ts` already encodes the board as a workflow progression rather than a generic status dump.
+- `work-item-lifecycle.ts` now owns explicit workflow transitions for planning, review, deploy approval, and blocked-build recovery:
+  - `send_to_planning`
+  - `mark_ready`
+  - `request_review`
+  - `request_deploy_approval`
+  - `resume_build`
+- `work-item-approvals.ts` now resolves phase-specific governance:
+  - review approval → `active/deploy`
+  - deploy approval → `done`
+  - review changes/rejected → `active/build` relaunch posture
 
 ---
+
+### Runtime regression hotfix — dashboard token/bootstrap mismatch (2026-04-24)
+**Status:** complete and verified on 2026-04-24.
+
+**Grounded status:**
+- Reproduced shared runtime failures across Operations / Jobs / Sessions / Chat via API endpoints and service logs:
+  - `/api/hermes-jobs` -> 500
+  - `/api/sessions` -> 500 (`Dashboard index failed: 500`)
+- Confirmed root cause was capability bootstrap mismatch, not four separate UI bugs:
+  - dashboard `/api/status` was healthy (`200`), so Workspace marked dashboard available
+  - dashboard root `/` was failing (`500`) and token bootstrap failed (`fetchDashboardToken`)
+  - protected `dashboardFetch` calls then threw and bubbled as runtime 500s
+- Confirmed underlying dashboard runtime error from `hermes-dashboard.service` logs:
+  - `FileNotFoundError: .../hermes_cli/web_dist/index.html`
+- Implemented minimal merge-safe source fix in `src/server/gateway-capabilities.ts`:
+  - `probeDashboard()` now requires successful token bootstrap; otherwise dashboard is treated as unavailable
+- Added regression coverage in `src/server/gateway-capabilities.test.ts`:
+  - status-up/token-down => `dashboard.available=false`
+  - status-up/token-up => `dashboard.available=true`
+- Verification pass completed:
+  - `pnpm vitest run src/server/gateway-capabilities.test.ts`
+  - `pnpm build`
+  - `systemctl --user restart hermes-workspace.service` / `is-active` -> `active`
+- Post-fix live API verification confirms degraded-but-healthy behavior:
+  - `/api/hermes-jobs` -> 200
+  - `/api/sessions` -> 200 unavailable payload (no 500)
+  - `/api/connection-status` -> 200 connected/portable
+  - `/api/gateway-status` now reports `dashboard.available=false`, `mode=portable`
+- Detailed incident record:
+  - `docs/plans/2026-04-24-hermes-workspace-runtime-api-regression-debug-handoff.md`
 
 ## 7. What to do immediately after a future context reset
 
@@ -236,18 +435,23 @@ When resuming this project in a new or compacted chat:
    - `src/screens/projects/project-detail-screen.tsx`
    - `src/screens/projects/work-item-detail-screen.tsx`
    - `src/server/work-item-launch.ts`
-   - `src/server/work-item-execution.ts`
+   - `src/server/work-item-lifecycle.ts`
+   - `src/server/work-item-approvals.ts`
 4. re-check the current slice status in section 4 before choosing work; do not assume older slice ordering is still current
-5. if no reprioritization is given, start with the remaining live QA gap for **Slice 1 — Idea capture + Plan with Researcher workflow**
-6. after that, continue with the unstaged Conductor/work-item launch routing refinement
+5. if no reprioritization is given, continue from the current section 4 immediate queue (runtime-dependency resilience + fallback regression coverage)
+6. then continue with whatever follow-on Mission Control priority is explicitly documented after that pass
 7. keep using the inspect → tests → patch → targeted tests → build → restart → live verify workflow
 
 ---
 
 ## 8. Bottom line
 
-The project is already past the original roadmap’s earliest slices. The next meaningful evolution is no longer “add Mission Control basics”; it is to make the workflow truly match the intended operating model:
+The project is already past the original roadmap’s earliest slices. The routing foundation, project/work-item control plane, approvals inbox, workflow policy, and Mission Control dashboard are in place.
 
-**idea capture → planning with Researcher → ready/build with Builder → review/approval → deploy/done**
+The next meaningful evolution after Phase 6 is to harden operational reliability in the same workflow:
 
-If resuming later, continue from **Slice 1 — Idea capture + Plan with Researcher workflow** first.
+**idea capture → planning with Researcher → build with Builder → review/approval → deploy/approval → done**
+
+with detail-path sync resilience and continued operator visibility when runtime dependencies fail.
+
+If resuming later, continue from the section 4 immediate queue (runtime-dependency resilience + fallback regression coverage).

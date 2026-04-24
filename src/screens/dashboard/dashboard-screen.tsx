@@ -39,6 +39,7 @@ type MissionControlSummary = {
   workItems: number
   pendingApprovals: number
   blockedWorkItems: number
+  failedMissions: number
   runningMissions: number
 }
 
@@ -52,6 +53,7 @@ type MissionControlQueueEntry = {
 
 type MissionControlQueues = {
   approvals: Array<MissionControlQueueEntry>
+  failed: Array<MissionControlQueueEntry>
   blocked: Array<MissionControlQueueEntry>
   running: Array<MissionControlQueueEntry>
 }
@@ -62,10 +64,12 @@ export const DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS: Record<keyof MissionContr
   workItems: 'Work items',
   pendingApprovals: 'Pending approvals',
   blockedWorkItems: 'Blocked work',
+  failedMissions: 'Failed missions',
   runningMissions: 'Running missions',
 }
 export const DASHBOARD_MISSION_CONTROL_QUEUE_TITLES: Record<keyof MissionControlQueues, string> = {
   approvals: 'Pending approvals',
+  failed: 'Failed missions',
   blocked: 'Blocked work',
   running: 'Running missions',
 }
@@ -107,6 +111,7 @@ export function buildDashboardMissionControlSummary(
     workItems: workItems.length,
     pendingApprovals: approvals.filter((approval) => approval.status === 'pending').length,
     blockedWorkItems: workItems.filter((workItem) => workItem.status === 'blocked').length,
+    failedMissions: workItems.filter((workItem) => workItem.missionState === 'failed').length,
     runningMissions: workItems.filter((workItem) => workItem.missionState === 'running').length,
   }
 }
@@ -117,6 +122,28 @@ export function buildDashboardMissionControlQueues(
   approvals: Array<ApprovalInboxEntry>,
 ): MissionControlQueues {
   const projectNames = new Map(projects.map((project) => [project.id, project.name]))
+  const projectAttentionCounts = new Map<string, number>()
+  const pendingApprovalCounts = approvals
+    .filter((approval) => approval.status === 'pending')
+    .reduce<Map<string, number>>((counts, approval) => {
+      counts.set(approval.projectId, (counts.get(approval.projectId) ?? 0) + 1)
+      return counts
+    }, new Map())
+
+  for (const workItem of workItems) {
+    const current = projectAttentionCounts.get(workItem.projectId) ?? 0
+    const shouldCount =
+      workItem.status === 'blocked' ||
+      workItem.missionState === 'failed' ||
+      workItem.missionState === 'running'
+    if (shouldCount) {
+      projectAttentionCounts.set(workItem.projectId, current + 1)
+    }
+  }
+
+  for (const [projectId, approvalCount] of pendingApprovalCounts.entries()) {
+    projectAttentionCounts.set(projectId, (projectAttentionCounts.get(projectId) ?? 0) + approvalCount)
+  }
 
   return {
     approvals: approvals
@@ -130,6 +157,29 @@ export function buildDashboardMissionControlQueues(
         detail: `${approval.phase === 'deploy' ? 'Deploy' : 'Review'} approval · requested ${approval.requestedAt}`,
         href: `/projects/${approval.projectId}/work-items/${approval.workItemId}`,
       })),
+    failed: workItems
+      .filter((workItem) => workItem.missionState === 'failed')
+      .sort((left, right) => {
+        const attentionDelta =
+          (projectAttentionCounts.get(right.projectId) ?? 0) -
+          (projectAttentionCounts.get(left.projectId) ?? 0)
+        if (attentionDelta !== 0) return attentionDelta
+        return (
+          Date.parse(right.missionLastRunAt ?? right.updatedAt) -
+          Date.parse(left.missionLastRunAt ?? left.updatedAt)
+        )
+      })
+      .slice(0, 5)
+      .map((workItem) => {
+        const attentionCount = projectAttentionCounts.get(workItem.projectId) ?? 1
+        return {
+          id: workItem.id,
+          title: workItem.title,
+          subtitle: projectNames.get(workItem.projectId) || 'Unknown project',
+          detail: `${workItem.phase ? WORK_ITEM_PHASE_LABELS[workItem.phase] : 'Mission'} failed · ${attentionCount} attention signals across project`,
+          href: `/projects/${workItem.projectId}/work-items/${workItem.id}`,
+        }
+      }),
     blocked: workItems
       .filter((workItem) => workItem.status === 'blocked')
       .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
@@ -1042,12 +1092,12 @@ export function DashboardScreen() {
       </div>
 
       {/* ── Mission Control Overview ── */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {(Object.keys(DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS) as Array<keyof MissionControlSummary>).map((key) => {
           const accentColor =
             key === 'pendingApprovals'
               ? palette.warning
-              : key === 'blockedWorkItems'
+              : key === 'blockedWorkItems' || key === 'failedMissions'
                 ? palette.danger
                 : key === 'runningMissions'
                   ? palette.accent
@@ -1066,7 +1116,9 @@ export function DashboardScreen() {
                       ? '✅'
                       : key === 'blockedWorkItems'
                         ? '⛔'
-                        : '🚀'
+                        : key === 'failedMissions'
+                          ? '🔥'
+                          : '🚀'
               }
               accentColor={accentColor}
               sub={
@@ -1074,22 +1126,39 @@ export function DashboardScreen() {
                   ? 'Operator decisions waiting now'
                   : key === 'blockedWorkItems'
                     ? 'Needs follow-up before work can continue'
-                    : key === 'runningMissions'
-                      ? 'Execution currently in flight'
-                      : undefined
+                    : key === 'failedMissions'
+                      ? 'Escalate and relaunch high-risk failures now'
+                      : key === 'runningMissions'
+                        ? 'Execution currently in flight'
+                        : undefined
               }
             />
           )
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
         <MissionControlQueueCard
           title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.approvals}
           entries={missionControlQueues.approvals}
           accentColor={palette.warning}
           emptyCopy="No pending approvals in the operator queue."
           onOpenAll={() => navigate({ to: '/projects/approvals' })}
+          onOpenEntry={(href) => {
+            const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
+            if (!match) return
+            navigate({
+              to: '/projects/$projectId/work-items/$workItemId',
+              params: { projectId: match[1], workItemId: match[2] },
+            })
+          }}
+        />
+        <MissionControlQueueCard
+          title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.failed}
+          entries={missionControlQueues.failed}
+          accentColor={palette.danger}
+          emptyCopy="No failed missions in the operator escalation queue."
+          onOpenAll={() => navigate({ to: '/projects' })}
           onOpenEntry={(href) => {
             const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
             if (!match) return

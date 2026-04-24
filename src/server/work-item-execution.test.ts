@@ -171,6 +171,7 @@ describe('work-item-execution', () => {
       phase: 'build',
       missionId: 'job-999',
     })
+    expect(result.workItem.history.at(-1)?.note).toContain('Run Resume Build before relaunching the build mission.')
   })
 
   it('extracts branch, pr, and artifact evidence from the latest Hermes run output', async () => {
@@ -233,5 +234,78 @@ describe('work-item-execution', () => {
       '/tmp/phase6/report.md',
       '/tmp/phase6/summary.json',
     ])
+  })
+
+  it('degrades to unknown execution state when Hermes dashboard index lookup fails', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Handle sync index outage',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'job-outage',
+      missionState: 'running',
+    })
+
+    getHermesJobById.mockRejectedValue(new Error('Dashboard index failed: 500'))
+    listHermesJobs.mockResolvedValue([])
+    getHermesJobRuns.mockResolvedValue([])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.state).toBe('unknown')
+    expect(result.execution.job).toBeNull()
+    expect(result.execution.transitionApplied).toBeNull()
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('build')
+
+    const persisted = getWorkItem(workItem.id)
+    expect(persisted?.id).toBe(workItem.id)
+    expect(persisted?.status).toBe('active')
+  })
+
+  it('falls back to dashboard job list lookup when direct job-id lookup fails', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Handle direct lookup outage',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'job-direct-fail',
+      missionState: 'unknown',
+    })
+
+    getHermesJobById.mockRejectedValue(new Error('Dashboard index failed: 500'))
+    listHermesJobs.mockResolvedValue([
+      {
+        id: 'job-direct-fail',
+        name: 'work-item-build-demo-fallback',
+        state: 'running',
+        last_status: null,
+        last_run_at: '2026-04-24T22:10:00Z',
+        last_error: null,
+        next_run_at: null,
+      },
+    ])
+    getHermesJobRuns.mockResolvedValue([])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.state).toBe('running')
+    expect(result.execution.job?.id).toBe('job-direct-fail')
+    expect(result.workItem.missionState).toBe('running')
+    expect(listHermesJobs).toHaveBeenCalledTimes(1)
   })
 })

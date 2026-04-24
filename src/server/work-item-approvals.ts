@@ -51,9 +51,10 @@ type WorkItemApprovalsFile = {
   approvals: Array<WorkItemApprovalRecord>
 }
 
-type RequestReviewApprovalInput = {
+type RequestWorkItemApprovalInput = {
   requestedBy?: string
   notes?: string
+  phase?: WorkItemApprovalPhase
 }
 
 type ResolveWorkItemApprovalInput = {
@@ -215,28 +216,29 @@ function updateWorkItemApproval(
   return next
 }
 
-export function requestWorkItemReviewApproval(
+export function requestWorkItemApproval(
   workItemId: string,
-  input: RequestReviewApprovalInput = {},
+  input: RequestWorkItemApprovalInput = {},
 ): WorkItemApprovalRecord {
   const workItem = getWorkItem(workItemId)
   if (!workItem) throw new Error('Work item not found')
-  if (workItem.phase !== 'review') throw new Error('Work item must be in review phase')
+  const phase = input.phase ?? 'review'
+  if (workItem.phase !== phase) throw new Error(`Work item must be in ${phase} phase`)
   const project = getProject(workItem.projectId)
   if (!project) throw new Error('Project not found')
 
   const existing = listWorkItemApprovals(workItemId).find(
-    (approval) => approval.phase === 'review' && approval.status === 'pending',
+    (approval) => approval.phase === phase && approval.status === 'pending',
   )
   if (existing) return existing
 
   const now = new Date().toISOString()
-  const autoApproved = shouldAutoApproveReview(workItem.id)
+  const autoApproved = phase === 'review' && shouldAutoApproveReview(workItem.id)
   const approval = normalizeApproval({
     id: randomUUID(),
     workItemId: workItem.id,
     projectId: workItem.projectId,
-    phase: 'review',
+    phase,
     status: autoApproved ? 'approved' : 'pending',
     requestedBy: input.requestedBy?.trim() || 'system',
     requestedAt: now,
@@ -254,15 +256,15 @@ export function requestWorkItemReviewApproval(
 
   if (autoApproved) {
     const updatedWorkItem = updateWorkItem(workItem.id, {
-      status: 'done',
-      phase: undefined,
+      status: 'active',
+      phase: 'deploy',
     })
     if (!updatedWorkItem) throw new Error('Failed to update work item after auto-approval')
     appendWorkItemHistoryEntry(updatedWorkItem.id, {
       action: 'status-change',
-      status: 'done',
-      phase: undefined,
-      note: 'Review auto-approved by policy; work item completed.',
+      status: 'active',
+      phase: 'deploy',
+      note: 'Review auto-approved by policy; advanced work item to deploy.',
       missionId: updatedWorkItem.missionId,
       sessionKey: updatedWorkItem.sessionKeys.at(-1),
       profile: updatedWorkItem.assignedProfile,
@@ -275,8 +277,8 @@ export function requestWorkItemReviewApproval(
     status: workItem.status,
     phase: workItem.phase,
     note: input.notes?.trim()
-      ? `Review approval requested: ${input.notes.trim()}`
-      : 'Review approval requested.',
+      ? `${phase === 'deploy' ? 'Deploy' : 'Review'} approval requested: ${input.notes.trim()}`
+      : `${phase === 'deploy' ? 'Deploy' : 'Review'} approval requested.`,
     missionId: workItem.missionId,
     sessionKey: workItem.sessionKeys.at(-1),
     profile: workItem.assignedProfile,
@@ -285,26 +287,55 @@ export function requestWorkItemReviewApproval(
   return approval
 }
 
-function approvalResolutionTransition(decision: ResolveWorkItemApprovalInput['decision']): {
+export function requestWorkItemReviewApproval(
+  workItemId: string,
+  input: Omit<RequestWorkItemApprovalInput, 'phase'> = {},
+): WorkItemApprovalRecord {
+  return requestWorkItemApproval(workItemId, { ...input, phase: 'review' })
+}
+
+function approvalResolutionTransition(
+  approval: WorkItemApprovalRecord,
+  decision: ResolveWorkItemApprovalInput['decision'],
+): {
   status: 'done' | 'active'
   phase?: WorkItemPhase
   note: string
 } {
+  if (approval.phase === 'review') {
+    if (decision === 'approved') {
+      return {
+        status: 'active',
+        phase: 'deploy',
+        note: 'Review approved; advanced work item to deploy.',
+      }
+    }
+
+    return {
+      status: 'active',
+      phase: 'build',
+      note:
+        decision === 'rejected'
+          ? 'Review rejected; returned work item to build for relaunch.'
+          : 'Review requested changes; returned work item to build for relaunch.',
+    }
+  }
+
   if (decision === 'approved') {
     return {
       status: 'done',
       phase: undefined,
-      note: 'Review approved; work item completed.',
+      note: 'Deploy approved; work item completed.',
     }
   }
 
   return {
     status: 'active',
-    phase: 'build',
+    phase: 'deploy',
     note:
       decision === 'rejected'
-        ? 'Review rejected; returned work item to build.'
-        : 'Review requested changes; returned work item to build.',
+        ? 'Deploy rejected; kept work item in deploy for follow-up and relaunch.'
+        : 'Deploy requested changes; kept work item in deploy for follow-up and relaunch.',
   }
 }
 
@@ -327,7 +358,7 @@ export function resolveWorkItemApprovalDecision(
   })
   if (!updatedApproval) throw new Error('Failed to update approval')
 
-  const transition = approvalResolutionTransition(input.decision)
+  const transition = approvalResolutionTransition(updatedApproval, input.decision)
   const updatedWorkItem = updateWorkItem(workItem.id, {
     status: transition.status,
     phase: transition.phase,

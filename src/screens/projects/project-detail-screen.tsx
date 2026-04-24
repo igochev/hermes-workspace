@@ -30,6 +30,7 @@ import {
   PROJECT_BOARD_FLOW_ORDER,
   buildProjectBoardUrgencySummary,
   buildWorkItemOperatorSignals,
+  buildWorkItemRecoveryHint,
   filterWorkItemsForProjectBoard,
   getWorkItemUrgencyTone,
   sortWorkItemsForProjectBoard,
@@ -76,6 +77,7 @@ export const PROJECT_BOARD_EMPTY_STATE_CLASS =
   'rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-6 text-center text-sm text-[var(--theme-muted)]'
 export const PROJECT_BOARD_SIGNAL_CHIP_CLASS =
   'inline-flex items-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--theme-text)]'
+export const PROJECT_RECOVERY_HINT_CLASS = 'mt-2 text-[11px] font-medium text-amber-300/90'
 export const PROJECT_BOARD_FILTER_BUTTON_CLASS =
   'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors'
 export const PROJECT_FORM_SELECT_CLASS =
@@ -88,6 +90,7 @@ export const PROJECT_ACCEPTANCE_CRITERIA_HELP_TEXT =
 export const PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL = 'Workflow Policy'
 export const PROJECT_WORKFLOW_POLICY_PANEL_TITLE = 'Project Workflow Policy'
 export const PROJECT_WORKFLOW_POLICY_SAVE_LABEL = 'Save Workflow Policy'
+export const PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING = 'Deploy governance'
 export const PROJECT_ROUTING_POLICY_EMPTY_VALUE = 'Auto fallback'
 export const PROJECT_ROUTING_PRECEDENCE_LABELS = [
   '1. Work item override',
@@ -124,6 +127,15 @@ export function buildProjectReviewAutoApprovalSummary(
   }
 
   return `Review auto-approval is enabled for ${REVIEW_AUTO_APPROVAL_PRIORITY_LABELS[reviewAutoApproval.maxPriority]} priority work items.`
+}
+
+export function buildProjectDeployGovernanceSummary(phaseProfiles: Pick<PhaseProfiles, 'deploy'>): string {
+  const deployProfile = phaseProfiles.deploy?.trim()
+  if (!deployProfile) {
+    return 'Deploy governance uses Auto fallback routing and requires explicit deploy approval before done.'
+  }
+
+  return `Deploy governance routes deploy launches to ${deployProfile} and requires explicit deploy approval before done.`
 }
 
 export const PROJECT_URGENCY_SUMMARY_LABELS: Record<keyof ProjectBoardUrgencySummary, string> = {
@@ -254,6 +266,10 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
   const reviewAutoApprovalSummary = useMemo(
     () => buildProjectReviewAutoApprovalSummary(reviewAutoApproval),
     [reviewAutoApproval],
+  )
+  const deployGovernanceSummary = useMemo(
+    () => buildProjectDeployGovernanceSummary(projectRouting),
+    [projectRouting],
   )
   const workItemsByStatus = useMemo(() => {
     const filteredWorkItems = filterWorkItemsForProjectBoard(workItems, boardFilter)
@@ -509,6 +525,12 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                       Review governance
                     </div>
                     <div className="mt-2 text-sm font-medium text-ink">{reviewAutoApprovalSummary}</div>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
+                    <div className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
+                      {PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING}
+                    </div>
+                    <div className="mt-2 text-sm font-medium text-ink">{deployGovernanceSummary}</div>
                   </div>
                 </div>
               </div>
@@ -841,6 +863,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                     ) : (
                       items.map((item) => {
                         const tone = getWorkItemUrgencyTone(item)
+                        const recoveryHint = buildWorkItemRecoveryHint(item)
                         return (
                           <Link
                             key={item.id}
@@ -876,6 +899,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                                 </span>
                               ))}
                             </div>
+                            {recoveryHint ? <p className={PROJECT_RECOVERY_HINT_CLASS}>{recoveryHint}</p> : null}
                           </Link>
                         )
                       })

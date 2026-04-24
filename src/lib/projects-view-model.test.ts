@@ -5,6 +5,7 @@ import {
   buildProjectBoardUrgencySummary,
   buildProjectStatsLine,
   buildWorkItemOperatorSignals,
+  buildWorkItemRecoveryHint,
   filterWorkItemsForProjectBoard,
   getWorkItemUrgencyTone,
   groupWorkItemsByStatus,
@@ -170,6 +171,57 @@ describe('projects-view-model', () => {
       pendingApprovals: 1,
       runningMissions: 1,
     })
+  })
+
+  it('adds an explicit recovery signal when blocked work has a failed mission', () => {
+    expect(
+      buildWorkItemOperatorSignals(
+        makeWorkItem({
+          id: 'recovery-needed',
+          status: 'blocked',
+          phase: 'build',
+          missionState: 'failed',
+        }),
+      ),
+    ).toEqual(
+      expect.arrayContaining(['Mission failed', 'Recovery ready', 'Build phase']),
+    )
+  })
+
+  it('builds recovery hints for failed and rework-oriented cards', () => {
+    expect(
+      buildWorkItemRecoveryHint(
+        makeWorkItem({
+          id: 'failed-build',
+          status: 'blocked',
+          phase: 'build',
+          missionState: 'failed',
+        }),
+      ),
+    ).toBe('Recovery: Resume Build, then relaunch Build.')
+    expect(
+      buildWorkItemRecoveryHint(
+        makeWorkItem({
+          id: 'changes-requested',
+          status: 'active',
+          phase: 'review',
+          approvals: [
+            {
+              id: 'approval-8',
+              workItemId: 'changes-requested',
+              projectId: 'project-1',
+              phase: 'review',
+              status: 'changes_requested',
+              requestedBy: 'operator',
+              requestedAt: '2026-04-21T00:00:00.000Z',
+              createdAt: '2026-04-21T00:00:00.000Z',
+              updatedAt: '2026-04-21T00:00:00.000Z',
+            },
+          ],
+        }),
+      ),
+    ).toBe('Recovery: Address review feedback and relaunch Build.')
+    expect(buildWorkItemRecoveryHint(makeWorkItem({ id: 'quiet', status: 'ready' }))).toBeNull()
   })
 
   it('assigns stronger urgency tones for board card emphasis', () => {

@@ -178,6 +178,7 @@ export async function launchWorkItemIntoConductor(
 
   const sessionKeys = Array.from(new Set([...workItem.sessionKeys, launch.sessionKey]))
   const missionLink = buildMissionLink(launch.jobId)
+  const wasRecoveryLaunch = workItem.status === 'blocked' || workItem.missionState === 'failed'
   const nextWorkItem = updateWorkItem(workItem.id, {
     status: 'active',
     phase,
@@ -187,15 +188,20 @@ export async function launchWorkItemIntoConductor(
     missionSessionKeyPrefix: launch.sessionKeyPrefix,
     missionLink,
     missionState: 'scheduled',
+    missionLastError: undefined,
     sessionKeys,
     repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
   })
 
   if (!nextWorkItem) throw new Error('Failed to update work item after launch')
 
-  const note = profile
-    ? `Launched ${phase} via Conductor using profile ${profile}.`
-    : `Launched ${phase} via Conductor.`
+  const note = wasRecoveryLaunch
+    ? profile
+      ? `Relaunched ${phase} via Conductor using profile ${profile} after failure recovery.`
+      : `Relaunched ${phase} via Conductor after failure recovery.`
+    : profile
+      ? `Launched ${phase} via Conductor using profile ${profile}.`
+      : `Launched ${phase} via Conductor.`
 
   const updatedWithHistory = appendWorkItemHistoryEntry(workItem.id, {
     action: 'launch',

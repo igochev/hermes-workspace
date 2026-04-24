@@ -1,3 +1,5 @@
+import type { WorkItemLifecycleAction } from './projects-api'
+
 const WORK_ITEMS_BASE = '/api/work-items'
 
 export type WorkItemExecutionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
@@ -56,8 +58,6 @@ export type WorkItemExecutionPayload = {
     transitionApplied: null | 'build->review' | 'active->blocked'
   }
 }
-
-export type WorkItemLifecycleAction = 'send_to_planning' | 'mark_ready' | 'request_review'
 
 export type WorkItemLifecyclePayload = {
   workItem: Record<string, unknown>

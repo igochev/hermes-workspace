@@ -85,6 +85,169 @@ The canonical workflow should now be treated as:
 For the exact current state, validated runtime details, and the prioritized next slices after this snapshot, continue from:
 - `docs/plans/2026-04-22-hermes-workspace-mission-control-continuation-handoff.md`
 
+## 2026-04-24 implementation audit snapshot
+
+The codebase has moved beyond the partially-complete routing state described in some older session notes.
+
+### Newly re-verified on 2026-04-24
+- `my-hermes-workspace-dev...origin/my-hermes-workspace-dev` was clean during audit.
+- Work-item → Conductor routing is implemented in `src/server/work-item-launch.ts`.
+- Effective routing precedence is test-covered as:
+  1. work-item override
+  2. project phase routing
+  3. request/global phase routing
+- Work-item detail now uses workflow-specific labels:
+  - `Plan with Researcher`
+  - `Launch Build`
+  - `Launch Review`
+  - `Launch Deploy`
+- Canonical mission-link persistence/exposure is in place:
+  - `missionJobId`
+  - `missionJobName`
+  - `missionSessionKeyPrefix`
+  - `missionLink`
+  - `missionState`
+- Targeted Mission Control tests passed for launch, routing, dashboard, and project/work-item UI.
+
+### Updated product conclusion
+The next gap is no longer launch routing. The next gap is finishing the authoritative workflow beyond review so Hermes Workspace behaves like a full operator Mission Control instead of stopping at review completion.
+
+### 2026-04-24 Phase 6A completion snapshot
+
+Grounded updates from the first Phase 6 slice:
+- Lifecycle contract now extends beyond review:
+  - review approval advances work items to deploy
+  - deploy approval is explicitly requested and resolved before done
+- Server-owned lifecycle actions now include:
+  - `request_deploy_approval`
+  - `resume_build`
+- Work-item detail lifecycle helpers now expose deploy/recovery-specific controls and labels.
+- Targeted tests passing after RED→GREEN updates:
+  - `src/server/work-item-lifecycle.test.ts`
+  - `src/server/work-item-approvals.test.ts`
+  - `src/screens/projects/work-item-detail-screen.test.ts`
+  - `src/server/work-item-phase5.test.ts`
+- Live verification against `http://localhost:3456` confirmed review -> deploy -> deploy approval -> done transitions on work item `bcc1ecd5-819b-4223-b8ec-bc74c84d01c4`, with board/inbox updates.
+
+### 2026-04-24 Phase 6B completion snapshot
+
+Grounded updates from the second Phase 6 slice:
+- Operator recovery flow is now explicit in server lifecycle + launch semantics:
+  - `resume_build` now clears stale failure state before relaunch (`missionState=unknown`, `missionLastError=undefined`)
+  - relaunching blocked/failed work now records recovery-specific launch history (`Relaunched ... after failure recovery`)
+  - failure-sync history now explicitly instructs operators to use `Resume Build` before relaunch
+- Project/operator visibility improved for recovery:
+  - board signals include `Recovery ready` for blocked+failed items
+  - project cards render explicit recovery hints for rework states (including review `changes_requested`)
+  - detail guidance/execution summary wording now routes operators through `Resume Build` + relaunch for failed build missions
+- Targeted RED→GREEN test coverage passing for recovery behavior:
+  - `src/server/work-item-execution.test.ts`
+  - `src/server/work-item-lifecycle.test.ts`
+  - `src/server/work-item-launch.test.ts`
+  - `src/lib/projects-view-model.test.ts`
+  - `src/screens/projects/work-item-detail-screen.test.ts`
+  - `src/screens/projects/project-detail-screen.test.ts`
+- Live verification against `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906` confirms project card recovery hint rendering (`Phase 4 approval flow demo` -> `Recovery: Address review feedback and relaunch Build.`).
+
+### 2026-04-24 Phase 6C completion snapshot
+
+Grounded updates from the third Phase 6 slice:
+- Dashboard/operator-console escalation now treats failed missions as first-class operator attention:
+  - mission-control summary adds `Failed missions` metric tile
+  - queue row adds dedicated `FAILED MISSIONS` card with direct links to affected work items
+- Cross-project attention semantics now prioritize failed queue order by project-level attention pressure (pending approvals + blocked/running/failed work), then mission recency.
+- Targeted RED→GREEN test coverage passing:
+  - `src/screens/dashboard/dashboard-screen.test.ts`
+- Additional dashboard-adjacent regression check passing:
+  - `src/screens/projects/project-detail-screen.test.ts`
+- Live verification against `http://localhost:3456/dashboard` confirms failed-mission tile + queue rendering in the command-center block.
+
+### 2026-04-24 Phase 6D completion snapshot
+
+Grounded updates from the fourth Phase 6 slice:
+- Project workflow policy now makes deploy governance explicit beside review governance:
+  - new `DEPLOY GOVERNANCE` policy block in project detail workflow panel
+  - deploy governance summary now always states explicit deploy approval requirement before done
+  - routing summary reflects configured deploy profile vs auto fallback path
+- Targeted RED→GREEN test coverage passing:
+  - `src/screens/projects/project-detail-screen.test.ts`
+- Additional regression check passing:
+  - `src/screens/dashboard/dashboard-screen.test.ts`
+- Live verification against `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906` confirms deploy governance text renders in Workflow Policy and includes explicit approval gating language.
+
+### 2026-04-24 Phase 6E completion snapshot
+
+Grounded updates from the fifth (closeout) Phase 6 slice:
+- Roadmap + continuation docs now include grounded shipped/live-verified outcomes for slices 6A through 6D and explicitly mark Phase 6 closeout complete.
+- Verification rerun before closeout docs update passed:
+  - `pnpm vitest run src/screens/projects/project-detail-screen.test.ts src/screens/dashboard/dashboard-screen.test.ts`
+  - `pnpm build`
+  - `systemctl --user restart hermes-workspace.service` / `is-active` -> `active`
+- Live verification rerun passed at:
+  - `http://localhost:3456/dashboard`
+  - `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906`
+- Remaining consciously deferred edge case remains unchanged:
+  - `/api/work-items/:id?syncExecution=true` can fail through dashboard-index dependency (`Dashboard index failed: 500`)
+
+### 2026-04-24 Post-Phase-6 hardening snapshot
+
+Grounded updates from the first post-phase reliability slice:
+- `/api/work-items/:id?syncExecution=true` now degrades safely when Hermes job lookup fails (`Dashboard index failed: 500` path), returning `execution.state='unknown'` instead of a route-level 500.
+- RED→GREEN resilience test added and passing:
+  - `src/server/work-item-execution.test.ts` (`degrades to unknown execution state when Hermes dashboard index lookup fails`)
+- Targeted verification pass completed:
+  - `pnpm vitest run src/server/work-item-execution.test.ts src/server/work-item-phase5.test.ts src/screens/projects/work-item-detail-screen.test.ts`
+  - `pnpm build`
+  - `systemctl --user restart hermes-workspace.service` / `is-active` -> `active`
+- Live verification confirms:
+  - `GET /api/work-items/d63d7e2f-1f31-43c1-8d40-cb6c9afed9bb?syncExecution=true` returns `200` with no error payload
+  - work-item detail page for that item now loads normally (no fallback `Work item not found`)
+  - approvals/dashboard/project-board surfaces remain healthy after restart
+
+### 2026-04-24 Post-Phase-6 hardening snapshot (lookup fallback expansion)
+
+Grounded updates from the second post-phase reliability slice:
+- `syncWorkItemExecutionState` now continues from direct `getHermesJobById(...)` failures to dashboard job-list fallback instead of degrading immediately to unknown.
+- RED→GREEN coverage added and passing:
+  - `src/server/work-item-execution.test.ts` (`falls back to dashboard job list lookup when direct job-id lookup fails`)
+- Targeted verification pass completed:
+  - `pnpm vitest run src/server/work-item-execution.test.ts`
+  - `pnpm vitest run src/server/work-item-execution.test.ts src/server/work-item-phase5.test.ts src/screens/projects/work-item-detail-screen.test.ts`
+  - `pnpm build`
+  - `systemctl --user restart hermes-workspace.service` / `is-active` -> `active`
+- Live verification confirms syncExecution endpoints remain non-fatal (HTTP 200, no error payload) for representative work items and core operator surfaces still render.
+
+### 2026-04-24 Runtime/API regression hotfix snapshot
+
+Grounded updates from the urgent runtime repair pass:
+- Shared cross-surface failures (`/operations`, `/jobs`, sessions loading, `/chat` warning) were traced to a single backend bootstrap issue.
+- Confirmed runtime mismatch:
+  - dashboard `/api/status` was healthy
+  - dashboard root `/` failed with 500, so session-token bootstrap failed
+  - Workspace still treated dashboard as available and attempted protected dashboard API calls, causing `Dashboard index failed: 500` throws.
+- Confirmed dashboard root failure from `hermes-dashboard.service` logs:
+  - `FileNotFoundError: .../hermes_cli/web_dist/index.html`
+- Minimal merge-safe fix shipped in `src/server/gateway-capabilities.ts`:
+  - `probeDashboard()` now requires successful token bootstrap to mark dashboard available.
+- New regression tests added and passing:
+  - `src/server/gateway-capabilities.test.ts`
+    - token bootstrap failure => dashboard unavailable fallback
+    - token bootstrap success => dashboard available
+- Verification pass completed:
+  - `pnpm vitest run src/server/gateway-capabilities.test.ts`
+  - `pnpm build`
+  - `systemctl --user restart hermes-workspace.service` / `is-active` -> `active`
+- Post-fix live API verification confirms failures are resolved/degraded safely:
+  - `/api/hermes-jobs` -> 200
+  - `/api/sessions` -> 200 unavailable payload (no route 500)
+  - `/api/connection-status` -> 200 connected/portable
+  - `/api/gateway-status` -> `dashboard.available=false`, `mode=portable`
+
+### Updated immediate priority
+1. repair the underlying Hermes dashboard root asset/runtime issue (`web_dist/index.html` missing) so dashboard mode can be re-enabled cleanly
+2. add route-level fallback envelope support in `/api/work-items/:id` for unexpected syncExecution throws (non-fatal warning + baseline payload)
+3. add route-level regression tests to lock non-500 envelope behavior
+
 ---
 
 # Target architecture

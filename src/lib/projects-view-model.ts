@@ -141,6 +141,9 @@ export function buildWorkItemOperatorSignals(workItem: WorkItemRecord): Array<st
     signals.push('Mission scheduled')
   } else if (workItem.missionState === 'failed') {
     signals.push('Mission failed')
+    if (workItem.status === 'blocked') {
+      signals.push('Recovery ready')
+    }
   } else if (workItem.missionState === 'succeeded') {
     signals.push('Mission succeeded')
   }
@@ -154,6 +157,17 @@ export function buildWorkItemOperatorSignals(workItem: WorkItemRecord): Array<st
   }
 
   return signals
+}
+
+export function buildWorkItemRecoveryHint(workItem: WorkItemRecord): string | null {
+  const latestApproval = workItem.approvals?.[0]
+  if (workItem.status === 'blocked' && workItem.phase === 'build' && workItem.missionState === 'failed') {
+    return 'Recovery: Resume Build, then relaunch Build.'
+  }
+  if (latestApproval?.status === 'changes_requested' && latestApproval.phase === 'review') {
+    return 'Recovery: Address review feedback and relaunch Build.'
+  }
+  return null
 }
 
 export function getWorkItemUrgencyTone(workItem: WorkItemRecord): WorkItemUrgencyTone {

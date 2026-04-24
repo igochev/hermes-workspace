@@ -8,6 +8,7 @@ import { createWorkItem, getWorkItem } from './work-items-store'
 import {
   listApprovalInboxEntries,
   listWorkItemApprovals,
+  requestWorkItemApproval,
   requestWorkItemReviewApproval,
   resolveWorkItemApprovalDecision,
 } from './work-item-approvals'
@@ -58,7 +59,7 @@ describe('work-item-approvals', () => {
     expect(listWorkItemApprovals(workItem.id)).toHaveLength(1)
   })
 
-  it('approves a review approval and completes the work item with audit history', () => {
+  it('approves a review approval and advances the work item into deploy with audit history', () => {
     const project = createProject({
       name: 'Mission Control Demo',
       repoPath: '/repos/mission-control-demo',
@@ -83,14 +84,15 @@ describe('work-item-approvals', () => {
 
     expect(result.approval.status).toBe('approved')
     expect(result.approval.resolvedBy).toBe('D3n13r')
-    expect(result.workItem.status).toBe('done')
-    expect(result.workItem.phase).toBeUndefined()
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('deploy')
     expect(result.workItem.history.at(-1)).toMatchObject({
       action: 'status-change',
-      status: 'done',
-      note: 'Review approved; work item completed.',
+      status: 'active',
+      phase: 'deploy',
+      note: 'Review approved; advanced work item to deploy.',
     })
-    expect(getWorkItem(workItem.id)?.status).toBe('done')
+    expect(getWorkItem(workItem.id)).toMatchObject({ status: 'active', phase: 'deploy' })
   })
 
   it('requests changes and returns the work item to build', () => {
@@ -123,7 +125,43 @@ describe('work-item-approvals', () => {
       action: 'status-change',
       status: 'active',
       phase: 'build',
-      note: 'Review requested changes; returned work item to build.',
+      note: 'Review requested changes; returned work item to build for relaunch.',
+    })
+  })
+
+  it('approves a deploy approval and completes the work item', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Approve deploy outcome',
+      status: 'active',
+      phase: 'deploy',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+    })
+    const approval = requestWorkItemApproval(workItem.id, {
+      requestedBy: 'operator',
+      notes: 'Ready for deploy approval',
+      phase: 'deploy',
+    })
+
+    const result = resolveWorkItemApprovalDecision(approval.id, {
+      decision: 'approved',
+      resolvedBy: 'D3n13r',
+      notes: 'Deploy validated',
+    })
+
+    expect(result.approval.phase).toBe('deploy')
+    expect(result.approval.status).toBe('approved')
+    expect(result.workItem.status).toBe('done')
+    expect(result.workItem.phase).toBeUndefined()
+    expect(result.workItem.history.at(-1)).toMatchObject({
+      action: 'status-change',
+      status: 'done',
+      note: 'Deploy approved; work item completed.',
     })
   })
 
@@ -199,13 +237,14 @@ describe('work-item-approvals', () => {
     expect(approval.resolvedBy).toBe('policy')
     expect(approval.resolutionNotes).toBe('Auto-approved by project review policy.')
     expect(getWorkItem(workItem.id)).toMatchObject({
-      status: 'done',
-      phase: undefined,
+      status: 'active',
+      phase: 'deploy',
     })
     expect(getWorkItem(workItem.id)?.history.at(-1)).toMatchObject({
       action: 'status-change',
-      status: 'done',
-      note: 'Review auto-approved by policy; work item completed.',
+      status: 'active',
+      phase: 'deploy',
+      note: 'Review auto-approved by policy; advanced work item to deploy.',
     })
   })
 })
