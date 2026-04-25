@@ -143,6 +143,12 @@ export function ProjectsScreen() {
               >
                 Approvals Inbox
               </Link>
+              <Link
+                to="/projects/autopilot"
+                className={PROJECTS_STAT_PILL_CLASS}
+              >
+                Autopilot Inbox
+              </Link>
               <button
                 type="button"
                 onClick={() => setShowCreate((value) => !value)}

@@ -650,10 +650,13 @@ When resuming this project in a new or compacted chat:
    - `src/server/work-items-store.ts` (data model — riskLevel + criteriaStatus fields)
 4. read `docs/plans/2026-04-25-hermes-workspace-profiles-workflow-rearchitecture.md` for the current architecture
 5. re-check the current slice status in section 4 before choosing work; do not assume older slice ordering is still current
-6. if no reprioritization is given, continue from the current section 4 immediate queue:
-   - **Slice K — notification watchdog** — ✅ shipped
-   - **Slice L — labels/analytics**
-   - use `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md` as the execution checklist
+6. if no reprioritization is given, continue from the Dream Mission Control implementation queue:
+   - **Slice N/O sub-slice 1 — PlanningDraft store + Planner structured-output parser** — ✅ shipped (tests + build verified)
+   - **Slice N/O sub-slice 2 — Planner enrichment service + API routes + launch guard** — ✅ shipped (targeted tests + build verified)
+   - **Slice N/O sub-slice 3 — UI panel/diff acceptance wiring** — ✅ shipped (UI helper tests + targeted server/UI tests + build verified)
+   - **Slice P/Q — Autopilot suggestions + project scout schedules** — ✅ shipped (store/routes/client APIs/screens/tests + full regression + build + service restart + API smoke)
+   - next priority: **Slice T/U — Structured review quality gates**
+   - use `docs/plans/2026-04-25-hermes-workspace-slice-t-u-structured-review-quality-gates-plan.md` as the execution checklist
 7. keep using the inspect → tests → patch → targeted tests → build → restart → live verify workflow
 
 ---
@@ -694,16 +697,86 @@ Extended the label analytics from lightweight counters (Slice L) into a full das
 | K | Notification watchdog (digest, de-dup, Discord) | ✅ Shipped |
 | L | Labels/tags + lightweight analytics counters | ✅ Shipped |
 | M | Label-based board analytics dashboard (cycle time, throughput, rework, status) | ✅ Shipped |
+| N/O-1 | PlanningDraft store + Planner structured-output parser (before UI) | ✅ Shipped |
+| N/O-2 | Planner enrichment service + API routes + launch guard | ✅ Shipped |
+| N/O-3 | Planner Enrichment UI panel + draft diff + accept/revision wiring | ✅ Shipped |
 
-**Regression baseline:** `143/143` passing
+**Regression baseline before this sub-slice:** `143/143` passing
+
+### 2026-04-25 Slice N/O sub-slice 1 completion snapshot
+
+Grounded updates from this session:
+
+- Added file-backed PlanningDraft persistence under `$HERMES_HOME/planning-drafts.json` via:
+  - `src/server/planning-drafts-store.ts`
+- Added parser/schema for structured Planner output via:
+  - `src/server/planner-output-schema.ts`
+- Added RED→GREEN tests for both primitives:
+  - `src/server/planning-drafts-store.test.ts`
+  - `src/server/planner-output-schema.test.ts`
+- Verified commands:
+  - `pnpm vitest run src/server/planning-drafts-store.test.ts src/server/planner-output-schema.test.ts`
+  - `pnpm build`
+
+### 2026-04-25 Slice N/O sub-slice 2 completion snapshot
+
+Grounded updates from this session:
+
+- Added Planner enrichment service and goal builder:
+  - `src/server/work-item-planning.ts`
+- Added RED→GREEN service tests:
+  - `src/server/work-item-planning.test.ts`
+- Added planning draft API routes:
+  - `src/routes/api/work-items.$workItemId.prepare.ts`
+  - `src/routes/api/work-items.$workItemId.planning-drafts.ts`
+  - `src/routes/api/planning-drafts.$draftId.ts`
+  - `src/routes/api/planning-drafts.$draftId.output.ts`
+  - `src/routes/api/planning-drafts.$draftId.accept.ts`
+- Added work-item detail payload enrichment with latest planning draft:
+  - `src/routes/api/work-items.$workItemId.ts`
+- Added build-launch guard to block unprepared rough ideas from Builder launch:
+  - `src/server/work-item-launch.ts`
+  - `src/server/work-item-launch.test.ts`
+  - `src/routes/api/work-items.$workItemId.launch.ts` (400 mapping)
+- Added client-facing planning API helpers and types groundwork:
+  - `src/lib/planning-drafts-api.ts`
+  - `src/lib/projects-api.ts`
+- Verified commands:
+  - `pnpm vitest run src/server/planning-drafts-store.test.ts src/server/planner-output-schema.test.ts src/server/work-item-planning.test.ts src/server/work-item-launch.test.ts`
+  - `pnpm build`
+
+### 2026-04-25 Slice N/O sub-slice 3 completion snapshot
+
+Grounded updates from this session:
+
+- Added Planner Enrichment helper APIs and launch gating helpers in work-item detail screen:
+  - `getPlanningDraftStatusLabel`
+  - `getPlanningDraftGuidance`
+  - `canLaunchBuildFromPlanningState`
+  - `buildPlanningDraftDiff`
+- Implemented Planner Enrichment panel UI in work item detail:
+  - no-draft state with **Prepare with Planner** action
+  - requested/running metadata rendering
+  - structured-ready diff preview + **Accept Planner Draft** flow
+  - parse-failed error/warnings rendering + **Request Revision** + relaunch flow
+  - accepted status rendering with accepted timestamp + plan path
+- Added build-launch UI gating + guidance for rough ideas not yet planner-prepared.
+- Updated project-detail rough idea intake copy and planner signal coverage:
+  - `PROJECT_CREATE_WORK_ITEM_BUTTON_LABEL = "Capture rough idea"`
+  - `PROJECT_CREATE_WORK_ITEM_SUBMIT_LABEL = "Create rough idea"`
+  - board chips now include `Needs Planner`, `Draft ready`, `Planner revision needed` through `buildWorkItemOperatorSignals`
+- Updated attention filtering to include unprepared inbox/research rough ideas.
+- Verified commands:
+  - `pnpm vitest run src/lib/projects-view-model.test.ts src/screens/projects/work-item-detail-screen.test.ts src/screens/projects/project-detail-screen.test.ts`
+  - `pnpm vitest run src/server/planning-drafts-store.test.ts src/server/planner-output-schema.test.ts src/server/work-item-planning.test.ts src/server/work-item-launch.test.ts src/screens/projects/work-item-detail-screen.test.ts src/screens/projects/project-detail-screen.test.ts`
+  - `pnpm build`
 
 The next meaningful evolutions are now defined by the CEO/Architect north-star audit:
 
-1. **Slice N — Idea Intake + Planner Enrichment** — rough ideas become Planner-prepared draft work items before Builder launch.
-2. **Slice P — Autopilot Suggestion Model + Inbox** — project-aware scout findings become reviewable suggestions, not immediate code changes.
-3. **Slice Q — Project Autopilot Scout Schedules** — easy daily/weekly improvement scouting per project.
-4. **Slice T — Structured Review Decision Parser** — review output becomes a real quality gate, not just job success/failure.
-5. **Slice R/S — Execution Runs + Supervisor** — durable run history plus stale/failure detection.
+1. **Slice P — Autopilot Suggestion Model + Inbox** — project-aware scout findings become reviewable suggestions, not immediate code changes.
+2. **Slice Q — Project Autopilot Scout Schedules** — easy daily/weekly improvement scouting per project.
+3. **Slice T — Structured Review Decision Parser** — review output becomes a real quality gate, not just job success/failure.
+4. **Slice R/S — Execution Runs + Supervisor** — durable run history plus stale/failure detection.
 
 Detailed implementation entrypoint:
 - `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`

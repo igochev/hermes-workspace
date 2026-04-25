@@ -231,6 +231,35 @@ export function buildPlannerReviewGoal(workItem: WorkItemRecord, project: Projec
     '',
     'Include a brief rationale for your decision in a SUMMARY section before the DECISION line.',
     '',
+    'STRUCTURED OUTPUT REQUIREMENT',
+    '',
+    'You MUST include REVIEW_DECISION_JSON matching this schema:',
+    '{',
+    '  "decision": "approved | changes_requested",',
+    '  "confidence": "low | medium | high",',
+    '  "summary": "...",',
+    '  "criteria": [{ "text": "...", "met": true, "evidence": "...", "notes": "..." }],',
+    '  "evidence": {',
+    '    "branchName": "...",',
+    '    "prUrl": "...",',
+    '    "artifactPaths": ["..."],',
+    '    "testCommands": ["..."],',
+    '    "testResults": [{ "command": "...", "status": "passed|failed|not_run|unknown", "summary": "..." }],',
+    '    "filesReviewed": ["..."],',
+    '    "planReviewed": true',
+    '  },',
+    '  "blockers": [],',
+    '  "risks": []',
+    '}',
+    '',
+    'You MUST end with exactly one final line:',
+    'DECISION: APPROVED',
+    'or',
+    'DECISION: CHANGES_REQUESTED',
+    '',
+    'If you cannot verify every acceptance criterion with evidence, use CHANGES_REQUESTED.',
+    'Missing structured output will require manual CEO review and will not auto-approve.',
+    '',
     ...(workItem.notes.length > 0 ? ['', ...buildNotesBlock(workItem)] : []),
     '',
     'Treat this as a tracked Mission Control Planner review. Reference the work item ID in all summaries.',
@@ -310,6 +339,15 @@ export async function launchWorkItemIntoConductor(
 
   const requestPhaseProfiles = normalizePhaseProfiles(request.phaseProfiles)
   const phase = normalizeLaunchPhase(request.phase, workItem.phase)
+
+  const launchingBuildWithoutPlannerPreparation =
+    phase === 'build' &&
+    !readOptionalString(workItem.planFilePath) &&
+    (workItem.status === 'inbox' || workItem.phase === 'research')
+  if (launchingBuildWithoutPlannerPreparation) {
+    throw new Error('Work item must be prepared by Planner before Builder launch')
+  }
+
   const isTwoPhase = isTwoPhaseLaunchCandidate(workItem, phase)
 
   // For two-phase pipeline, resolve both profiles and build combined goal

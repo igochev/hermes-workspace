@@ -157,6 +157,44 @@ describe('work-items-store', () => {
     ])
   })
 
+  it('normalizes review decision quality-gate fields with defaults and round-trips valid values', () => {
+    const workItem = createWorkItem({
+      projectId: 'project-review-gate',
+      title: 'Review gate fields test',
+      repoPathSnapshot: '/repos/gate',
+    })
+
+    expect(workItem.reviewQualityGateReasons).toEqual([])
+    expect(workItem.reviewMissingEvidence).toEqual([])
+    expect(workItem.reviewDecision).toBeUndefined()
+    expect(workItem.reviewDecisionConfidence).toBeUndefined()
+    expect(workItem.reviewQualityGateStatus).toBeUndefined()
+    expect(workItem.reviewParserError).toBeUndefined()
+
+    const updated = updateWorkItem(workItem.id, {
+      reviewDecision: 'approved' as const,
+      reviewDecisionSummary: 'All criteria met with evidence.',
+      reviewDecisionConfidence: 'high' as const,
+      reviewDecisionSource: 'json' as const,
+      reviewQualityGateStatus: 'pass' as const,
+      reviewQualityGateReasons: ['All gates passed'],
+      reviewMissingEvidence: [],
+    })
+
+    expect(updated?.reviewDecision).toBe('approved')
+    expect(updated?.reviewDecisionSummary).toBe('All criteria met with evidence.')
+    expect(updated?.reviewDecisionConfidence).toBe('high')
+    expect(updated?.reviewDecisionSource).toBe('json')
+    expect(updated?.reviewQualityGateStatus).toBe('pass')
+    expect(updated?.reviewQualityGateReasons).toEqual(['All gates passed'])
+    expect(updated?.reviewMissingEvidence).toEqual([])
+
+    const reset = updateWorkItem(workItem.id, {
+      reviewQualityGateStatus: 'manual_review' as const,
+    })
+    expect(reset?.reviewQualityGateStatus).toBe('manual_review')
+  })
+
   it('updates work items and can remove all work items for a deleted project', () => {
     const keep = createWorkItem({
       projectId: 'project-keep',

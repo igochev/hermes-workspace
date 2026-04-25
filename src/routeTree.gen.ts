@@ -28,6 +28,7 @@ import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as SettingsMcpRouteImport } from './routes/settings/mcp'
+import { Route as ProjectsAutopilotRouteImport } from './routes/projects/autopilot'
 import { Route as ProjectsApprovalsRouteImport } from './routes/projects/approvals'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
@@ -69,9 +70,11 @@ import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection
 import { Route as ApiConductorStopRouteImport } from './routes/api/conductor-stop'
 import { Route as ApiConductorSpawnRouteImport } from './routes/api/conductor-spawn'
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
+import { Route as ApiAutopilotSuggestionsRouteImport } from './routes/api/autopilot-suggestions'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdAutopilotRouteImport } from './routes/projects/$projectId/autopilot'
 import { Route as ApiWorkItemsWorkItemIdRouteImport } from './routes/api/work-items.$workItemId'
 import { Route as ApiWorkItemApprovalsApprovalIdRouteImport } from './routes/api/work-item-approvals.$approvalId'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
@@ -87,6 +90,7 @@ import { Route as ApiProfilesListRouteImport } from './routes/api/profiles/list'
 import { Route as ApiProfilesDeleteRouteImport } from './routes/api/profiles/delete'
 import { Route as ApiProfilesCreateRouteImport } from './routes/api/profiles/create'
 import { Route as ApiProfilesActivateRouteImport } from './routes/api/profiles/activate'
+import { Route as ApiPlanningDraftsDraftIdRouteImport } from './routes/api/planning-drafts.$draftId'
 import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
 import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
 import { Route as ApiModelInfoRouteImport } from './routes/api/model/info'
@@ -105,13 +109,20 @@ import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/c
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
 import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
+import { Route as ApiAutopilotSuggestionsSuggestionIdRouteImport } from './routes/api/autopilot-suggestions.$suggestionId'
 import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
+import { Route as ApiWorkItemsWorkItemIdPrepareRouteImport } from './routes/api/work-items.$workItemId.prepare'
+import { Route as ApiWorkItemsWorkItemIdPlanningDraftsRouteImport } from './routes/api/work-items.$workItemId.planning-drafts'
 import { Route as ApiWorkItemsWorkItemIdLifecycleRouteImport } from './routes/api/work-items.$workItemId.lifecycle'
 import { Route as ApiWorkItemsWorkItemIdLaunchRouteImport } from './routes/api/work-items.$workItemId.launch'
 import { Route as ApiWorkItemsWorkItemIdApprovalsRouteImport } from './routes/api/work-items.$workItemId.approvals'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 import { Route as ApiProjectsProjectIdLabelAnalyticsRouteImport } from './routes/api/projects.$projectId.label-analytics'
+import { Route as ApiProjectsProjectIdAutopilotScheduleRouteImport } from './routes/api/projects.$projectId.autopilot-schedule'
+import { Route as ApiPlanningDraftsDraftIdOutputRouteImport } from './routes/api/planning-drafts.$draftId.output'
+import { Route as ApiPlanningDraftsDraftIdAcceptRouteImport } from './routes/api/planning-drafts.$draftId.accept'
+import { Route as ApiAutopilotSuggestionsSuggestionIdConvertRouteImport } from './routes/api/autopilot-suggestions.$suggestionId.convert'
 
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
@@ -207,6 +218,11 @@ const SettingsMcpRoute = SettingsMcpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
   getParentRoute: () => SettingsRoute,
+} as any)
+const ProjectsAutopilotRoute = ProjectsAutopilotRouteImport.update({
+  id: '/autopilot',
+  path: '/autopilot',
+  getParentRoute: () => ProjectsRoute,
 } as any)
 const ProjectsApprovalsRoute = ProjectsApprovalsRouteImport.update({
   id: '/approvals',
@@ -414,6 +430,11 @@ const ApiChatEventsRoute = ApiChatEventsRouteImport.update({
   path: '/api/chat-events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAutopilotSuggestionsRoute = ApiAutopilotSuggestionsRouteImport.update({
+  id: '/api/autopilot-suggestions',
+  path: '/api/autopilot-suggestions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthCheckRoute = ApiAuthCheckRouteImport.update({
   id: '/api/auth-check',
   path: '/api/auth-check',
@@ -429,6 +450,12 @@ const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ProjectsProjectIdRoute,
 } as any)
+const ProjectsProjectIdAutopilotRoute =
+  ProjectsProjectIdAutopilotRouteImport.update({
+    id: '/autopilot',
+    path: '/autopilot',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
 const ApiWorkItemsWorkItemIdRoute = ApiWorkItemsWorkItemIdRouteImport.update({
   id: '/$workItemId',
   path: '/$workItemId',
@@ -505,6 +532,12 @@ const ApiProfilesActivateRoute = ApiProfilesActivateRouteImport.update({
   path: '/api/profiles/activate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPlanningDraftsDraftIdRoute =
+  ApiPlanningDraftsDraftIdRouteImport.update({
+    id: '/api/planning-drafts/$draftId',
+    path: '/api/planning-drafts/$draftId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOauthPollTokenRoute = ApiOauthPollTokenRouteImport.update({
   id: '/api/oauth/poll-token',
   path: '/api/oauth/poll-token',
@@ -595,11 +628,29 @@ const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiHermesJobsRoute,
 } as any)
+const ApiAutopilotSuggestionsSuggestionIdRoute =
+  ApiAutopilotSuggestionsSuggestionIdRouteImport.update({
+    id: '/$suggestionId',
+    path: '/$suggestionId',
+    getParentRoute: () => ApiAutopilotSuggestionsRoute,
+  } as any)
 const ProjectsProjectIdWorkItemsWorkItemIdRoute =
   ProjectsProjectIdWorkItemsWorkItemIdRouteImport.update({
     id: '/work-items/$workItemId',
     path: '/work-items/$workItemId',
     getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdPrepareRoute =
+  ApiWorkItemsWorkItemIdPrepareRouteImport.update({
+    id: '/prepare',
+    path: '/prepare',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdPlanningDraftsRoute =
+  ApiWorkItemsWorkItemIdPlanningDraftsRouteImport.update({
+    id: '/planning-drafts',
+    path: '/planning-drafts',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
   } as any)
 const ApiWorkItemsWorkItemIdLifecycleRoute =
   ApiWorkItemsWorkItemIdLifecycleRouteImport.update({
@@ -637,6 +688,30 @@ const ApiProjectsProjectIdLabelAnalyticsRoute =
     path: '/label-analytics',
     getParentRoute: () => ApiProjectsProjectIdRoute,
   } as any)
+const ApiProjectsProjectIdAutopilotScheduleRoute =
+  ApiProjectsProjectIdAutopilotScheduleRouteImport.update({
+    id: '/autopilot-schedule',
+    path: '/autopilot-schedule',
+    getParentRoute: () => ApiProjectsProjectIdRoute,
+  } as any)
+const ApiPlanningDraftsDraftIdOutputRoute =
+  ApiPlanningDraftsDraftIdOutputRouteImport.update({
+    id: '/output',
+    path: '/output',
+    getParentRoute: () => ApiPlanningDraftsDraftIdRoute,
+  } as any)
+const ApiPlanningDraftsDraftIdAcceptRoute =
+  ApiPlanningDraftsDraftIdAcceptRouteImport.update({
+    id: '/accept',
+    path: '/accept',
+    getParentRoute: () => ApiPlanningDraftsDraftIdRoute,
+  } as any)
+const ApiAutopilotSuggestionsSuggestionIdConvertRoute =
+  ApiAutopilotSuggestionsSuggestionIdConvertRouteImport.update({
+    id: '/convert',
+    path: '/convert',
+    getParentRoute: () => ApiAutopilotSuggestionsSuggestionIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -655,6 +730,7 @@ export interface FileRoutesByFullPath {
   '/terminal': typeof TerminalRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
@@ -696,11 +772,13 @@ export interface FileRoutesByFullPath {
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/approvals': typeof ProjectsApprovalsRoute
+  '/projects/autopilot': typeof ProjectsAutopilotRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -719,6 +797,7 @@ export interface FileRoutesByFullPath {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/planning-drafts/$draftId': typeof ApiPlanningDraftsDraftIdRouteWithChildren
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -734,13 +813,20 @@ export interface FileRoutesByFullPath {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId/autopilot': typeof ProjectsProjectIdAutopilotRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/api/autopilot-suggestions/$suggestionId/convert': typeof ApiAutopilotSuggestionsSuggestionIdConvertRoute
+  '/api/planning-drafts/$draftId/accept': typeof ApiPlanningDraftsDraftIdAcceptRoute
+  '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
+  '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
   '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
+  '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
+  '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRoutesByTo {
@@ -758,6 +844,7 @@ export interface FileRoutesByTo {
   '/terminal': typeof TerminalRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
@@ -798,11 +885,13 @@ export interface FileRoutesByTo {
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/projects/approvals': typeof ProjectsApprovalsRoute
+  '/projects/autopilot': typeof ProjectsAutopilotRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/projects': typeof ProjectsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -821,6 +910,7 @@ export interface FileRoutesByTo {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/planning-drafts/$draftId': typeof ApiPlanningDraftsDraftIdRouteWithChildren
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -836,13 +926,20 @@ export interface FileRoutesByTo {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId/autopilot': typeof ProjectsProjectIdAutopilotRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/api/autopilot-suggestions/$suggestionId/convert': typeof ApiAutopilotSuggestionsSuggestionIdConvertRoute
+  '/api/planning-drafts/$draftId/accept': typeof ApiPlanningDraftsDraftIdAcceptRoute
+  '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
+  '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
   '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
+  '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
+  '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRoutesById {
@@ -863,6 +960,7 @@ export interface FileRoutesById {
   '/terminal': typeof TerminalRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
@@ -904,11 +1002,13 @@ export interface FileRoutesById {
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/approvals': typeof ProjectsApprovalsRoute
+  '/projects/autopilot': typeof ProjectsAutopilotRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -927,6 +1027,7 @@ export interface FileRoutesById {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/planning-drafts/$draftId': typeof ApiPlanningDraftsDraftIdRouteWithChildren
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -942,13 +1043,20 @@ export interface FileRoutesById {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId/autopilot': typeof ProjectsProjectIdAutopilotRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/api/autopilot-suggestions/$suggestionId/convert': typeof ApiAutopilotSuggestionsSuggestionIdConvertRoute
+  '/api/planning-drafts/$draftId/accept': typeof ApiPlanningDraftsDraftIdAcceptRoute
+  '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
+  '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
   '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
+  '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
+  '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRouteTypes {
@@ -970,6 +1078,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/autopilot-suggestions'
     | '/api/chat-events'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
@@ -1011,11 +1120,13 @@ export interface FileRouteTypes {
     | '/chat/$sessionKey'
     | '/projects/$projectId'
     | '/projects/approvals'
+    | '/projects/autopilot'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat/'
     | '/projects/'
     | '/settings/'
+    | '/api/autopilot-suggestions/$suggestionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1034,6 +1145,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/planning-drafts/$draftId'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1049,13 +1161,20 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
+    | '/projects/$projectId/autopilot'
     | '/projects/$projectId/'
+    | '/api/autopilot-suggestions/$suggestionId/convert'
+    | '/api/planning-drafts/$draftId/accept'
+    | '/api/planning-drafts/$draftId/output'
+    | '/api/projects/$projectId/autopilot-schedule'
     | '/api/projects/$projectId/label-analytics'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
+    | '/api/work-items/$workItemId/planning-drafts'
+    | '/api/work-items/$workItemId/prepare'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1073,6 +1192,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/autopilot-suggestions'
     | '/api/chat-events'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
@@ -1113,11 +1233,13 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/projects/approvals'
+    | '/projects/autopilot'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat'
     | '/projects'
     | '/settings'
+    | '/api/autopilot-suggestions/$suggestionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1136,6 +1258,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/planning-drafts/$draftId'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1151,13 +1274,20 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
+    | '/projects/$projectId/autopilot'
     | '/projects/$projectId'
+    | '/api/autopilot-suggestions/$suggestionId/convert'
+    | '/api/planning-drafts/$draftId/accept'
+    | '/api/planning-drafts/$draftId/output'
+    | '/api/projects/$projectId/autopilot-schedule'
     | '/api/projects/$projectId/label-analytics'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
+    | '/api/work-items/$workItemId/planning-drafts'
+    | '/api/work-items/$workItemId/prepare'
     | '/projects/$projectId/work-items/$workItemId'
   id:
     | '__root__'
@@ -1177,6 +1307,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/autopilot-suggestions'
     | '/api/chat-events'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
@@ -1218,11 +1349,13 @@ export interface FileRouteTypes {
     | '/chat/$sessionKey'
     | '/projects/$projectId'
     | '/projects/approvals'
+    | '/projects/autopilot'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat/'
     | '/projects/'
     | '/settings/'
+    | '/api/autopilot-suggestions/$suggestionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1241,6 +1374,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/planning-drafts/$draftId'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1256,13 +1390,20 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
+    | '/projects/$projectId/autopilot'
     | '/projects/$projectId/'
+    | '/api/autopilot-suggestions/$suggestionId/convert'
+    | '/api/planning-drafts/$draftId/accept'
+    | '/api/planning-drafts/$draftId/output'
+    | '/api/projects/$projectId/autopilot-schedule'
     | '/api/projects/$projectId/label-analytics'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
+    | '/api/work-items/$workItemId/planning-drafts'
+    | '/api/work-items/$workItemId/prepare'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesById: FileRoutesById
 }
@@ -1283,6 +1424,7 @@ export interface RootRouteChildren {
   TerminalRoute: typeof TerminalRoute
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
+  ApiAutopilotSuggestionsRoute: typeof ApiAutopilotSuggestionsRouteWithChildren
   ApiChatEventsRoute: typeof ApiChatEventsRoute
   ApiConductorSpawnRoute: typeof ApiConductorSpawnRoute
   ApiConductorStopRoute: typeof ApiConductorStopRoute
@@ -1335,6 +1477,7 @@ export interface RootRouteChildren {
   ApiModelInfoRoute: typeof ApiModelInfoRoute
   ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
   ApiOauthPollTokenRoute: typeof ApiOauthPollTokenRoute
+  ApiPlanningDraftsDraftIdRoute: typeof ApiPlanningDraftsDraftIdRouteWithChildren
   ApiProfilesActivateRoute: typeof ApiProfilesActivateRoute
   ApiProfilesCreateRoute: typeof ApiProfilesCreateRoute
   ApiProfilesDeleteRoute: typeof ApiProfilesDeleteRoute
@@ -1478,6 +1621,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/mcp'
       preLoaderRoute: typeof SettingsMcpRouteImport
       parentRoute: typeof SettingsRoute
+    }
+    '/projects/autopilot': {
+      id: '/projects/autopilot'
+      path: '/autopilot'
+      fullPath: '/projects/autopilot'
+      preLoaderRoute: typeof ProjectsAutopilotRouteImport
+      parentRoute: typeof ProjectsRoute
     }
     '/projects/approvals': {
       id: '/projects/approvals'
@@ -1766,6 +1916,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/autopilot-suggestions': {
+      id: '/api/autopilot-suggestions'
+      path: '/api/autopilot-suggestions'
+      fullPath: '/api/autopilot-suggestions'
+      preLoaderRoute: typeof ApiAutopilotSuggestionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth-check': {
       id: '/api/auth-check'
       path: '/api/auth-check'
@@ -1785,6 +1942,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/projects/$projectId/'
       preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/autopilot': {
+      id: '/projects/$projectId/autopilot'
+      path: '/autopilot'
+      fullPath: '/projects/$projectId/autopilot'
+      preLoaderRoute: typeof ProjectsProjectIdAutopilotRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
     '/api/work-items/$workItemId': {
@@ -1890,6 +2054,13 @@ declare module '@tanstack/react-router' {
       path: '/api/profiles/activate'
       fullPath: '/api/profiles/activate'
       preLoaderRoute: typeof ApiProfilesActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/planning-drafts/$draftId': {
+      id: '/api/planning-drafts/$draftId'
+      path: '/api/planning-drafts/$draftId'
+      fullPath: '/api/planning-drafts/$draftId'
+      preLoaderRoute: typeof ApiPlanningDraftsDraftIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/oauth/poll-token': {
@@ -2018,12 +2189,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesJobsJobIdRouteImport
       parentRoute: typeof ApiHermesJobsRoute
     }
+    '/api/autopilot-suggestions/$suggestionId': {
+      id: '/api/autopilot-suggestions/$suggestionId'
+      path: '/$suggestionId'
+      fullPath: '/api/autopilot-suggestions/$suggestionId'
+      preLoaderRoute: typeof ApiAutopilotSuggestionsSuggestionIdRouteImport
+      parentRoute: typeof ApiAutopilotSuggestionsRoute
+    }
     '/projects/$projectId/work-items/$workItemId': {
       id: '/projects/$projectId/work-items/$workItemId'
       path: '/work-items/$workItemId'
       fullPath: '/projects/$projectId/work-items/$workItemId'
       preLoaderRoute: typeof ProjectsProjectIdWorkItemsWorkItemIdRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/api/work-items/$workItemId/prepare': {
+      id: '/api/work-items/$workItemId/prepare'
+      path: '/prepare'
+      fullPath: '/api/work-items/$workItemId/prepare'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdPrepareRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
+    '/api/work-items/$workItemId/planning-drafts': {
+      id: '/api/work-items/$workItemId/planning-drafts'
+      path: '/planning-drafts'
+      fullPath: '/api/work-items/$workItemId/planning-drafts'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdPlanningDraftsRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
     }
     '/api/work-items/$workItemId/lifecycle': {
       id: '/api/work-items/$workItemId/lifecycle'
@@ -2067,15 +2259,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProjectsProjectIdLabelAnalyticsRouteImport
       parentRoute: typeof ApiProjectsProjectIdRoute
     }
+    '/api/projects/$projectId/autopilot-schedule': {
+      id: '/api/projects/$projectId/autopilot-schedule'
+      path: '/autopilot-schedule'
+      fullPath: '/api/projects/$projectId/autopilot-schedule'
+      preLoaderRoute: typeof ApiProjectsProjectIdAutopilotScheduleRouteImport
+      parentRoute: typeof ApiProjectsProjectIdRoute
+    }
+    '/api/planning-drafts/$draftId/output': {
+      id: '/api/planning-drafts/$draftId/output'
+      path: '/output'
+      fullPath: '/api/planning-drafts/$draftId/output'
+      preLoaderRoute: typeof ApiPlanningDraftsDraftIdOutputRouteImport
+      parentRoute: typeof ApiPlanningDraftsDraftIdRoute
+    }
+    '/api/planning-drafts/$draftId/accept': {
+      id: '/api/planning-drafts/$draftId/accept'
+      path: '/accept'
+      fullPath: '/api/planning-drafts/$draftId/accept'
+      preLoaderRoute: typeof ApiPlanningDraftsDraftIdAcceptRouteImport
+      parentRoute: typeof ApiPlanningDraftsDraftIdRoute
+    }
+    '/api/autopilot-suggestions/$suggestionId/convert': {
+      id: '/api/autopilot-suggestions/$suggestionId/convert'
+      path: '/convert'
+      fullPath: '/api/autopilot-suggestions/$suggestionId/convert'
+      preLoaderRoute: typeof ApiAutopilotSuggestionsSuggestionIdConvertRouteImport
+      parentRoute: typeof ApiAutopilotSuggestionsSuggestionIdRoute
+    }
   }
 }
 
 interface ProjectsProjectIdRouteChildren {
+  ProjectsProjectIdAutopilotRoute: typeof ProjectsProjectIdAutopilotRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdWorkItemsWorkItemIdRoute: typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 
 const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
+  ProjectsProjectIdAutopilotRoute: ProjectsProjectIdAutopilotRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
   ProjectsProjectIdWorkItemsWorkItemIdRoute:
     ProjectsProjectIdWorkItemsWorkItemIdRoute,
@@ -2087,12 +2309,14 @@ const ProjectsProjectIdRouteWithChildren =
 interface ProjectsRouteChildren {
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
   ProjectsApprovalsRoute: typeof ProjectsApprovalsRoute
+  ProjectsAutopilotRoute: typeof ProjectsAutopilotRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
 }
 
 const ProjectsRouteChildren: ProjectsRouteChildren = {
   ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
   ProjectsApprovalsRoute: ProjectsApprovalsRoute,
+  ProjectsAutopilotRoute: ProjectsAutopilotRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
 }
 
@@ -2115,6 +2339,36 @@ const SettingsRouteChildren: SettingsRouteChildren = {
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
+
+interface ApiAutopilotSuggestionsSuggestionIdRouteChildren {
+  ApiAutopilotSuggestionsSuggestionIdConvertRoute: typeof ApiAutopilotSuggestionsSuggestionIdConvertRoute
+}
+
+const ApiAutopilotSuggestionsSuggestionIdRouteChildren: ApiAutopilotSuggestionsSuggestionIdRouteChildren =
+  {
+    ApiAutopilotSuggestionsSuggestionIdConvertRoute:
+      ApiAutopilotSuggestionsSuggestionIdConvertRoute,
+  }
+
+const ApiAutopilotSuggestionsSuggestionIdRouteWithChildren =
+  ApiAutopilotSuggestionsSuggestionIdRoute._addFileChildren(
+    ApiAutopilotSuggestionsSuggestionIdRouteChildren,
+  )
+
+interface ApiAutopilotSuggestionsRouteChildren {
+  ApiAutopilotSuggestionsSuggestionIdRoute: typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
+}
+
+const ApiAutopilotSuggestionsRouteChildren: ApiAutopilotSuggestionsRouteChildren =
+  {
+    ApiAutopilotSuggestionsSuggestionIdRoute:
+      ApiAutopilotSuggestionsSuggestionIdRouteWithChildren,
+  }
+
+const ApiAutopilotSuggestionsRouteWithChildren =
+  ApiAutopilotSuggestionsRoute._addFileChildren(
+    ApiAutopilotSuggestionsRouteChildren,
+  )
 
 interface ApiHermesJobsRouteChildren {
   ApiHermesJobsJobIdRoute: typeof ApiHermesJobsJobIdRoute
@@ -2159,10 +2413,13 @@ const ApiMemoryRouteWithChildren = ApiMemoryRoute._addFileChildren(
 )
 
 interface ApiProjectsProjectIdRouteChildren {
+  ApiProjectsProjectIdAutopilotScheduleRoute: typeof ApiProjectsProjectIdAutopilotScheduleRoute
   ApiProjectsProjectIdLabelAnalyticsRoute: typeof ApiProjectsProjectIdLabelAnalyticsRoute
 }
 
 const ApiProjectsProjectIdRouteChildren: ApiProjectsProjectIdRouteChildren = {
+  ApiProjectsProjectIdAutopilotScheduleRoute:
+    ApiProjectsProjectIdAutopilotScheduleRoute,
   ApiProjectsProjectIdLabelAnalyticsRoute:
     ApiProjectsProjectIdLabelAnalyticsRoute,
 }
@@ -2231,6 +2488,8 @@ interface ApiWorkItemsWorkItemIdRouteChildren {
   ApiWorkItemsWorkItemIdApprovalsRoute: typeof ApiWorkItemsWorkItemIdApprovalsRoute
   ApiWorkItemsWorkItemIdLaunchRoute: typeof ApiWorkItemsWorkItemIdLaunchRoute
   ApiWorkItemsWorkItemIdLifecycleRoute: typeof ApiWorkItemsWorkItemIdLifecycleRoute
+  ApiWorkItemsWorkItemIdPlanningDraftsRoute: typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
+  ApiWorkItemsWorkItemIdPrepareRoute: typeof ApiWorkItemsWorkItemIdPrepareRoute
 }
 
 const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
@@ -2238,6 +2497,9 @@ const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
     ApiWorkItemsWorkItemIdApprovalsRoute: ApiWorkItemsWorkItemIdApprovalsRoute,
     ApiWorkItemsWorkItemIdLaunchRoute: ApiWorkItemsWorkItemIdLaunchRoute,
     ApiWorkItemsWorkItemIdLifecycleRoute: ApiWorkItemsWorkItemIdLifecycleRoute,
+    ApiWorkItemsWorkItemIdPlanningDraftsRoute:
+      ApiWorkItemsWorkItemIdPlanningDraftsRoute,
+    ApiWorkItemsWorkItemIdPrepareRoute: ApiWorkItemsWorkItemIdPrepareRoute,
   }
 
 const ApiWorkItemsWorkItemIdRouteWithChildren =
@@ -2257,6 +2519,22 @@ const ApiWorkItemsRouteWithChildren = ApiWorkItemsRoute._addFileChildren(
   ApiWorkItemsRouteChildren,
 )
 
+interface ApiPlanningDraftsDraftIdRouteChildren {
+  ApiPlanningDraftsDraftIdAcceptRoute: typeof ApiPlanningDraftsDraftIdAcceptRoute
+  ApiPlanningDraftsDraftIdOutputRoute: typeof ApiPlanningDraftsDraftIdOutputRoute
+}
+
+const ApiPlanningDraftsDraftIdRouteChildren: ApiPlanningDraftsDraftIdRouteChildren =
+  {
+    ApiPlanningDraftsDraftIdAcceptRoute: ApiPlanningDraftsDraftIdAcceptRoute,
+    ApiPlanningDraftsDraftIdOutputRoute: ApiPlanningDraftsDraftIdOutputRoute,
+  }
+
+const ApiPlanningDraftsDraftIdRouteWithChildren =
+  ApiPlanningDraftsDraftIdRoute._addFileChildren(
+    ApiPlanningDraftsDraftIdRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
@@ -2274,6 +2552,7 @@ const rootRouteChildren: RootRouteChildren = {
   TerminalRoute: TerminalRoute,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
+  ApiAutopilotSuggestionsRoute: ApiAutopilotSuggestionsRouteWithChildren,
   ApiChatEventsRoute: ApiChatEventsRoute,
   ApiConductorSpawnRoute: ApiConductorSpawnRoute,
   ApiConductorStopRoute: ApiConductorStopRoute,
@@ -2326,6 +2605,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelInfoRoute: ApiModelInfoRoute,
   ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,
   ApiOauthPollTokenRoute: ApiOauthPollTokenRoute,
+  ApiPlanningDraftsDraftIdRoute: ApiPlanningDraftsDraftIdRouteWithChildren,
   ApiProfilesActivateRoute: ApiProfilesActivateRoute,
   ApiProfilesCreateRoute: ApiProfilesCreateRoute,
   ApiProfilesDeleteRoute: ApiProfilesDeleteRoute,

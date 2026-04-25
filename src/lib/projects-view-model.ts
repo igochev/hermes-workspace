@@ -410,6 +410,19 @@ export function buildWorkItemOperatorSignals(workItem: WorkItemRecord): Array<st
     signals.push('Changes requested')
   }
 
+  const latestDraft = workItem.latestPlanningDraft
+  if (latestDraft?.status === 'structured_ready') {
+    signals.push('Draft ready')
+  } else if (latestDraft?.status === 'parse_failed') {
+    signals.push('Planner revision needed')
+  } else if (
+    workItem.status === 'inbox' &&
+    workItem.phase === 'research' &&
+    !workItem.planFilePath
+  ) {
+    signals.push('Needs Planner')
+  }
+
   if (workItem.missionState === 'running') {
     signals.push('Mission running')
   } else if (workItem.missionState === 'scheduled') {
@@ -467,8 +480,16 @@ function hasApprovalAttention(workItem: WorkItemRecord): boolean {
 }
 
 function isWorkItemNeedingAttention(workItem: WorkItemRecord): boolean {
+  const needsPlanner =
+    workItem.status === 'inbox' &&
+    workItem.phase === 'research' &&
+    !workItem.planFilePath &&
+    workItem.latestPlanningDraft?.status !== 'structured_ready' &&
+    workItem.latestPlanningDraft?.status !== 'accepted'
+
   return (
     hasApprovalAttention(workItem) ||
+    needsPlanner ||
     workItem.status === 'blocked' ||
     workItem.missionState === 'running' ||
     workItem.missionState === 'scheduled' ||

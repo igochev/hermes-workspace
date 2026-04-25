@@ -7,6 +7,8 @@ import {
   PROJECT_BOARD_EMPTY_STATE_CLASS,
   PROJECT_BOARD_SIGNAL_CHIP_CLASS,
   PROJECT_CARD_TONE_CLASSES,
+  PROJECT_CREATE_WORK_ITEM_BUTTON_LABEL,
+  PROJECT_CREATE_WORK_ITEM_SUBMIT_LABEL,
   PROJECT_DETAIL_BOARD_ORDER,
   PROJECT_FORM_NATIVE_SELECT_STYLE,
   PROJECT_FORM_SELECT_CLASS,
@@ -29,6 +31,8 @@ import {
   buildProjectWorkflowPolicyPhaseSummaries,
   toggleProjectBoardShortcutFilter,
 } from './project-detail-screen'
+import { buildWorkItemOperatorSignals } from '@/lib/projects-view-model'
+import type { WorkItemRecord } from '@/lib/projects-api'
 
 describe('project detail screen board constants', () => {
   it('orders project board columns in a left-to-right operational flow', () => {
@@ -161,6 +165,66 @@ describe('project detail screen board constants', () => {
     expect(buildProjectDeployGovernanceSummary({ deploy: '' })).toBe(
       'Deploy governance uses Auto fallback routing and requires explicit deploy approval before done.',
     )
+  })
+
+  it('surfaces rough-idea creation labels and planner-state board chips', () => {
+    expect(PROJECT_CREATE_WORK_ITEM_BUTTON_LABEL).toBe('Capture rough idea')
+    expect(PROJECT_CREATE_WORK_ITEM_SUBMIT_LABEL).toBe('Create rough idea')
+
+    const baseItem: WorkItemRecord = {
+      id: 'work-item-1',
+      projectId: 'project-1',
+      title: 'Rough idea',
+      description: '',
+      status: 'inbox',
+      phase: 'research',
+      priority: 'medium',
+      riskLevel: 'medium',
+      labels: [],
+      repoPathSnapshot: '/repo',
+      sessionKeys: [],
+      artifactPaths: [],
+      acceptanceCriteria: [],
+      criteriaStatus: [],
+      notes: [],
+      approvals: [],
+      history: [],
+      createdAt: '2026-04-25T00:00:00.000Z',
+      updatedAt: '2026-04-25T00:00:00.000Z',
+    }
+
+    expect(buildWorkItemOperatorSignals(baseItem)).toEqual(
+      expect.arrayContaining(['Needs Planner', 'Research phase']),
+    )
+    expect(
+      buildWorkItemOperatorSignals({
+        ...baseItem,
+        latestPlanningDraft: {
+          id: 'draft-1',
+          workItemId: baseItem.id,
+          projectId: baseItem.projectId,
+          status: 'structured_ready',
+          parseWarnings: [],
+          createdAt: '2026-04-25T00:10:00.000Z',
+          updatedAt: '2026-04-25T00:10:00.000Z',
+        },
+      }),
+    ).toEqual(expect.arrayContaining(['Draft ready']))
+    expect(
+      buildWorkItemOperatorSignals({
+        ...baseItem,
+        latestPlanningDraft: {
+          id: 'draft-2',
+          workItemId: baseItem.id,
+          projectId: baseItem.projectId,
+          status: 'parse_failed',
+          parseWarnings: [],
+          parseError: 'Missing required planFilePath',
+          createdAt: '2026-04-25T00:20:00.000Z',
+          updatedAt: '2026-04-25T00:20:00.000Z',
+        },
+      }),
+    ).toEqual(expect.arrayContaining(['Planner revision needed']))
   })
 
 })

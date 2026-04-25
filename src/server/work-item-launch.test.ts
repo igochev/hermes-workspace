@@ -54,6 +54,12 @@ describe('work-item-launch', () => {
         description: 'workspace evolution',
         phaseProfiles: { research: '', build: '', review: '', deploy: '' },
         reviewAutoApproval: { enabled: false, maxPriority: 'low' },
+        autopilotPolicy: {
+          enabled: false,
+          schedulePreset: 'manual' as const,
+          suggestionLimit: 5,
+          scoutSources: [],
+        },
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
       },
@@ -72,6 +78,8 @@ describe('work-item-launch', () => {
         artifactPaths: [],
         acceptanceCriteria: ['Launch API exists', 'Mission metadata is stored'],
         criteriaStatus: [],
+        reviewQualityGateReasons: [],
+        reviewMissingEvidence: [],
         notes: ['User approved Phase 2'],
         history: [],
         createdAt: '2026-01-01T00:00:00.000Z',
@@ -105,7 +113,13 @@ describe('work-item-launch', () => {
         },
         reviewAutoApproval: {
           enabled: false,
-          maxPriority: 'low',
+          maxPriority: 'high',
+        },
+        autopilotPolicy: {
+          enabled: false,
+          schedulePreset: 'manual' as const,
+          suggestionLimit: 5,
+          scoutSources: [],
         },
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
@@ -125,6 +139,8 @@ describe('work-item-launch', () => {
         artifactPaths: [],
         acceptanceCriteria: [],
         criteriaStatus: [],
+        reviewQualityGateReasons: [],
+        reviewMissingEvidence: [],
         notes: ['Started as an idea-capture request.'],
         history: [],
         createdAt: '2026-01-01T00:00:00.000Z',
@@ -138,6 +154,103 @@ describe('work-item-launch', () => {
     expect(goal).toContain('Primary outcome for this research/planning launch:')
     expect(goal).toContain('draft acceptance criteria')
     expect(goal).toContain('If acceptance criteria are incomplete, propose them explicitly')
+  })
+
+  it('rejects build launch for unprepared rough ideas without planFilePath', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Rough idea without planner draft',
+      status: 'inbox',
+      phase: 'research',
+      priority: 'medium',
+      repoPathSnapshot: project.repoPath,
+      planFilePath: undefined,
+    })
+
+    await expect(
+      launchWorkItemIntoConductor(workItem.id, {
+        phase: 'build',
+        phaseProfiles: { build: 'builder' },
+      }),
+    ).rejects.toThrow('Work item must be prepared by Planner before Builder launch')
+
+    expect(launchConductorMission).not.toHaveBeenCalled()
+  })
+
+  it('allows build launch for ready items with planFilePath', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Prepared for build',
+      status: 'ready',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      planFilePath: 'docs/plans/prepared-draft.md',
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-122_pending',
+      sessionKeyPrefix: 'cron_job-122_',
+      jobId: 'job-122',
+      jobName: 'work-item-build-ready',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'build',
+      phaseProfiles: { build: 'builder', research: 'planner' },
+    })
+
+    expect(result.launch.jobId).toBe('job-122')
+    expect(launchConductorMission).toHaveBeenCalledTimes(1)
+  })
+
+  it('still allows research launch for rough ideas', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+      phaseProfiles: {
+        research: 'researcher',
+      },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Rough idea with research launch',
+      status: 'inbox',
+      phase: 'research',
+      priority: 'medium',
+      repoPathSnapshot: project.repoPath,
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-1234_pending',
+      sessionKeyPrefix: 'cron_job-1234_',
+      jobId: 'job-1234',
+      jobName: 'work-item-research-rough',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'research',
+      phaseProfiles: { research: 'researcher' },
+    })
+
+    expect(result.launch.phase).toBe('research')
+    expect(result.launch.profile).toBe('researcher')
+    expect(launchConductorMission).toHaveBeenCalledTimes(1)
   })
 
   it('launches a work item into conductor as a two-phase pipeline when status is ready', async () => {
@@ -365,6 +478,12 @@ describe('buildPlannerReviewGoal', () => {
       repoUrl: 'https://github.com/example/demo',
       phaseProfiles: { research: '', build: '', review: '', deploy: '' },
       reviewAutoApproval: { enabled: false, maxPriority: 'medium' as const },
+      autopilotPolicy: {
+        enabled: false,
+        schedulePreset: 'manual' as const,
+        suggestionLimit: 5,
+        scoutSources: [],
+      },
       createdAt: '2026-04-25T12:00:00Z',
       updatedAt: '2026-04-25T12:00:00Z',
     }
@@ -380,6 +499,8 @@ describe('buildPlannerReviewGoal', () => {
       labels: [],
       repoPathSnapshot: '/repos/mission-control-demo',
       planFilePath: 'docs/plans/phase-3-plan.md',
+      reviewQualityGateReasons: [],
+      reviewMissingEvidence: [],
       acceptanceCriteria: ['Feature A is implemented', 'Feature B passes all tests'],
       criteriaStatus: [
         { text: 'Feature A is implemented', met: true },
@@ -404,6 +525,11 @@ describe('buildPlannerReviewGoal', () => {
     expect(goal).toContain('DECISION: APPROVED')
     expect(goal).toContain('DECISION: CHANGES_REQUESTED')
     expect(goal).toContain('Operator note')
+    expect(goal).toContain('REVIEW_DECISION_JSON')
+    expect(goal).toContain('"confidence": "low | medium | high"')
+    expect(goal).toContain('"testResults": [{ "command": "...", "status": "passed|failed|not_run|unknown", "summary": "..." }]')
+    expect(goal).toContain('"blockers": []')
+    expect(goal).toContain('Missing structured output will require manual CEO review')
   })
 
   it('handles items with no plan file path or criteria gracefully', () => {
@@ -414,6 +540,12 @@ describe('buildPlannerReviewGoal', () => {
       repoPath: '/repos/mission-control-demo',
       phaseProfiles: { research: '', build: '', review: '', deploy: '' },
       reviewAutoApproval: { enabled: false, maxPriority: 'medium' as const },
+      autopilotPolicy: {
+        enabled: false,
+        schedulePreset: 'manual' as const,
+        suggestionLimit: 5,
+        scoutSources: [],
+      },
       createdAt: '2026-04-25T13:00:00Z',
       updatedAt: '2026-04-25T13:00:00Z',
     }
@@ -430,6 +562,8 @@ describe('buildPlannerReviewGoal', () => {
       repoPathSnapshot: '/repos/mission-control-demo',
       acceptanceCriteria: [],
       criteriaStatus: [],
+      reviewQualityGateReasons: [],
+      reviewMissingEvidence: [],
       notes: [],
       sessionKeys: [],
       artifactPaths: [],

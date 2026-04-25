@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
+
 import { isAuthenticated } from '../../server/auth-middleware'
-import { launchWorkItemIntoConductor } from '../../server/work-item-launch'
+import { recordPlannerOutput } from '../../server/work-item-planning'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -9,24 +10,26 @@ function jsonResponse(data: unknown, status = 200) {
   })
 }
 
-export const Route = createFileRoute('/api/work-items/$workItemId/launch')({
+export const Route = createFileRoute('/api/planning-drafts/$draftId/output')({
   server: {
     handlers: {
       POST: async ({ request, params }) => {
-        if (!isAuthenticated(request)) {
-          return jsonResponse({ error: 'Unauthorized' }, 401)
-        }
+        if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
 
         try {
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
-          const payload = await launchWorkItemIntoConductor(params.workItemId, body)
-          return jsonResponse(payload, 201)
+          if (typeof body.rawOutput !== 'string') {
+            return jsonResponse({ error: 'rawOutput is required' }, 400)
+          }
+
+          const draft = recordPlannerOutput(params.draftId, body.rawOutput)
+          return jsonResponse({ draft })
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           const status =
-            message === 'Work item not found' || message === 'Project not found'
+            message === 'Planning draft not found'
               ? 404
-              : message.includes('repoPath is required') || message.includes('must be prepared by Planner')
+              : message.includes('rawOutput')
                 ? 400
                 : 500
           return jsonResponse({ error: message }, status)

@@ -77,21 +77,34 @@ Core existing seams:
 
 ## 5. Execution protocol for cheaper implementer models
 
-For each assigned plan:
+### Starting a fresh session
 
-1. Read this index.
-2. Read only the assigned detailed plan.
-3. Inspect the exact files named in that plan.
-4. Create a todo list from the plan tasks.
-5. Implement one task at a time.
-6. For each task:
+When the user sends a minimal prompt like "proceed on Hermes Workspace":
+
+1. Navigate to the project repo: `~/.Hermes/workspace/projects/hermes-workspace`
+2. **Read first:** `docs/handoff/current-slice-status.md` — this tells you which plan is active, what's done, what's next
+3. If new to this project, read this index (sections 4 + 8) for architecture rules
+4. Read the active slice plan (from the handoff) for implementation details
+5. Implement the next uncompleted task
+6. **Update `docs/handoff/current-slice-status.md`** with completed task, next step, and current test/build state
+7. Report results
+
+For each assigned plan (when implementing):
+
+1. Read this index (first time in this project).
+2. Read the handoff to find position.
+3. Read only the assigned detailed plan.
+4. Inspect the exact files named in that plan.
+5. Create a todo list from the plan tasks.
+6. Implement one task at a time.
+7. For each task:
    - write failing test;
    - run focused test and confirm RED;
    - implement minimal code;
    - run focused test and confirm GREEN;
    - run adjacent regression tests;
-   - update docs if task changes behavior.
-7. After all tasks in the plan:
+   - update handoff with completed task.
+8. After all tasks in the plan:
    - run all targeted tests named in the plan;
    - run `pnpm vitest run` or `pnpm test`;
    - run `pnpm build`;
@@ -176,3 +189,23 @@ Start with:
 `docs/plans/2026-04-25-hermes-workspace-slice-n-o-idea-planner-enrichment-plan.md`
 
 The first implementation sub-slice should be **PlanningDraft store + parser tests**, not UI.
+
+## 10. After all current slices ship
+
+When all 4 slices (N/O → P/Q → T/U → R/S) are implemented and verified:
+
+1. The handoff at `docs/handoff/current-slice-status.md` will be updated by Builder to reflect "all planned slices complete"
+2. D3n13r or Main can request new features for the next cycle
+3. **Main's job** (me, Hermes Main profile): analyze the request, create new slice plans, update this index with new entries in the doc map, update the handoff to point to the first new slice
+4. **Builder's job**: implements from whatever the handoff points to — no knowledge of cycles needed
+5. **D3n13r's job**: says "proceed on Hermes Workspace" — same as always
+
+### What this means in practice
+
+When you finish this cycle and want something new:
+- You tell **me** (Main) what you want next
+- I create new slice plans + update the index + update the handoff
+- You tell Builder "proceed on Hermes Workspace" 
+- Builder reads the updated handoff and continues seamlessly
+
+**No new protocol needed.** The same self-navigation system handles new feature cycles transparently.

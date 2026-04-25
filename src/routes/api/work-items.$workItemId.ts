@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProject } from '../../server/projects-store'
 import { listWorkItemApprovals } from '../../server/work-item-approvals'
+import { getLatestPlanningDraftForWorkItem } from '../../server/planning-drafts-store'
 import { syncWorkItemExecutionState } from '../../server/work-item-execution'
 import {
   deleteWorkItem,
@@ -66,6 +67,7 @@ function buildWorkItemPayload(workItemId: string) {
     workItem: {
       ...workItem,
       approvals: listWorkItemApprovals(workItem.id).slice().reverse(),
+      latestPlanningDraft: getLatestPlanningDraftForWorkItem(workItem.id),
     },
     project: getProject(workItem.projectId),
   }
@@ -87,6 +89,7 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
               workItem: {
                 ...result.workItem,
                 approvals: listWorkItemApprovals(result.workItem.id).slice().reverse(),
+                latestPlanningDraft: getLatestPlanningDraftForWorkItem(result.workItem.id),
               },
               project: result.project,
               execution: result.execution,
@@ -198,6 +201,27 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
               : {}),
             ...(body.reviewDecision === 'approved' || body.reviewDecision === 'changes_requested'
               ? { reviewDecision: body.reviewDecision }
+              : {}),
+            ...(body.reviewDecisionSummary === null || typeof body.reviewDecisionSummary === 'string'
+              ? { reviewDecisionSummary: (body.reviewDecisionSummary as string | null) ?? undefined }
+              : {}),
+            ...(body.reviewDecisionConfidence === 'low' || body.reviewDecisionConfidence === 'medium' || body.reviewDecisionConfidence === 'high'
+              ? { reviewDecisionConfidence: body.reviewDecisionConfidence }
+              : {}),
+            ...(body.reviewDecisionSource === 'json' || body.reviewDecisionSource === 'decision-line-fallback'
+              ? { reviewDecisionSource: body.reviewDecisionSource }
+              : {}),
+            ...(body.reviewParserError === null || typeof body.reviewParserError === 'string'
+              ? { reviewParserError: (body.reviewParserError as string | null) ?? undefined }
+              : {}),
+            ...(body.reviewQualityGateStatus === 'pass' || body.reviewQualityGateStatus === 'fail' || body.reviewQualityGateStatus === 'manual_review'
+              ? { reviewQualityGateStatus: body.reviewQualityGateStatus }
+              : {}),
+            ...(Array.isArray(body.reviewQualityGateReasons)
+              ? { reviewQualityGateReasons: body.reviewQualityGateReasons.filter((v: unknown): v is string => typeof v === 'string') }
+              : {}),
+            ...(Array.isArray(body.reviewMissingEvidence)
+              ? { reviewMissingEvidence: body.reviewMissingEvidence.filter((v: unknown): v is string => typeof v === 'string') }
               : {}),
             ...(Array.isArray(body.labels)
               ? {

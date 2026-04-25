@@ -10,6 +10,28 @@ export type ReviewAutoApprovalPolicy = {
   maxPriority: 'low' | 'medium' | 'high'
 }
 
+export type ProjectAutopilotSchedulePreset = 'manual' | 'daily' | 'weekly'
+export type ProjectAutopilotScoutSource =
+  | 'manual'
+  | 'autopilot'
+  | 'repo-health-scout'
+  | 'failing-tests-scout'
+  | 'stale-docs-scout'
+  | 'ux-friction-scout'
+  | 'dependency-api-scout'
+  | 'architecture-debt-scout'
+
+export type ProjectAutopilotPolicy = {
+  enabled: boolean
+  schedulePreset: ProjectAutopilotSchedulePreset
+  scoutProfile?: string
+  suggestionLimit: number
+  scoutSources: Array<ProjectAutopilotScoutSource>
+  jobId?: string
+  jobName?: string
+  lastCreatedAt?: string
+}
+
 export type ProjectRecord = {
   id: string
   name: string
@@ -20,6 +42,7 @@ export type ProjectRecord = {
   description?: string
   phaseProfiles: ConductorPhaseProfiles
   reviewAutoApproval: ReviewAutoApprovalPolicy
+  autopilotPolicy: ProjectAutopilotPolicy
   createdAt: string
   updatedAt: string
 }
@@ -37,6 +60,7 @@ type CreateProjectInput = {
   description?: string
   phaseProfiles?: unknown
   reviewAutoApproval?: unknown
+  autopilotPolicy?: unknown
 }
 
 type UpdateProjectInput = Partial<Omit<ProjectRecord, 'id' | 'createdAt' | 'updatedAt'>>
@@ -96,6 +120,58 @@ function normalizeReviewAutoApprovalPolicy(value: unknown): ReviewAutoApprovalPo
   }
 }
 
+const DEFAULT_AUTOPILOT_SCOUT_SOURCES: Array<ProjectAutopilotScoutSource> = [
+  'repo-health-scout',
+  'stale-docs-scout',
+  'architecture-debt-scout',
+]
+
+const VALID_AUTOPILOT_SOURCES = new Set<ProjectAutopilotScoutSource>([
+  'manual',
+  'autopilot',
+  'repo-health-scout',
+  'failing-tests-scout',
+  'stale-docs-scout',
+  'ux-friction-scout',
+  'dependency-api-scout',
+  'architecture-debt-scout',
+])
+
+function normalizeAutopilotPolicy(value: unknown): ProjectAutopilotPolicy {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+
+  const schedulePreset: ProjectAutopilotSchedulePreset =
+    candidate.schedulePreset === 'daily' || candidate.schedulePreset === 'weekly'
+      ? candidate.schedulePreset
+      : 'manual'
+
+  const scoutSources = Array.isArray(candidate.scoutSources)
+    ? Array.from(
+        new Set(
+          candidate.scoutSources.filter(
+            (source): source is ProjectAutopilotScoutSource =>
+              typeof source === 'string' &&
+              VALID_AUTOPILOT_SOURCES.has(source as ProjectAutopilotScoutSource),
+          ),
+        ),
+      )
+    : []
+
+  return {
+    enabled: candidate.enabled === true,
+    schedulePreset,
+    scoutProfile: asOptionalString(candidate.scoutProfile),
+    suggestionLimit:
+      typeof candidate.suggestionLimit === 'number' && Number.isFinite(candidate.suggestionLimit)
+        ? Math.max(1, Math.round(candidate.suggestionLimit))
+        : 5,
+    scoutSources: scoutSources.length > 0 ? scoutSources : [...DEFAULT_AUTOPILOT_SCOUT_SOURCES],
+    jobId: asOptionalString(candidate.jobId),
+    jobName: asOptionalString(candidate.jobName),
+    lastCreatedAt: asOptionalString(candidate.lastCreatedAt),
+  }
+}
+
 function slugifyProjectName(name: string): string {
   const normalized = name
     .trim()
@@ -120,9 +196,10 @@ function uniqueSlug(baseSlug: string, projects: Array<ProjectRecord>, excludeId?
 }
 
 function normalizeProject(
-  project: (Omit<Partial<ProjectRecord>, 'phaseProfiles' | 'reviewAutoApproval'> & {
+  project: (Omit<Partial<ProjectRecord>, 'phaseProfiles' | 'reviewAutoApproval' | 'autopilotPolicy'> & {
     phaseProfiles?: unknown
     reviewAutoApproval?: unknown
+    autopilotPolicy?: unknown
   }) &
     Pick<ProjectRecord, 'id' | 'name' | 'slug' | 'repoPath' | 'createdAt' | 'updatedAt'>,
 ): ProjectRecord {
@@ -138,6 +215,7 @@ function normalizeProject(
     reviewAutoApproval: normalizeReviewAutoApprovalPolicy(
       (project as Partial<ProjectRecord>).reviewAutoApproval,
     ),
+    autopilotPolicy: normalizeAutopilotPolicy((project as Partial<ProjectRecord>).autopilotPolicy),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   }
@@ -165,6 +243,7 @@ export function createProject(input: CreateProjectInput): ProjectRecord {
     description: input.description,
     phaseProfiles: input.phaseProfiles,
     reviewAutoApproval: input.reviewAutoApproval,
+    autopilotPolicy: input.autopilotPolicy,
     createdAt: now,
     updatedAt: now,
   })
@@ -201,6 +280,8 @@ export function updateProject(projectId: string, updates: UpdateProjectInput): P
       updates.reviewAutoApproval !== undefined
         ? updates.reviewAutoApproval
         : current.reviewAutoApproval,
+    autopilotPolicy:
+      updates.autopilotPolicy !== undefined ? updates.autopilotPolicy : current.autopilotPolicy,
     createdAt: current.createdAt,
     updatedAt: new Date().toISOString(),
   })

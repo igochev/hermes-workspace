@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
+
 import { isAuthenticated } from '../../server/auth-middleware'
-import { launchWorkItemIntoConductor } from '../../server/work-item-launch'
+import { prepareWorkItemWithPlanner } from '../../server/work-item-planning'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -9,7 +10,7 @@ function jsonResponse(data: unknown, status = 200) {
   })
 }
 
-export const Route = createFileRoute('/api/work-items/$workItemId/launch')({
+export const Route = createFileRoute('/api/work-items/$workItemId/prepare')({
   server: {
     handlers: {
       POST: async ({ request, params }) => {
@@ -19,14 +20,14 @@ export const Route = createFileRoute('/api/work-items/$workItemId/launch')({
 
         try {
           const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
-          const payload = await launchWorkItemIntoConductor(params.workItemId, body)
+          const payload = await prepareWorkItemWithPlanner(params.workItemId, body)
           return jsonResponse(payload, 201)
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           const status =
             message === 'Work item not found' || message === 'Project not found'
               ? 404
-              : message.includes('repoPath is required') || message.includes('must be prepared by Planner')
+              : message.includes('required')
                 ? 400
                 : 500
           return jsonResponse({ error: message }, status)

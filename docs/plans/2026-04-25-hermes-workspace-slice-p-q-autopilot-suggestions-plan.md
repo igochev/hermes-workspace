@@ -451,6 +451,44 @@ Files:
 
 Add links to global/project Autopilot pages.
 
+### P/Q execution snapshot (shipped 2026-04-26)
+- Added canonical `AutopilotSuggestion` file-backed model and lifecycle helpers in `src/server/autopilot-suggestions-store.ts`.
+- Added suggestion API routes with convert-to-work-item flow:
+  - `src/routes/api/autopilot-suggestions.ts`
+  - `src/routes/api/autopilot-suggestions.$suggestionId.ts`
+  - `src/routes/api/autopilot-suggestions.$suggestionId.convert.ts`
+- Added client APIs + label maps:
+  - `src/lib/autopilot-suggestions-api.ts`
+  - `src/lib/project-autopilot-api.ts`
+- Added global/project Autopilot screens + routes:
+  - `src/screens/projects/autopilot-suggestions-screen.tsx`
+  - `src/routes/projects/autopilot.tsx`
+  - `src/screens/projects/project-autopilot-screen.tsx`
+  - `src/routes/projects/$projectId/autopilot.tsx`
+- Added project autopilot policy model/defaults to projects domain:
+  - `src/server/projects-store.ts`
+  - `src/lib/projects-api.ts`
+- Added safe scout prompt builder:
+  - `src/server/autopilot-scout-prompts.ts`
+- Added job-management helpers used by project autopilot scheduling:
+  - `src/server/hermes-jobs.ts`
+  - `src/routes/api/projects.$projectId.autopilot-schedule.ts`
+- Added navigation links from project list/detail to Autopilot surfaces.
+- Test coverage added/updated:
+  - `src/server/autopilot-suggestions-store.test.ts`
+  - `src/server/autopilot-suggestions-routes.test.ts`
+  - `src/server/autopilot-scout-prompts.test.ts`
+  - `src/server/projects-store.test.ts`
+  - `src/screens/projects/autopilot-suggestions-screen.test.ts`
+  - `src/screens/projects/project-autopilot-screen.test.ts`
+- Verification:
+  - `pnpm vitest run` → `192/192` passing
+  - `pnpm build` passing
+  - `systemctl --user restart hermes-workspace.service` + `is-active` → `active`
+  - API smoke:
+    - `GET /api/autopilot-suggestions` → 200
+    - `GET /api/projects/46b401f9-9243-472f-b5b7-04bf34596906/autopilot-schedule` → 200
+
 ---
 
 ## 10. Full verification

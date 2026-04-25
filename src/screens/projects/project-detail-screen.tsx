@@ -104,6 +104,8 @@ export const PROJECT_WORKFLOW_POLICY_SAVE_LABEL = 'Save Workflow Policy'
 export const PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING = 'Deploy governance'
 export const PROJECT_WIP_WARNING_BADGE_LABEL = 'WIP high'
 export const PROJECT_WIP_WARNING_LAUNCH_HINT = 'WIP is high; finish one active item first.'
+export const PROJECT_CREATE_WORK_ITEM_BUTTON_LABEL = 'Capture rough idea'
+export const PROJECT_CREATE_WORK_ITEM_SUBMIT_LABEL = 'Create rough idea'
 export const PROJECT_ROUTING_POLICY_EMPTY_VALUE = 'Auto fallback'
 export const PROJECT_ROUTING_PRECEDENCE_LABELS = [
   '1. Work item override',
@@ -479,13 +481,20 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                 className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
               >
                 <HugeiconsIcon icon={Add01Icon} size={14} />
-                {showCreateWorkItem ? 'Close' : 'New Work Item'}
+                {showCreateWorkItem ? 'Close' : PROJECT_CREATE_WORK_ITEM_BUTTON_LABEL}
               </button>
               <Link
                 to="/projects/approvals"
                 className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]/80"
               >
                 Approvals Inbox
+              </Link>
+              <Link
+                to="/projects/$projectId/autopilot"
+                params={{ projectId: project.id }}
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]/80"
+              >
+                Project Autopilot
               </Link>
               <button
                 type="button"
@@ -849,7 +858,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                 >
                   {createWorkItemMutation.isPending
                     ? 'Creating…'
-                    : 'Create Work Item'}
+                    : PROJECT_CREATE_WORK_ITEM_SUBMIT_LABEL}
                 </button>
               </div>
             </div>

@@ -15,16 +15,25 @@ import { toast } from '@/components/ui/toast'
 import {
   deleteWorkItem,
   updateWorkItem,
+  type PlannerStructuredOutput,
+  type PlanningDraftRecord,
+  type PlanningDraftStatus,
   type WorkItemApprovalDecision,
   type WorkItemBlockedReason,
   type WorkItemCriterionStatus,
   type WorkItemRiskLevel,
+  type WorkItemStatus,
   WORK_ITEM_BLOCKED_REASON_LABELS,
   WORK_ITEM_PHASE_LABELS,
   WORK_ITEM_PRIORITY_LABELS,
   WORK_ITEM_RISK_LEVEL_LABELS,
   WORK_ITEM_STATUS_LABELS,
 } from '@/lib/projects-api'
+import {
+  acceptPlanningDraft,
+  prepareWorkItemWithPlanner,
+  updatePlanningDraft,
+} from '@/lib/planning-drafts-api'
 import { resolveWorkItemApproval } from '@/lib/work-item-approvals-api'
 import { launchWorkItem } from '@/lib/work-item-launch-api'
 import {
@@ -100,6 +109,100 @@ export function parseWorkItemDetailListDraft(value: string): Array<string> {
     .split('\n')
     .map((item) => item.trim())
     .filter((item) => item.length > 0)
+}
+
+export function getPlanningDraftStatusLabel(status?: string): string {
+  if (!status) return 'No draft'
+  if (status === 'requested') return 'Planner requested'
+  if (status === 'running') return 'Planner running'
+  if (status === 'structured_ready') return 'Draft ready'
+  if (status === 'parse_failed') return 'Planner revision needed'
+  if (status === 'accepted') return 'Accepted'
+  if (status === 'revision_requested') return 'Revision requested'
+  if (status === 'cancelled') return 'Cancelled'
+  return status
+}
+
+export function getPlanningDraftGuidance(status?: string): string {
+  if (!status) return 'No planner draft yet. Prepare with Planner to generate a structured enrichment draft.'
+  if (status === 'requested' || status === 'running') {
+    return 'Planner enrichment is running. Wait for structured output, then review the suggested changes before accepting.'
+  }
+  if (status === 'structured_ready') {
+    return 'Planner draft is ready. Review the diff preview and Accept Planner Draft when the enrichment looks correct.'
+  }
+  if (status === 'parse_failed') {
+    return 'Planner output could not be parsed. Request revision and ask Planner to return schema-valid JSON only.'
+  }
+  if (status === 'accepted') {
+    return 'Planner draft accepted. Work item is prepared for Build launch.'
+  }
+  if (status === 'revision_requested') {
+    return 'Revision requested. Relaunch Planner after clarifying the missing or invalid fields.'
+  }
+  return 'Review planner draft metadata and continue with the next workflow action.'
+}
+
+export function canLaunchBuildFromPlanningState(
+  workItem: {
+    status: WorkItemStatus
+    phase: 'research' | 'build' | 'review' | 'deploy' | undefined
+    planFilePath?: string
+  },
+  latestDraft?: { status: PlanningDraftStatus } | null,
+): boolean {
+  if (workItem.planFilePath) return true
+
+  const isRoughIdea = workItem.status === 'inbox' && workItem.phase === 'research'
+  if (!isRoughIdea) return true
+
+  return latestDraft?.status === 'accepted'
+}
+
+function formatPlanningDiffList(items: Array<string>, separator: '\n' | ', '): string {
+  if (items.length === 0) return '—'
+  return items.join(separator)
+}
+
+export function buildPlanningDraftDiff(
+  currentWorkItem: {
+    title: string
+    description: string
+    priority: string
+    riskLevel: string
+    labels: Array<string>
+    acceptanceCriteria: Array<string>
+    notes: Array<string>
+    planFilePath?: string
+  },
+  structuredOutput?: PlannerStructuredOutput,
+): Array<{ label: string; before: string; after: string }> {
+  if (!structuredOutput) return []
+
+  const diffs: Array<{ label: string; before: string; after: string }> = []
+  const pushDiff = (label: string, before: string, after: string) => {
+    if (before === after) return
+    diffs.push({ label, before, after })
+  }
+
+  pushDiff('Title', currentWorkItem.title || '—', structuredOutput.title || '—')
+  pushDiff('Description', currentWorkItem.description || '—', structuredOutput.description || '—')
+  pushDiff('Priority', currentWorkItem.priority || '—', structuredOutput.priority || '—')
+  pushDiff('Risk level', currentWorkItem.riskLevel || '—', structuredOutput.riskLevel || '—')
+  pushDiff(
+    'Labels',
+    formatPlanningDiffList(currentWorkItem.labels, ', '),
+    formatPlanningDiffList(structuredOutput.labels, ', '),
+  )
+  pushDiff(
+    'Acceptance criteria',
+    formatPlanningDiffList(currentWorkItem.acceptanceCriteria, '\n'),
+    formatPlanningDiffList(structuredOutput.acceptanceCriteria, '\n'),
+  )
+  pushDiff('Notes', formatPlanningDiffList(currentWorkItem.notes, '\n'), formatPlanningDiffList(structuredOutput.notes, '\n'))
+  pushDiff('Plan file path', currentWorkItem.planFilePath || '—', structuredOutput.planFilePath || '—')
+
+  return diffs
 }
 
 export function buildWorkItemAcceptanceCriteriaStatus(
@@ -418,6 +521,52 @@ export function WorkItemDetailScreen({
     },
   })
 
+  const plannerPrepareMutation = useMutation({
+    mutationFn: () => prepareWorkItemWithPlanner(workItemId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey })
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      toast('Planner enrichment requested')
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to prepare with Planner', {
+        type: 'error',
+      })
+    },
+  })
+
+  const plannerAcceptMutation = useMutation({
+    mutationFn: (draftId: string) => acceptPlanningDraft(draftId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey })
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      toast('Planner draft accepted')
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to accept planner draft', {
+        type: 'error',
+      })
+    },
+  })
+
+  const plannerRevisionMutation = useMutation({
+    mutationFn: ({ draftId, parseError }: { draftId: string; parseError?: string }) =>
+      updatePlanningDraft(draftId, {
+        status: 'revision_requested',
+        parseError,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey })
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      toast('Planner revision requested')
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to request planner revision', {
+        type: 'error',
+      })
+    },
+  })
+
   const criteriaStatusMutation = useMutation({
     mutationFn: (criteriaStatus: Array<WorkItemCriterionStatus>) =>
       updateWorkItem(workItemId, {
@@ -545,6 +694,17 @@ export function WorkItemDetailScreen({
     latestRunStatus: execution?.latestRun?.status ?? null,
   })
   const approvalSummary = getWorkItemApprovalSummary(workItem?.approvals ?? [])
+  const latestPlanningDraft: PlanningDraftRecord | null = workItem?.latestPlanningDraft ?? null
+  const planningDraftStatusLabel = getPlanningDraftStatusLabel(latestPlanningDraft?.status)
+  const planningDraftGuidance = getPlanningDraftGuidance(latestPlanningDraft?.status)
+  const planningDiff = workItem
+    ? buildPlanningDraftDiff(workItem, latestPlanningDraft?.structuredOutput)
+    : []
+  const canLaunchBuild = workItem
+    ? canLaunchBuildFromPlanningState(workItem, latestPlanningDraft)
+    : true
+  const isBuildLaunchAction =
+    primaryLaunchLabel === 'Launch Build' || primaryLaunchLabel === 'Relaunch Build'
 
   useEffect(() => {
     if (!executionSyncWarning) return
@@ -723,7 +883,7 @@ export function WorkItemDetailScreen({
                   <button
                     type="button"
                     onClick={() => launchMutation.mutate()}
-                    disabled={launchMutation.isPending}
+                    disabled={launchMutation.isPending || (isBuildLaunchAction && !canLaunchBuild)}
                     className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                   >
                     <HugeiconsIcon icon={PlayIcon} size={14} />
@@ -736,6 +896,11 @@ export function WorkItemDetailScreen({
                     {WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL}
                   </a>
                 </div>
+                {isBuildLaunchAction && !canLaunchBuild ? (
+                  <div className="mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                    Build launch is gated until this rough idea is prepared by Planner and accepted.
+                  </div>
+                ) : null}
               </div>
 
               <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
@@ -896,6 +1061,137 @@ export function WorkItemDetailScreen({
                 <Detail label="Created" value={workItem.createdAt} />
                 <Detail label="Updated" value={workItem.updatedAt} />
               </dl>
+            </Panel>
+
+            <Panel title="Planner Enrichment">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="inline-flex items-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2.5 py-1 text-xs font-medium text-[var(--theme-text)]">
+                    {planningDraftStatusLabel}
+                  </span>
+                  <p className="text-sm text-[var(--theme-muted)]">{planningDraftGuidance}</p>
+                </div>
+                {!latestPlanningDraft ? (
+                  <button
+                    type="button"
+                    onClick={() => plannerPrepareMutation.mutate()}
+                    disabled={plannerPrepareMutation.isPending}
+                    className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                  >
+                    {plannerPrepareMutation.isPending ? 'Preparing…' : 'Prepare with Planner'}
+                  </button>
+                ) : null}
+              </div>
+
+              {latestPlanningDraft ? (
+                <div className="mt-4 space-y-4">
+                  <div className="grid gap-2 text-sm text-[var(--theme-text)] md:grid-cols-2">
+                    <Detail label="Draft ID" value={latestPlanningDraft.id} />
+                    <Detail label="Planner Job ID" value={latestPlanningDraft.plannerJobId || '—'} />
+                    <Detail label="Planner Job Name" value={latestPlanningDraft.plannerJobName || '—'} />
+                    <Detail label="Planner Session" value={latestPlanningDraft.plannerSessionKey || '—'} />
+                    <Detail
+                      label="Planner Session Prefix"
+                      value={latestPlanningDraft.plannerSessionKeyPrefix || '—'}
+                    />
+                    <Detail label="Planner Profile" value={latestPlanningDraft.plannerProfile || '—'} />
+                    <Detail label="Draft Updated" value={latestPlanningDraft.updatedAt} />
+                    <Detail label="Accepted At" value={latestPlanningDraft.acceptedAt || '—'} />
+                    <Detail label="Plan File Path" value={latestPlanningDraft.planFilePath || '—'} />
+                  </div>
+
+                  {latestPlanningDraft.status === 'structured_ready' ? (
+                    <>
+                      {planningDiff.length === 0 ? (
+                        <EmptyCopy>No structured changes detected.</EmptyCopy>
+                      ) : (
+                        <ul className="space-y-2">
+                          {planningDiff.map((entry) => (
+                            <li
+                              key={entry.label}
+                              className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2"
+                            >
+                              <div className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                                {entry.label}
+                              </div>
+                              <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
+                                <div>
+                                  <div className="text-[11px] uppercase tracking-wide text-[var(--theme-muted)]">
+                                    Current
+                                  </div>
+                                  <pre className="mt-1 whitespace-pre-wrap break-words font-sans text-[var(--theme-text)]">
+                                    {entry.before}
+                                  </pre>
+                                </div>
+                                <div>
+                                  <div className="text-[11px] uppercase tracking-wide text-[var(--theme-muted)]">
+                                    Planner draft
+                                  </div>
+                                  <pre className="mt-1 whitespace-pre-wrap break-words font-sans text-[var(--theme-text)]">
+                                    {entry.after}
+                                  </pre>
+                                </div>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => plannerAcceptMutation.mutate(latestPlanningDraft.id)}
+                          disabled={plannerAcceptMutation.isPending}
+                          className="rounded-lg bg-[var(--theme-accent)] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                        >
+                          {plannerAcceptMutation.isPending ? 'Accepting…' : 'Accept Planner Draft'}
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+
+                  {latestPlanningDraft.status === 'parse_failed' ? (
+                    <div className="space-y-3">
+                      {latestPlanningDraft.parseError ? (
+                        <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                          {latestPlanningDraft.parseError}
+                        </div>
+                      ) : null}
+                      {latestPlanningDraft.parseWarnings.length > 0 ? (
+                        <ul className="space-y-1 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                          {latestPlanningDraft.parseWarnings.map((warning) => (
+                            <li key={warning}>• {warning}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            plannerRevisionMutation.mutate({
+                              draftId: latestPlanningDraft.id,
+                              parseError:
+                                latestPlanningDraft.parseError ||
+                                'Revision requested: please return valid structured JSON output.',
+                            })
+                          }
+                          disabled={plannerRevisionMutation.isPending}
+                          className="rounded-lg border border-[var(--theme-border)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)] disabled:opacity-60"
+                        >
+                          {plannerRevisionMutation.isPending ? 'Requesting…' : 'Request Revision'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => plannerPrepareMutation.mutate()}
+                          disabled={plannerPrepareMutation.isPending}
+                          className="rounded-lg bg-[var(--theme-accent)] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                        >
+                          {plannerPrepareMutation.isPending ? 'Preparing…' : 'Relaunch Planner'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </Panel>
 
             <Panel title="Acceptance Criteria">

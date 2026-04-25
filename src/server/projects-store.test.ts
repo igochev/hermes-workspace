@@ -82,7 +82,7 @@ describe('projects-store', () => {
       repoUrl: 'https://github.com/igochev/hermes-workspace',
       defaultBranch: 'develop',
       phaseProfiles: {
-          research: 'planner',
+        research: 'planner',
         build: 'project-builder',
         review: 'reviewer',
       },
@@ -99,7 +99,7 @@ describe('projects-store', () => {
     expect(updated?.repoUrl).toBe('https://github.com/igochev/hermes-workspace')
     expect(updated?.defaultBranch).toBe('develop')
     expect(updated?.phaseProfiles).toEqual({
-          research: 'planner',
+      research: 'planner',
       build: 'project-builder',
       review: 'reviewer',
       deploy: '',
@@ -113,5 +113,78 @@ describe('projects-store', () => {
     expect(deleteProject(first.id)).toBe(true)
     expect(getProject(first.id)).toBeNull()
     expect(listProjects().map((project) => project.id)).toEqual([second.id])
+  })
+
+  it('applies default autopilot policy for new projects', () => {
+    const project = createProject({
+      name: 'Autopilot defaults',
+      repoPath: '/repos/autopilot-defaults',
+    })
+
+    expect(project.autopilotPolicy).toEqual({
+      enabled: false,
+      schedulePreset: 'manual',
+      suggestionLimit: 5,
+      scoutSources: ['repo-health-scout', 'stale-docs-scout', 'architecture-debt-scout'],
+    })
+  })
+
+  it('normalizes autopilot policy updates', () => {
+    const project = createProject({
+      name: 'Autopilot normalize',
+      repoPath: '/repos/autopilot-normalize',
+    })
+
+    const updated = updateProject(project.id, {
+      autopilotPolicy: {
+        enabled: true,
+        schedulePreset: 'yearly' as unknown as 'daily',
+        suggestionLimit: 0,
+        scoutSources: ['failing-tests-scout', 'failing-tests-scout', 'unknown-source' as unknown as 'manual'],
+      },
+    })
+
+    expect(updated?.autopilotPolicy).toEqual({
+      enabled: true,
+      schedulePreset: 'manual',
+      suggestionLimit: 1,
+      scoutSources: ['failing-tests-scout'],
+    })
+  })
+
+  it('hydrates existing project records without autopilotPolicy using defaults', () => {
+    const hermesHome = process.env.HERMES_HOME!
+    fs.mkdirSync(hermesHome, { recursive: true })
+    const projectsFile = path.join(hermesHome, 'projects.json')
+    fs.writeFileSync(
+      projectsFile,
+      JSON.stringify(
+        {
+          projects: [
+            {
+              id: 'project-legacy',
+              name: 'Legacy Project',
+              slug: 'legacy-project',
+              repoPath: '/repos/legacy',
+              phaseProfiles: { research: '', build: '', review: '', deploy: '' },
+              reviewAutoApproval: { enabled: false, maxPriority: 'low' },
+              createdAt: '2026-04-25T00:00:00.000Z',
+              updatedAt: '2026-04-25T00:00:00.000Z',
+            },
+          ],
+        },
+        null,
+        2,
+      ) + '\n',
+      'utf-8',
+    )
+
+    const legacy = listProjects()[0]
+    expect(legacy.autopilotPolicy).toEqual({
+      enabled: false,
+      schedulePreset: 'manual',
+      suggestionLimit: 5,
+      scoutSources: ['repo-health-scout', 'stale-docs-scout', 'architecture-debt-scout'],
+    })
   })
 })

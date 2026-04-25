@@ -13,6 +13,28 @@ export type ReviewAutoApprovalPolicy = {
   maxPriority: 'low' | 'medium' | 'high'
 }
 
+export type ProjectAutopilotSchedulePreset = 'manual' | 'daily' | 'weekly'
+export type ProjectAutopilotScoutSource =
+  | 'manual'
+  | 'autopilot'
+  | 'repo-health-scout'
+  | 'failing-tests-scout'
+  | 'stale-docs-scout'
+  | 'ux-friction-scout'
+  | 'dependency-api-scout'
+  | 'architecture-debt-scout'
+
+export type ProjectAutopilotPolicy = {
+  enabled: boolean
+  schedulePreset: ProjectAutopilotSchedulePreset
+  scoutProfile?: string
+  suggestionLimit: number
+  scoutSources: Array<ProjectAutopilotScoutSource>
+  jobId?: string
+  jobName?: string
+  lastCreatedAt?: string
+}
+
 export type ProjectRecord = {
   id: string
   name: string
@@ -23,6 +45,7 @@ export type ProjectRecord = {
   description?: string
   phaseProfiles: PhaseProfiles
   reviewAutoApproval: ReviewAutoApprovalPolicy
+  autopilotPolicy: ProjectAutopilotPolicy
   createdAt: string
   updatedAt: string
 }
@@ -49,6 +72,50 @@ export type WorkItemCriterionStatus = {
   met: boolean
 }
 
+export type PlanningDraftStatus =
+  | 'requested'
+  | 'running'
+  | 'structured_ready'
+  | 'parse_failed'
+  | 'accepted'
+  | 'revision_requested'
+  | 'cancelled'
+
+export type PlannerStructuredOutput = {
+  title: string
+  description: string
+  priority: WorkItemPriority
+  riskLevel: WorkItemRiskLevel
+  labels: Array<string>
+  acceptanceCriteria: Array<string>
+  notes: Array<string>
+  planFilePath: string
+  openQuestions: Array<string>
+  suggestedPhase: 'research' | 'build'
+}
+
+export type PlanningDraftRecord = {
+  id: string
+  workItemId: string
+  projectId: string
+  status: PlanningDraftStatus
+  plannerJobId?: string
+  plannerJobName?: string
+  plannerSessionKey?: string
+  plannerSessionKeyPrefix?: string
+  plannerProfile?: string
+  plannerLink?: string
+  rawOutput?: string
+  structuredOutput?: PlannerStructuredOutput
+  parseWarnings: Array<string>
+  parseError?: string
+  planFilePath?: string
+  createdAt: string
+  updatedAt: string
+  acceptedAt?: string
+  revisionRequestedAt?: string
+}
+
 export type WorkItemRecord = {
   id: string
   projectId: string
@@ -62,6 +129,7 @@ export type WorkItemRecord = {
   assignedProfile?: string
   labels: Array<string>
   repoPathSnapshot: string
+  planFilePath?: string
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -70,6 +138,16 @@ export type WorkItemRecord = {
   missionState?: 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
   missionLastRunAt?: string
   missionLastError?: string
+  reviewJobId?: string
+  reviewState?: 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
+  reviewDecision?: 'approved' | 'changes_requested' | 'manual_review'
+  reviewDecisionSummary?: string
+  reviewDecisionConfidence?: 'low' | 'medium' | 'high'
+  reviewDecisionSource?: 'json' | 'decision-line-fallback'
+  reviewParserError?: string
+  reviewQualityGateStatus?: 'pass' | 'fail' | 'manual_review'
+  reviewQualityGateReasons: Array<string>
+  reviewMissingEvidence: Array<string>
   sessionKeys: Array<string>
   branchName?: string
   prUrl?: string
@@ -92,6 +170,7 @@ export type WorkItemRecord = {
     createdAt: string
     updatedAt: string
   }>
+  latestPlanningDraft?: PlanningDraftRecord | null
   history: Array<{
     id: string
     action: 'launch' | 'status-change' | 'note'
@@ -116,6 +195,7 @@ export type CreateProjectInput = {
   description?: string
   phaseProfiles?: Partial<PhaseProfiles>
   reviewAutoApproval?: Partial<ReviewAutoApprovalPolicy>
+  autopilotPolicy?: Partial<ProjectAutopilotPolicy>
 }
 
 export type UpdateProjectInput = Partial<CreateProjectInput>

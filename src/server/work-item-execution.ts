@@ -12,6 +12,12 @@ import { requestWorkItemReviewApproval, resolveWorkItemApprovalDecision } from '
 import { getHermesJobById, getHermesJobRuns, listHermesJobs, type HermesJobInfo } from './hermes-jobs'
 import { buildMissionLink, launchConductorMission } from './conductor-launch'
 import { launchPlannerReview } from './work-item-launch'
+import {
+  parsePlannerReviewDecision,
+  evaluateReviewQualityGate,
+  type ReviewDecisionParseResult,
+  type ReviewQualityGateResult,
+} from './work-item-review-decision'
 
 export type SyncedExecutionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 
@@ -304,7 +310,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
     }
   }
 
-  // Auto-resolve Planner review approval when review mission completes
+  // Auto-resolve Planner review approval using structured decision parsing and quality gates
   if (
     updated.status === 'active' &&
     updated.phase === 'review' &&
@@ -326,45 +332,128 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
         }
         if (reviewJob) {
           const reviewState = deriveExecutionState(reviewJob)
-          if (reviewState === 'succeeded') {
-            resolveWorkItemApprovalDecision(pendingReview.id, {
-              decision: 'approved',
-              resolvedBy: 'planner',
-              notes: 'Planner review approved the build output against the plan. Automatically advancing to deploy.',
-            })
-            updated = updateWorkItem(updated.id, {
-              reviewState: 'succeeded' as const,
-              reviewDecision: 'approved' as const,
-            }) ?? updated
-            appendWorkItemHistoryEntry(updated.id, {
-              action: 'status-change',
-              status: 'active',
-              phase: 'deploy',
-              note: 'Planner review passed; automatically advanced work item to deploy.',
-              missionId: updated.missionId,
-              sessionKey: updated.sessionKeys.at(-1),
-              profile: updated.assignedProfile,
-            })
-          } else if (reviewState === 'failed') {
-            const errorNote = readOptionalString(reviewJob.last_error) || 'Planner review identified issues.'
-            resolveWorkItemApprovalDecision(pendingReview.id, {
-              decision: 'changes_requested',
-              resolvedBy: 'planner',
-              notes: `Planner review found issues: ${errorNote}. Returning work item to build for fixes.`,
-            })
-            updated = updateWorkItem(updated.id, {
-              reviewState: 'failed' as const,
-              reviewDecision: 'changes_requested' as const,
-            }) ?? updated
-            appendWorkItemHistoryEntry(updated.id, {
-              action: 'status-change',
-              status: 'active',
-              phase: 'build',
-              note: `Planner review rejected build output: ${errorNote}. Returned to build for fixes.`,
-              missionId: updated.missionId,
-              sessionKey: updated.sessionKeys.at(-1),
-              profile: updated.assignedProfile,
-            })
+          let parseResult: ReviewDecisionParseResult
+          let gateResult: ReviewQualityGateResult
+
+          // Extract review output text: latest run output, job last_error, or empty
+          const jobRuns = await getHermesJobRuns(updated.reviewJobId).catch(() => [])
+          const latestRun = jobRuns[0] ?? null
+          const runOutputStr =
+            latestRun?.output && typeof latestRun.output === 'object'
+              ? JSON.stringify(latestRun.output, null, 2)
+              : typeof latestRun?.output === 'string'
+                ? latestRun.output
+                : ''
+          const jobErrorStr = readOptionalString(reviewJob.last_error) || ''
+          const combinedText = [runOutputStr, jobErrorStr].filter(Boolean).join('\n\n')
+          const outputText = combinedText || `reviewState=${reviewState}`
+
+          if (reviewState === 'succeeded' || reviewState === 'failed') {
+            parseResult = parsePlannerReviewDecision(outputText)
+          } else {
+            parseResult = { ok: false, error: `Review job state is ${reviewState} — not ready for evaluation.`, source: 'missing', warnings: [] }
+          }
+
+          // Persist parser/gate fields to work item
+          const workItemUpdates: Record<string, unknown> = {}
+
+          if (parseResult.ok) {
+            workItemUpdates.reviewDecisionSummary = parseResult.parsed.summary
+            workItemUpdates.reviewDecisionConfidence = parseResult.parsed.confidence
+            workItemUpdates.reviewDecisionSource = parseResult.source
+          } else {
+            workItemUpdates.reviewParserError = parseResult.error || 'Unknown parse error'
+          }
+
+          // Evaluate quality gates
+          const projectForGate = getProject(updated.projectId)
+          gateResult = evaluateReviewQualityGate({
+            workItem: updated,
+            project: projectForGate ?? { reviewAutoApproval: { enabled: false, maxPriority: 'low' } },
+            parseResult,
+          })
+
+          workItemUpdates.reviewQualityGateStatus = gateResult.status
+          workItemUpdates.reviewQualityGateReasons = gateResult.reasons
+          workItemUpdates.reviewMissingEvidence = gateResult.missingEvidence
+
+          if (gateResult.autoResolvable && gateResult.status === 'fail') {
+            // changes_requested — auto-resolve back to build
+            const errorNote =
+              parseResult.ok && parseResult.parsed.summary
+                ? parseResult.parsed.summary
+                : 'Planner review requested changes — no structured details available.'
+
+            // Dedup: skip if latest history already contains this message
+            const lastHistoryNote = updated.history.at(-1)?.note ?? ''
+            if (!lastHistoryNote.includes('Planner review requested changes')) {
+              resolveWorkItemApprovalDecision(pendingReview.id, {
+                decision: 'changes_requested',
+                resolvedBy: 'planner',
+                notes: `Planner review found issues: ${errorNote}. Returning work item to build for fixes.`,
+              })
+              updated = updateWorkItem(updated.id, {
+                ...workItemUpdates,
+                reviewState: 'failed' as const,
+                reviewDecision: 'changes_requested' as const,
+              }) ?? updated
+              appendWorkItemHistoryEntry(updated.id, {
+                action: 'status-change',
+                status: 'active',
+                phase: 'build',
+                note: `Planner review requested changes: ${errorNote}. Returned to build for fixes.`,
+                missionId: updated.missionId,
+                sessionKey: updated.sessionKeys.at(-1),
+                profile: updated.assignedProfile,
+              })
+            }
+          } else if (gateResult.autoResolvable && gateResult.status === 'pass') {
+            // Approved with passing gates — auto-resolve and advance to deploy
+            const lastHistoryNote = updated.history.at(-1)?.note ?? ''
+            if (!lastHistoryNote.includes('Planner review passed')) {
+              resolveWorkItemApprovalDecision(pendingReview.id, {
+                decision: 'approved',
+                resolvedBy: 'planner',
+                notes: `Planner review approved with structured decision. Gate status: pass.`,
+              })
+              updated = updateWorkItem(updated.id, {
+                ...workItemUpdates,
+                reviewState: 'succeeded' as const,
+                reviewDecision: 'approved' as const,
+              }) ?? updated
+              appendWorkItemHistoryEntry(updated.id, {
+                action: 'status-change',
+                status: 'active',
+                phase: 'deploy',
+                note: 'Planner review passed all quality gates; automatically advanced work item to deploy.',
+                missionId: updated.missionId,
+                sessionKey: updated.sessionKeys.at(-1),
+                profile: updated.assignedProfile,
+              })
+            }
+          } else {
+            // Manual review needed — set reviewDecision=manual_review, keep approval pending
+            workItemUpdates.reviewDecision = 'manual_review' as const
+            workItemUpdates.reviewState = reviewState === 'failed' ? ('failed' as const) : ('succeeded' as const)
+            if (parseResult.ok) {
+              workItemUpdates.reviewDecisionSummary = parseResult.parsed.summary
+            }
+            updated = updateWorkItem(updated.id, workItemUpdates) ?? updated
+
+            const lastHistoryNote = updated.history.at(-1)?.note ?? ''
+            if (!lastHistoryNote.includes('Manual review')) {
+              appendWorkItemHistoryEntry(updated.id, {
+                action: 'note',
+                status: 'active',
+                phase: 'review',
+                note: gateResult.status === 'manual_review'
+                  ? `Manual review required: ${gateResult.reasons.join('; ')}`
+                  : `Manual review required — review completed but could not be auto-resolved with quality gates.`,
+                missionId: updated.missionId,
+                sessionKey: updated.sessionKeys.at(-1),
+                profile: updated.assignedProfile,
+              })
+            }
           }
         }
       }

@@ -31,6 +31,9 @@ export type WorkItemMissionState = 'scheduled' | 'running' | 'succeeded' | 'fail
 export type WorkItemReviewState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 export type WorkItemReviewDecision = 'approved' | 'changes_requested'
 
+export type WorkItemStructuredReviewDecision = 'approved' | 'changes_requested' | 'manual_review'
+export type WorkItemReviewQualityGateStatus = 'pass' | 'fail' | 'manual_review'
+
 export type WorkItemCriterionStatus = {
   text: string
   met: boolean
@@ -61,6 +64,13 @@ export type WorkItemRecord = {
   reviewJobId?: string
   reviewState?: WorkItemReviewState
   reviewDecision?: WorkItemReviewDecision
+  reviewDecisionSummary?: string
+  reviewDecisionConfidence?: 'low' | 'medium' | 'high'
+  reviewDecisionSource?: 'json' | 'decision-line-fallback'
+  reviewParserError?: string
+  reviewQualityGateStatus?: WorkItemReviewQualityGateStatus
+  reviewQualityGateReasons: Array<string>
+  reviewMissingEvidence: Array<string>
   sessionKeys: Array<string>
   branchName?: string
   prUrl?: string
@@ -94,6 +104,13 @@ type CreateWorkItemInput = {
   reviewJobId?: string
   reviewState?: WorkItemReviewState
   reviewDecision?: WorkItemReviewDecision
+  reviewDecisionSummary?: string
+  reviewDecisionConfidence?: 'low' | 'medium' | 'high'
+  reviewDecisionSource?: 'json' | 'decision-line-fallback'
+  reviewParserError?: string
+  reviewQualityGateStatus?: WorkItemReviewQualityGateStatus
+  reviewQualityGateReasons?: Array<string>
+  reviewMissingEvidence?: Array<string>
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -312,6 +329,27 @@ function normalizeWorkItem(
       (workItem as Partial<WorkItemRecord>).reviewDecision === 'changes_requested'
       ? (workItem as Partial<WorkItemRecord>).reviewDecision
       : undefined,
+    reviewDecisionSummary: asOptionalString((workItem as Partial<WorkItemRecord>).reviewDecisionSummary),
+    reviewDecisionConfidence:
+      (workItem as Partial<WorkItemRecord>).reviewDecisionConfidence === 'low' ||
+      (workItem as Partial<WorkItemRecord>).reviewDecisionConfidence === 'medium' ||
+      (workItem as Partial<WorkItemRecord>).reviewDecisionConfidence === 'high'
+        ? (workItem as Partial<WorkItemRecord>).reviewDecisionConfidence
+        : undefined,
+    reviewDecisionSource:
+      (workItem as Partial<WorkItemRecord>).reviewDecisionSource === 'json' ||
+      (workItem as Partial<WorkItemRecord>).reviewDecisionSource === 'decision-line-fallback'
+        ? (workItem as Partial<WorkItemRecord>).reviewDecisionSource
+        : undefined,
+    reviewParserError: asOptionalString((workItem as Partial<WorkItemRecord>).reviewParserError),
+    reviewQualityGateStatus:
+      (workItem as Partial<WorkItemRecord>).reviewQualityGateStatus === 'pass' ||
+      (workItem as Partial<WorkItemRecord>).reviewQualityGateStatus === 'fail' ||
+      (workItem as Partial<WorkItemRecord>).reviewQualityGateStatus === 'manual_review'
+        ? (workItem as Partial<WorkItemRecord>).reviewQualityGateStatus
+        : undefined,
+    reviewQualityGateReasons: asStringArray((workItem as Partial<WorkItemRecord>).reviewQualityGateReasons),
+    reviewMissingEvidence: asStringArray((workItem as Partial<WorkItemRecord>).reviewMissingEvidence),
     missionId: asOptionalString(workItem.missionId),
     missionJobId: asOptionalString((workItem as Partial<WorkItemRecord>).missionJobId),
     missionJobName: asOptionalString((workItem as Partial<WorkItemRecord>).missionJobName),
@@ -374,6 +412,17 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     assignedProfile: input.assignedProfile,
     labels: input.labels,
     repoPathSnapshot: input.repoPathSnapshot,
+    planFilePath: input.planFilePath,
+    reviewJobId: input.reviewJobId,
+    reviewState: input.reviewState,
+    reviewDecision: input.reviewDecision,
+    reviewDecisionSummary: input.reviewDecisionSummary,
+    reviewDecisionConfidence: input.reviewDecisionConfidence,
+    reviewDecisionSource: input.reviewDecisionSource,
+    reviewParserError: input.reviewParserError,
+    reviewQualityGateStatus: input.reviewQualityGateStatus,
+    reviewQualityGateReasons: input.reviewQualityGateReasons,
+    reviewMissingEvidence: input.reviewMissingEvidence,
     missionId: input.missionId,
     missionJobId: input.missionJobId,
     missionJobName: input.missionJobName,

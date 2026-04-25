@@ -1,17 +1,25 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  buildWorkItemConductorHref,
-  getWorkItemApprovalSummary,
-  getWorkItemExecutionSummary,
-  getWorkItemLifecycleActionLabel,
-  getAvailableWorkItemLifecycleActions,
-  getWorkItemAcceptanceCriteriaProgress,
+  buildPlanningDraftDiff,
   buildWorkItemAcceptanceCriteriaStatus,
+  buildWorkItemConductorHref,
+  canLaunchBuildFromPlanningState,
+  getAvailableWorkItemLifecycleActions,
+  getPlanningDraftGuidance,
+  getPlanningDraftStatusLabel,
+  getWorkItemAcceptanceCriteriaProgress,
   getWorkItemAcceptanceCriteriaProgressLabel,
+  getWorkItemApprovalSummary,
   getWorkItemBlockedReasonGuidance,
+  getWorkItemExecutionSummary,
+  getWorkItemExecutionSyncWarningMessage,
+  getWorkItemLifecycleActionLabel,
   getWorkItemOperatorGuidance,
+  getWorkItemPrimaryLaunchLabel,
   parseWorkItemDetailListDraft,
+  reviewDecisionLabel,
+  stringifyWorkItemDetailListDraft,
   WORK_ITEM_BLOCKED_REASON_FIELD_LABEL,
   WORK_ITEM_BLOCKED_REASON_HELP_TEXT,
   WORK_ITEM_DETAIL_ACCEPTANCE_CRITERIA_HELP_TEXT,
@@ -22,11 +30,7 @@ import {
   WORK_ITEM_DETAIL_NOTES_HELP_TEXT,
   WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL,
   WORK_ITEM_DETAIL_PANEL_CLASS,
-  stringifyWorkItemDetailListDraft,
-  getWorkItemPrimaryLaunchLabel,
-  getWorkItemExecutionSyncWarningMessage,
   WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE,
-  reviewDecisionLabel,
 } from './work-item-detail-screen'
 
 describe('work item detail screen theme classes', () => {
@@ -184,5 +188,85 @@ describe('work item detail screen theme classes', () => {
     )
     expect(reviewDecisionLabel('unknown')).toBe('unknown')
     expect(reviewDecisionLabel('')).toBe('—')
+  })
+
+  it('maps planner enrichment statuses to operator labels, guidance, launch gating, and diff previews', () => {
+    expect(getPlanningDraftStatusLabel()).toBe('No draft')
+    expect(getPlanningDraftStatusLabel('running')).toBe('Planner running')
+    expect(getPlanningDraftStatusLabel('structured_ready')).toBe('Draft ready')
+    expect(getPlanningDraftStatusLabel('parse_failed')).toBe('Planner revision needed')
+    expect(getPlanningDraftStatusLabel('accepted')).toBe('Accepted')
+
+    expect(getPlanningDraftGuidance()).toContain('Prepare with Planner')
+    expect(getPlanningDraftGuidance('parse_failed')).toContain('Request revision')
+    expect(getPlanningDraftGuidance('structured_ready')).toContain('Accept Planner Draft')
+
+    const roughIdea = { status: 'inbox' as const, phase: 'research' as const, planFilePath: undefined }
+    const readyBuild = {
+      status: 'ready' as const,
+      phase: 'build' as const,
+      planFilePath: 'docs/plans/project-1-abcd1234-planner-draft.md',
+    }
+
+    expect(canLaunchBuildFromPlanningState(roughIdea, null)).toBe(false)
+    expect(
+      canLaunchBuildFromPlanningState(roughIdea, {
+        status: 'structured_ready' as const,
+      }),
+    ).toBe(false)
+    expect(
+      canLaunchBuildFromPlanningState(roughIdea, {
+        status: 'accepted' as const,
+      }),
+    ).toBe(true)
+    expect(canLaunchBuildFromPlanningState(readyBuild, null)).toBe(true)
+
+    expect(
+      buildPlanningDraftDiff(
+        {
+          title: 'Original title',
+          description: 'Original description',
+          priority: 'medium',
+          riskLevel: 'high',
+          labels: ['api'],
+          acceptanceCriteria: ['Current criterion'],
+          notes: ['Current note'],
+          planFilePath: undefined,
+        },
+        {
+          title: 'Improved title',
+          description: 'Updated description',
+          priority: 'high',
+          riskLevel: 'medium',
+          labels: ['api', 'planner'],
+          acceptanceCriteria: ['Current criterion', 'New criterion'],
+          notes: ['Current note', 'Refined note'],
+          planFilePath: 'docs/plans/project-1-abcd1234-planner-draft.md',
+          openQuestions: ['Need rollout owner?'],
+          suggestedPhase: 'build',
+        },
+      ),
+    ).toEqual([
+      { label: 'Title', before: 'Original title', after: 'Improved title' },
+      { label: 'Description', before: 'Original description', after: 'Updated description' },
+      { label: 'Priority', before: 'medium', after: 'high' },
+      { label: 'Risk level', before: 'high', after: 'medium' },
+      { label: 'Labels', before: 'api', after: 'api, planner' },
+      {
+        label: 'Acceptance criteria',
+        before: 'Current criterion',
+        after: 'Current criterion\nNew criterion',
+      },
+      {
+        label: 'Notes',
+        before: 'Current note',
+        after: 'Current note\nRefined note',
+      },
+      {
+        label: 'Plan file path',
+        before: '—',
+        after: 'docs/plans/project-1-abcd1234-planner-draft.md',
+      },
+    ])
   })
 })
