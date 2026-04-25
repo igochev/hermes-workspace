@@ -25,7 +25,9 @@
 - **Researcher** is an ad-hoc/Autopilot scout support role for web recon, comparisons, API changes, and feasibility checks.
 - Idea-only requests should start as Work Items or Autopilot Suggestions, usually with `status=inbox` and `phase=research` until Planner enrichment makes them ready.
 - Acceptance criteria should be drafted/refined by Planner, not forced at initial capture time.
-- New north-star roadmap for the next era: `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`. Recommended next slice: **Slice N — Idea Intake + Planner Enrichment**.
+- New north-star roadmap for the next era: `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`.
+- Implementer-ready plan index for cheaper models: `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`.
+- Recommended next slice: **Slice N/O — Idea Intake + Planner Enrichment + Structured Planner Output**.
 
 ### 1.2 Live-verified runtime facts
 - Runtime repo in use: `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
@@ -703,10 +705,13 @@ The next meaningful evolutions are now defined by the CEO/Architect north-star a
 4. **Slice T — Structured Review Decision Parser** — review output becomes a real quality gate, not just job success/failure.
 5. **Slice R/S — Execution Runs + Supervisor** — durable run history plus stale/failure detection.
 
+Detailed implementation entrypoint:
+- `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
+
 Detailed high-level roadmap:
 - `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`
 
 Detailed historic execution order and shipped slice scope:
 - `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
 
-If resuming later, start from the high-level roadmap above, then turn Slice N into an executable implementation plan.
+If resuming later, start from the implementation index above, then execute the Slice N/O detailed plan task-by-task.

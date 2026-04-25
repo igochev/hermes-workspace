@@ -754,6 +754,14 @@ This order prioritizes ease of delegation first, then proactive ideation, then q
 
 ## 8. Implementation protocol for future slices
 
+Detailed implementer-ready plans now exist and should be used instead of implementing from this high-level roadmap directly:
+
+- `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
+- `docs/plans/2026-04-25-hermes-workspace-slice-n-o-idea-planner-enrichment-plan.md`
+- `docs/plans/2026-04-25-hermes-workspace-slice-p-q-autopilot-suggestions-plan.md`
+- `docs/plans/2026-04-25-hermes-workspace-slice-t-u-structured-review-quality-gates-plan.md`
+- `docs/plans/2026-04-25-hermes-workspace-slice-r-s-execution-runs-supervisor-plan.md`
+
 For each slice:
 
 1. inspect current implementation first;

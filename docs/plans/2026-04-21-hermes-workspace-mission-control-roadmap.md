@@ -87,9 +87,10 @@ For the exact current state, validated runtime details, and the prioritized next
 
 ## 2026-04-25 CEO/Architect dream Mission Control audit
 
-A new high-level north-star roadmap has been added after re-auditing the current codebase, existing plans, and the Developer's desired delegation experience:
+A new high-level north-star roadmap and implementer-ready plan index have been added after re-auditing the current codebase, existing plans, and the Developer's desired delegation experience:
 
 - `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`
+- `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
 
 Strategic conclusion from that audit: the foundation is solid, but the next product era must focus on delegation intelligence — rough idea intake, Planner enrichment, project-aware Autopilot suggestions, structured review decisions, execution supervision, global attention queue, and role/capacity/cost policy. The recommended next implementation slice is **Slice N — Idea Intake + Planner Enrichment**.
 
