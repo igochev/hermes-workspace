@@ -500,6 +500,21 @@ export function WorkItemDetailScreen({
   const [notesDraft, setNotesDraft] = useState('')
   const [showCancelInput, setShowCancelInput] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [isAddingLabel, setIsAddingLabel] = useState(false)
+  const [newLabel, setNewLabel] = useState('')
+  const labelMutation = useMutation({
+    mutationFn: (labels: Array<string>) =>
+      updateWorkItem(workItem.id, { labels }).then(() => queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      toast('Labels updated')
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to update labels', {
+        type: 'error',
+      })
+    },
+  })
   const primaryLaunchLabel = getWorkItemPrimaryLaunchLabel({
     phase: workItem?.phase,
     status: workItem?.status ?? 'ready',
@@ -592,6 +607,9 @@ export function WorkItemDetailScreen({
                   <Badge>{WORK_ITEM_PRIORITY_LABELS[workItem.priority]}</Badge>
                   <Badge>{WORK_ITEM_RISK_LEVEL_LABELS[workItem.riskLevel]}</Badge>
                   {workItem.assignedProfile ? <Badge>{workItem.assignedProfile}</Badge> : null}
+                  {workItem.labels.map((label) => (
+                    <span key={label} className="inline-flex items-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--theme-muted)]">{label}</span>
+                  ))}
                 </div>
                 <h1 className="text-2xl font-medium text-ink">{workItem.title}</h1>
                 <p className="max-w-3xl text-sm text-[var(--theme-muted)]">
@@ -740,6 +758,96 @@ export function WorkItemDetailScreen({
                   >
                     Delete
                   </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                  Labels
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {workItem.labels.map((label) => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-accent)]/30 bg-[var(--theme-accent)]/10 px-2.5 py-1 text-xs font-medium text-[var(--theme-text)]"
+                    >
+                      {label}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          labelMutation.mutate({
+                            labels: workItem.labels.filter((l) => l !== label),
+                          })
+                        }
+                        disabled={labelMutation.isPending}
+                        className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[var(--theme-muted)] transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-40"
+                        aria-label={`Remove label ${label}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {isAddingLabel ? (
+                    <div className="inline-flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={newLabel}
+                        onChange={(event) => setNewLabel(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && newLabel.trim()) {
+                            labelMutation.mutate({
+                              labels: [...workItem.labels, newLabel.trim()],
+                            })
+                            setNewLabel('')
+                            setIsAddingLabel(false)
+                          } else if (event.key === 'Escape') {
+                            setIsAddingLabel(false)
+                            setNewLabel('')
+                          }
+                        }}
+                        placeholder="label"
+                        className="w-24 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1 text-xs font-medium text-[var(--theme-text)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--theme-accent)]/25"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newLabel.trim()) {
+                            labelMutation.mutate({
+                              labels: [...workItem.labels, newLabel.trim()],
+                            })
+                            setNewLabel('')
+                            setIsAddingLabel(false)
+                          } else {
+                            setIsAddingLabel(false)
+                            setNewLabel('')
+                          }
+                        }}
+                        disabled={labelMutation.isPending || !newLabel.trim()}
+                        className="rounded-full bg-[var(--theme-accent)] px-2.5 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingLabel(false)
+                          setNewLabel('')
+                        }}
+                        className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingLabel(true)}
+                      className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--theme-border)] bg-transparent px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)]/50 hover:text-[var(--theme-text)]"
+                    >
+                      + Add Label
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

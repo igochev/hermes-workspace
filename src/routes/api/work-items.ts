@@ -151,6 +151,9 @@ export const Route = createFileRoute('/api/work-items')({
             notes: Array.isArray(body.notes)
               ? body.notes.filter((value): value is string => typeof value === 'string')
               : [],
+            labels: Array.isArray(body.labels)
+              ? body.labels.filter((value): value is string => typeof value === 'string')
+              : [],
           })
 
           return jsonResponse({ workItem }, 201)

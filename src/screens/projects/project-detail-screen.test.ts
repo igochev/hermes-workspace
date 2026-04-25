@@ -66,15 +66,21 @@ describe('project detail screen board constants', () => {
 
   it('defines urgency summary labels, filter routing, stronger urgent card tones, and clearer shortcut state helpers', () => {
     expect(PROJECT_URGENCY_SUMMARY_LABELS).toEqual({
+      activeThisWeek: 'Active this week',
       blocked: 'Blocked',
+      blockedThisWeek: 'Blocked this week',
       changesRequested: 'Changes requested',
+      doneThisWeek: 'Done this week',
       failedMissions: 'Mission failures',
       pendingApprovals: 'Pending approvals',
       runningMissions: 'Missions running',
     })
     expect(PROJECT_URGENCY_SUMMARY_FILTERS).toEqual({
+      activeThisWeek: 'attention',
       blocked: 'attention',
+      blockedThisWeek: 'attention',
       changesRequested: 'approvals',
+      doneThisWeek: 'attention',
       failedMissions: 'execution',
       pendingApprovals: 'approvals',
       runningMissions: 'execution',

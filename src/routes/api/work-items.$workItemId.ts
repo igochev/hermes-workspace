@@ -199,6 +199,11 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
             ...(body.reviewDecision === 'approved' || body.reviewDecision === 'changes_requested'
               ? { reviewDecision: body.reviewDecision }
               : {}),
+            ...(Array.isArray(body.labels)
+              ? {
+                  labels: body.labels.filter((value): value is string => typeof value === 'string'),
+                }
+              : {}),
           }
 
           const workItem = updateWorkItem(params.workItemId, updates)

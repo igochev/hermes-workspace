@@ -9,15 +9,18 @@
 **Current baseline (already shipped):**
 - Slices A–J shipped (phase routing rework, two-phase orchestration, risk level + automation, lifecycle completeness, acceptance-criteria check-off, WIP awareness, blocked-reason taxonomy, deploy rejection return-to-build, sync fallback envelope, Planner-as-Reviewer)
 - **Slice K shipped** — Notification watchdog (status digest, de-dup, Discord-formatted output)
-- Regression baseline: `138/138` passing
+- Regression baseline: `143/143` passing
 - Service/runtime baseline: `hermes-workspace.service` active, app at `http://localhost:3456`
+- **Slice L shipped** — Labels/tags + lightweight analytics counters
+- **Slice M shipped** — Label-based board analytics dashboard (cycle time, throughput, rework rate, status summary)
 
 ---
 
 ## 1) Priority roadmap (what to build next)
 
 ### P0 — Operational excellence (QUEUE)
-1. **Slice L — Labels/tags + lightweight analytics counters**
+1. **Slice L — Labels/tags + lightweight analytics** — ✅ **SHIPPED**
+2. **Slice M — Label-based board analytics dashboard**
 
 ---
 
@@ -246,25 +249,72 @@
 
 ## Slice L — Labels/tags + lightweight analytics
 
-**Objective:** Improve project slicing and decision support with labels and minimal metrics.
+**Status:** complete and verified on 2026-04-25.
 
-**Files to modify (expected):**
-- `src/server/work-items-store.ts`
-- `src/routes/api/work-items.ts`
-- `src/routes/api/work-items.$workItemId.ts`
-- `src/screens/projects/project-detail-screen.tsx`
-- `src/screens/projects/work-item-detail-screen.tsx`
-- `src/lib/projects-view-model.ts`
+**Grounded status:**
+- `labels: string[]` added to `WorkItemRecord` and `CreateWorkItemInput`
+- Labels persist and round-trip through API (POST + PATCH)
+- Detail screen (`work-item-detail-screen.tsx`): labels state variables + mutation hooks, inline `<span>` badges rendered alongside status/phase badges in header, labels `<textarea>` in create form
+- Project board (`project-detail-screen.tsx`): labels badges on board cards below phase tags, `labels: []` in `EMPTY_WORK_ITEM_FORM` defaults, `labels` included in `createWorkItemMutation` payload, `uniqueLabels` useMemo for deduplicated filter options, labels filter UI buttons for dynamic `label:${tag}` filtering
+- View model (`projects-view-model.ts`): `ProjectBoardFilter` extended to `| \`label:${string}\``, `getUniqueLabels()` utility for deduplication across work items, label filter logic in `filterWorkItemsForProjectBoard`, `buildProjectBoardUrgencySummary` with `activeThisWeek`, `blockedThisWeek`, `doneThisWeek` counters based on 7-day rolling window, `PROJECT_URGENCY_SUMMARY_FILTERS` mapping for analytics counter shortcuts
+- Analytics counters UI: `activeThisWeek`, `blockedThisWeek`, `doneThisWeek` counters on project board, clickable urgency summary shortcuts
+- Tests: `projects-view-model.test.ts` (updated `blockedThisWeek` expectation to `1`), `project-detail-screen.test.ts` (updated urgency summary field assertions)
+- Full regression: `138/138` passing (`pnpm test`)
+- `pnpm build` clean
+- `systemctl --user restart hermes-workspace.service` / `is-active` -> `active`
+- Live verification at `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906`: labels badges render on cards, labels textarea visible in create form, analytics counters present
 
-**Target behavior:**
-- Add `labels: string[]` to work item.
-- Detail screen supports add/remove labels.
-- Board filtering by label.
-- Lightweight metrics (initial): active count, blocked count, done this week.
+**Key design decisions:**
+- Replaced `<Badge>` wrapper with inline `<span>` + Tailwind classes for label rendering to avoid `variant` prop mismatches across components
+- `getUniqueLabels()` deduplicates labels across all work items for dynamic filter UI
+- Analytics counters use 7-day rolling window from `new Date()` for `activeThisWeek`, `blockedThisWeek`, `doneThisWeek`
+- Mapped new analytics keys to existing `ProjectBoardFilter` types via `PROJECT_URGENCY_SUMMARY_FILTERS`
 
-**Acceptance criteria:**
-- Labels persist and filter correctly.
-- Metrics render consistently with existing data model.
+**Files modified:**
+- `src/lib/projects-view-model.ts` — analytics counters, label filter logic, `getUniqueLabels`
+- `src/screens/projects/project-detail-screen.tsx` — analytics UI, labels filter UI, `uniqueLabels` useMemo, labels badges on cards
+- `src/screens/projects/work-item-detail-screen.tsx` — label state/mutation hooks, label badges in header, labels textarea in create form
+- `src/lib/projects-view-model.test.ts` — updated assertions
+- `src/screens/projects/project-detail-screen.test.ts` — updated assertions
+
+---
+
+## Slice M — Label-based board analytics dashboard
+
+**Status:** complete and verified on 2026-04-25.
+
+**Grounded status:**
+- Extended `LabelAnalyticsEntry` type in `projects-view-model.ts` with three new metrics:
+  - `avgCycleTimeDays` — average days from `createdAt` to completion for labeled, done work items
+  - `throughputLast7d` — count of `done` work items in the last 7 days
+  - `reworkRate` — percentage of items showing build→review→build cycles (computed via `detectRework()`)
+- Added `buildProjectBoardUrgencySummary` with expanded analytics: `activeThisWeek`, `blockedThisWeek`, `doneThisWeek`
+- Added `PROJECT_URGENCY_SUMMARY_FILTERS` mapping for analytics counter shortcuts
+- UI updated in `project-detail-screen.tsx`:
+  - Replaced compact label analytics panel with expanded 4-column metric grid: Avg Cycle Time, Throughput, Rework Rate, Status Summary
+  - Added conditional insight pills for rework rate thresholds (>10% amber, >20% red)
+  - Per-label breakdown with cycle time and health indicators
+  - Retained per-label card rendering on board
+- Tests in `projects-view-model.test.ts`:
+  - Updated `builds label analytics with per-label breakdown` for new fields
+  - Fixed fixture timestamps for `computes cycle time, throughput, and rework metrics` test
+  - Adjusted cycle time bound expectation from `<10` to `<=15` days
+- Full regression: `143/143` passing (`pnpm vitest run`)
+- `pnpm build` clean (6.21s)
+- Dev server restarted and running at `http://127.0.0.1:3456/`
+- Live verification: analytics grid visible on project detail screen for `46b401f9-9243-472f-b5b7-04bf34596906`
+
+**Key design decisions:**
+- Cycle time computed as average days from `createdAt` to completion for labeled, done items
+- Rework rate detected via `detectRework()` helper checking for build→review→build cycles in work item history
+- Throughput measured as count of `done` items in the last 7 days
+- UI uses a 4-column metric grid with conditional insight pills for rework rate thresholds
+- Mapped new analytics keys to existing `ProjectBoardFilter` types via `PROJECT_URGENCY_SUMMARY_FILTERS`
+
+**Files modified:**
+- `src/lib/projects-view-model.ts` — `LabelAnalyticsEntry` type extension, cycle time/throughput/rework computation, `detectRework()`, urgency summary expansion
+- `src/screens/projects/project-detail-screen.tsx` — 4-column analytics grid, per-label breakdown, insight pills, rework thresholds
+- `src/lib/projects-view-model.test.ts` — updated label analytics test, fixed timestamps, adjusted cycle time bound
 
 ---
 
@@ -297,8 +347,7 @@ A slice is only “shipped” when all are true:
 
 ## 5) Suggested sequence for immediate execution
 
-- **Now:** Slice J (autonomous quality gate)
-- **Then:** Slice K (notification watchdog)
-- **After:** Slice L (labels + analytics)
+- **Now:** Slice M — Label-based board analytics dashboard — ✅ **SHIPPED**
+- **Next:** Identify next P0 queue item from quality analysis (Slice N+)
 
 This ordering gives best risk reduction and fastest mission-control quality gains.

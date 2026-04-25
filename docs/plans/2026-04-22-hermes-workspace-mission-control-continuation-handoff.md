@@ -507,11 +507,39 @@ These are the grounded slice states after live QA and diff inspection on 2026-04
 - `pnpm build` clean, service restarted and active
 - Live API verification confirmed `reviewJobId`/`reviewState`/`reviewDecision` round-trip and `syncExecution` return
 
+### Slice K — Notification watchdog (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- `src/server/work-item-notification-digest.ts`: `buildStatusDigest()`, `formatDigestForDiscord()`, `digestStateHasChanged()`/`persistDigestHash()`, `formatDigestAge()`
+- `src/routes/api/work-item-notification-digest.ts`: `GET /api/work-item-notification-digest` (JSON + `hasChanged` + Discord message), `GET ?format=discord` (formatted only)
+- 7 new tests in `work-item-notification-digest.test.ts`
+- Full regression: `138/138` passing
+- Live API verification confirmed digest returns correct pending approval data with `hasChanged=true`
+
+### Slice L — Labels/tags + lightweight analytics (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- `labels: string[]` added to `WorkItemRecord` and `CreateWorkItemInput`, persists through API (POST + PATCH)
+- View model (`projects-view-model.ts`): `ProjectBoardFilter` extended to `| \`label:${string}\``, `getUniqueLabels()` utility, label filter logic, `buildProjectBoardUrgencySummary` with `activeThisWeek`/`blockedThisWeek`/`doneThisWeek` (7-day rolling window), `PROJECT_URGENCY_SUMMARY_FILTERS` mapping
+- Project board (`project-detail-screen.tsx`): analytics counters UI, labels badges on cards, `uniqueLabels` useMemo, labels filter UI buttons, `labels: []` in form defaults, `labels` in create mutation
+- Detail screen (`work-item-detail-screen.tsx`): labels state/mutation hooks, inline `<span>` badges in header, labels textarea in create form
+- Tests: `projects-view-model.test.ts`, `project-detail-screen.test.ts` updated
+- Full regression: `138/138` passing, `pnpm build` clean, service active
+- Live verification at target project confirmed labels badges, analytics counters, create form labels textarea
+
+**Key design decisions:**
+- Inline `<span>` + Tailwind for labels (avoids `<Badge>` `variant` prop mismatches)
+- `getUniqueLabels()` deduplicates across all work items
+- Analytics counters use 7-day rolling window
+- Mapped analytics keys to `ProjectBoardFilter` via `PROJECT_URGENCY_SUMMARY_FILTERS`
+
 ### Next practical priority
-Slice A (phase routing rewire), Slice B (two-phase orchestration), **Slice C (risk level field)**, **Slice E (riskLevel automation)**, **Slice F (lifecycle completeness)**, **Slice G (acceptance criteria verification)**, **Slice H1/H2 (WIP + blocked taxonomy)**, **Slice I1 (deploy rejection return-to-build)**, **Slice I2 (sync fallback envelope)**, **Slice J (Planner-as-Reviewer)**, and **Slice K (Notification watchdog)** are complete. The immediate queue is:
+Slice A (phase routing rewire), Slice B (two-phase orchestration), **Slice C (risk level field)**, **Slice E (riskLevel automation)**, **Slice F (lifecycle completeness)**, **Slice G (acceptance criteria verification)**, **Slice H1/H2 (WIP + blocked taxonomy)**, **Slice I1 (deploy rejection return-to-build)**, **Slice I2 (sync fallback envelope)**, **Slice J (Planner-as-Reviewer)**, **Slice K (Notification watchdog)**, and **Slice L (labels/analytics)** are complete. The immediate queue is:
 1. **Slice K — notification watchdog** — ✅ **SHIPPED** (status digest, de-dup, Discord-formatted output)
-2. **Slice L — labels/analytics**
-   - cross-cutting categorization + lightweight throughput/blocked insights
+2. **Slice L — labels/analytics** — ✅ **SHIPPED** (labels/tags, board filtering, lightweight analytics counters)
+3. **Slice M — label-based board analytics dashboard**
 
 Detailed execution breakdown is tracked in:
 - `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
@@ -628,7 +656,7 @@ When resuming this project in a new or compacted chat:
 
 ## 8. Bottom line
 
-The project is already past the original roadmap's earliest slices. The routing foundation, project/work-item control plane, approvals inbox, workflow policy, Mission Control dashboard, two-phase launch pipeline, and risk level field are all in place.
+The project is already past the original roadmap's earliest slices. The routing foundation, project/work-item control plane, approvals inbox, workflow policy, Mission Control dashboard, two-phase launch pipeline, risk level field, labels/analytics, and board analytics dashboard are all in place.
 
 ### 2026-04-25 architectural shift
 
@@ -644,9 +672,34 @@ A major profiles/workflow re-architecture was completed on 2026-04-25:
 
 See `docs/plans/2026-04-25-hermes-workspace-profiles-workflow-rearchitecture.md` for full details.
 
+### 2026-04-25 Slice M — Label-based board analytics dashboard (shipped)
+
+Extended the label analytics from lightweight counters (Slice L) into a full dashboard:
+
+- **Model:** `LabelAnalyticsEntry` extended with `avgCycleTimeDays`, `throughputLast7d`, `reworkRate`
+- **Metrics:** cycle time (avg days from `createdAt` to completion), throughput (done count in 7d), rework rate (build→review→build cycles)
+- **UI:** 4-column metric grid on project detail screen (Avg Cycle Time, Throughput, Rework Rate, Status Summary) with per-label breakdown and conditional insight pills for rework thresholds
+- **Tests:** 143/143 passing, production build clean
+- **Files:** `projects-view-model.ts`, `project-detail-screen.tsx`, `projects-view-model.test.ts`
+
+#### Shipped slices summary (as of 2026-04-25)
+
+| Slice | Feature | Status |
+|-------|---------|--------|
+| A–J | Phase routing, two-phase orchestration, risk level, lifecycle, acceptance criteria, WIP, blocked taxonomy, deploy rejection, sync fallback, Planner-as-Reviewer | ✅ Shipped |
+| K | Notification watchdog (digest, de-dup, Discord) | ✅ Shipped |
+| L | Labels/tags + lightweight analytics counters | ✅ Shipped |
+| M | Label-based board analytics dashboard (cycle time, throughput, rework, status) | ✅ Shipped |
+
+**Regression baseline:** `143/143` passing
+
 The next meaningful evolutions are:
 
-1. **Slice L — labels/analytics** — cross-cutting categorization and lightweight throughput/blocked visibility
+1. **Slice M — Label-based board analytics dashboard** — ✅ **SHIPPED** (cycle time, throughput, rework rate, status summary)
+
+The next queue items are:
+
+1. **Slice N+** — Identify from quality analysis (`docs/plans/2026-04-25-hermes-workspace-workflow-quality-analysis.md`)
 
 Detailed execution order and file-level scope:
 - `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`

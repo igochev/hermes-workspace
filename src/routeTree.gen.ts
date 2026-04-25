@@ -111,6 +111,7 @@ import { Route as ApiWorkItemsWorkItemIdLaunchRouteImport } from './routes/api/w
 import { Route as ApiWorkItemsWorkItemIdApprovalsRouteImport } from './routes/api/work-items.$workItemId.approvals'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
+import { Route as ApiProjectsProjectIdLabelAnalyticsRouteImport } from './routes/api/projects.$projectId.label-analytics'
 
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
@@ -630,6 +631,12 @@ const ApiSessionsSessionKeyActiveRunRoute =
     path: '/$sessionKey/active-run',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
+const ApiProjectsProjectIdLabelAnalyticsRoute =
+  ApiProjectsProjectIdLabelAnalyticsRouteImport.update({
+    id: '/label-analytics',
+    path: '/label-analytics',
+    getParentRoute: () => ApiProjectsProjectIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -719,7 +726,7 @@ export interface FileRoutesByFullPath {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
-  '/api/projects/$projectId': typeof ApiProjectsProjectIdRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -728,6 +735,7 @@ export interface FileRoutesByFullPath {
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
@@ -820,7 +828,7 @@ export interface FileRoutesByTo {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
-  '/api/projects/$projectId': typeof ApiProjectsProjectIdRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -829,6 +837,7 @@ export interface FileRoutesByTo {
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
@@ -925,7 +934,7 @@ export interface FileRoutesById {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
-  '/api/projects/$projectId': typeof ApiProjectsProjectIdRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -934,6 +943,7 @@ export interface FileRoutesById {
   '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
   '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
@@ -1040,6 +1050,7 @@ export interface FileRouteTypes {
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
     | '/projects/$projectId/'
+    | '/api/projects/$projectId/label-analytics'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
@@ -1141,6 +1152,7 @@ export interface FileRouteTypes {
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
     | '/projects/$projectId'
+    | '/api/projects/$projectId/label-analytics'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
@@ -1245,6 +1257,7 @@ export interface FileRouteTypes {
     | '/api/work-item-approvals/$approvalId'
     | '/api/work-items/$workItemId'
     | '/projects/$projectId/'
+    | '/api/projects/$projectId/label-analytics'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
@@ -2047,6 +2060,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/projects/$projectId/label-analytics': {
+      id: '/api/projects/$projectId/label-analytics'
+      path: '/label-analytics'
+      fullPath: '/api/projects/$projectId/label-analytics'
+      preLoaderRoute: typeof ApiProjectsProjectIdLabelAnalyticsRouteImport
+      parentRoute: typeof ApiProjectsProjectIdRoute
+    }
   }
 }
 
@@ -2138,12 +2158,24 @@ const ApiMemoryRouteWithChildren = ApiMemoryRoute._addFileChildren(
   ApiMemoryRouteChildren,
 )
 
+interface ApiProjectsProjectIdRouteChildren {
+  ApiProjectsProjectIdLabelAnalyticsRoute: typeof ApiProjectsProjectIdLabelAnalyticsRoute
+}
+
+const ApiProjectsProjectIdRouteChildren: ApiProjectsProjectIdRouteChildren = {
+  ApiProjectsProjectIdLabelAnalyticsRoute:
+    ApiProjectsProjectIdLabelAnalyticsRoute,
+}
+
+const ApiProjectsProjectIdRouteWithChildren =
+  ApiProjectsProjectIdRoute._addFileChildren(ApiProjectsProjectIdRouteChildren)
+
 interface ApiProjectsRouteChildren {
-  ApiProjectsProjectIdRoute: typeof ApiProjectsProjectIdRoute
+  ApiProjectsProjectIdRoute: typeof ApiProjectsProjectIdRouteWithChildren
 }
 
 const ApiProjectsRouteChildren: ApiProjectsRouteChildren = {
-  ApiProjectsProjectIdRoute: ApiProjectsProjectIdRoute,
+  ApiProjectsProjectIdRoute: ApiProjectsProjectIdRouteWithChildren,
 }
 
 const ApiProjectsRouteWithChildren = ApiProjectsRoute._addFileChildren(

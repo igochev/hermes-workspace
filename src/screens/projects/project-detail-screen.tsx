@@ -32,14 +32,17 @@ import {
   PROJECT_STATUS_ORDER,
   PROJECT_BOARD_FLOW_ORDER,
   PROJECT_ACTIVE_WIP_WARNING_THRESHOLD,
+  buildLabelAnalytics,
   buildProjectBoardUrgencySummary,
   buildProjectWipHint,
   buildWorkItemOperatorSignals,
   buildWorkItemRecoveryHint,
   filterWorkItemsForProjectBoard,
+  getUniqueLabels,
   getWorkItemUrgencyTone,
   isProjectWipHigh,
   sortWorkItemsForProjectBoard,
+  type LabelAnalyticsEntry,
   type ProjectBoardFilter,
   type ProjectBoardUrgencySummary,
   type WorkItemUrgencyTone,
@@ -54,6 +57,7 @@ const EMPTY_WORK_ITEM_FORM: Omit<CreateWorkItemInput, 'projectId'> = {
   priority: 'medium',
   riskLevel: 'medium',
   assignedProfile: '',
+  labels: [],
   repoPathSnapshot: '',
   acceptanceCriteria: [],
   notes: [],
@@ -153,6 +157,9 @@ export const PROJECT_URGENCY_SUMMARY_LABELS: Record<keyof ProjectBoardUrgencySum
   runningMissions: 'Missions running',
   failedMissions: 'Mission failures',
   blocked: 'Blocked',
+  activeThisWeek: 'Active this week',
+  blockedThisWeek: 'Blocked this week',
+  doneThisWeek: 'Done this week',
 }
 export const PROJECT_URGENCY_SUMMARY_SHORTCUT_LABELS: Record<ProjectBoardFilter, string> = {
   all: 'All work',
@@ -178,6 +185,9 @@ export const PROJECT_URGENCY_SUMMARY_FILTERS: Record<keyof ProjectBoardUrgencySu
   runningMissions: 'execution',
   failedMissions: 'execution',
   blocked: 'attention',
+  activeThisWeek: 'attention',
+  blockedThisWeek: 'attention',
+  doneThisWeek: 'attention',
 }
 
 export function toggleProjectBoardShortcutFilter(
@@ -284,6 +294,15 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
     () => workItems.filter((item) => item.status === 'active').length,
     [workItems],
   )
+  const uniqueLabels = useMemo(
+    () => getUniqueLabels(workItems),
+    [workItems],
+  )
+  const labelAnalytics = useMemo(
+    () => buildLabelAnalytics(workItems),
+    [workItems],
+  )
+  const [labelFilter, setLabelFilter] = useState<string | null>(null)
   const projectWipLaunchHint = useMemo(
     () => buildProjectWipHint(activeWorkItemCount, PROJECT_ACTIVE_WIP_WARNING_THRESHOLD),
     [activeWorkItemCount],
@@ -379,6 +398,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
       priority: form.priority,
       riskLevel: form.riskLevel,
       assignedProfile: form.assignedProfile?.trim() || undefined,
+      labels: form.labels,
       repoPathSnapshot: form.repoPathSnapshot?.trim() || project.repoPath,
       acceptanceCriteria: form.acceptanceCriteria,
       notes: form.notes,
@@ -771,6 +791,28 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
               </div>
               <div className="space-y-1 md:col-span-2">
                 <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
+                  Labels
+                </label>
+                <textarea
+                  value={form.labels.join('\n')}
+                  onChange={(event) =>
+                    updateField(
+                      'labels',
+                      event.target.value
+                        .split('\n')
+                        .map((value) => value.trim())
+                        .filter(Boolean),
+                    )
+                  }
+                  placeholder="One label per line (e.g. frontend, api, urgent)"
+                  className="min-h-16 w-full rounded-2xl border border-[var(--theme-border)] bg-surface px-3 py-2 text-sm text-ink outline-none transition-shadow focus:ring-2 focus:ring-[var(--theme-accent)]/25"
+                />
+                <p className="text-xs text-[var(--theme-muted)]">
+                  Optional tags for filtering and organization.
+                </p>
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
                   Notes
                 </label>
                 <textarea
@@ -874,6 +916,184 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
             })}
           </div>
 
+          {labelAnalytics.labels.length > 0 && (
+            <div className="space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                  Label Analytics
+                </h3>
+                <span className="text-[11px] text-[var(--theme-muted)]">
+                  {labelAnalytics.totalLabels} labels · {labelAnalytics.totalWorkItems} items
+                </span>
+              </div>
+
+              {/* Project-level aggregate metrics */}
+              <div className="grid gap-2 sm:grid-cols-4">
+                {/* Average Cycle Time */}
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-2.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--theme-muted)]">
+                    Avg Cycle Time
+                  </div>
+                  <div className="text-lg font-bold text-[var(--theme-text)]">
+                    {labelAnalytics.avgCycleTimeDays != null
+                      ? `${labelAnalytics.avgCycleTimeDays.toFixed(1)}d`
+                      : '—'}
+                  </div>
+                </div>
+
+                {/* Throughput */}
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-2.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--theme-muted)]">
+                    Throughput
+                  </div>
+                  <div className="text-lg font-bold text-[var(--theme-text)]">
+                    {labelAnalytics.throughputPerWeek > 0
+                      ? `${labelAnalytics.throughputPerWeek.toFixed(1)}/wk`
+                      : '—'}
+                  </div>
+                </div>
+
+                {/* Rework Rate */}
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-2.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--theme-muted)]">
+                    Rework Rate
+                  </div>
+                  <div className={`text-lg font-bold ${labelAnalytics.reworkRate > 0.2 ? 'text-red-400' : labelAnalytics.reworkRate > 0 ? 'text-amber-400' : 'text-[var(--theme-text)]'}`}>
+                    {labelAnalytics.reworkRate > 0
+                      ? `${(labelAnalytics.reworkRate * 100).toFixed(0)}%`
+                      : '—'}
+                  </div>
+                </div>
+
+                {/* Status Summary */}
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-2.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--theme-muted)]">
+                    Status
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm font-bold text-[var(--theme-text)]">
+                    <span className="text-emerald-400">{labelAnalytics.totalDone}</span>
+                    <span className="text-[var(--theme-muted)]">·</span>
+                    <span className="text-sky-400">{labelAnalytics.totalActive}</span>
+                    <span className="text-[var(--theme-muted)]">·</span>
+                    <span className="text-red-400">{labelAnalytics.totalBlocked}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary insights */}
+              <div className="flex flex-wrap gap-2">
+                {labelAnalytics.mostUsedLabel && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[11px] text-[var(--theme-muted)]">
+                    Most used: <strong className="text-[var(--theme-text)]">{labelAnalytics.mostUsedLabel}</strong>
+                  </span>
+                )}
+                {labelAnalytics.mostBlockedLabel && labelAnalytics.mostBlockedLabel !== labelAnalytics.mostUsedLabel && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/8 px-2 py-0.5 text-[11px] text-red-300">
+                    Most blocked: <strong>{labelAnalytics.mostBlockedLabel}</strong>
+                  </span>
+                )}
+                {labelAnalytics.healthiestLabel && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/8 px-2 py-0.5 text-[11px] text-emerald-300">
+                    Healthiest: <strong>{labelAnalytics.healthiestLabel}</strong>
+                  </span>
+                )}
+                {labelAnalytics.reworkRate > 0.1 && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/8 px-2 py-0.5 text-[11px] text-amber-300">
+                    ⚠ Rework: {(labelAnalytics.reworkRate * 100).toFixed(0)}%
+                  </span>
+                )}
+              </div>
+
+              {/* Per-label breakdown */}
+              <div className="space-y-2">
+                {labelAnalytics.labels.map((entry) => (
+                  <div key={entry.label} className="flex items-center gap-3">
+                    {/* Label name - clickable to filter */}
+                    <button
+                      type="button"
+                      onClick={() => setBoardFilter(`label:${entry.label}` as ProjectBoardFilter)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <span className="text-xs font-medium text-[var(--theme-text)]">{entry.label}</span>
+                    </button>
+
+                    {/* Status counts */}
+                    <div className="flex items-center gap-1.5 text-[11px] text-[var(--theme-muted)]">
+                      <span>{entry.total}</span>
+                      {entry.active > 0 && <span className="text-sky-400">· {entry.active} active</span>}
+                      {entry.blocked > 0 && <span className="text-red-400">· {entry.blocked} blocked</span>}
+                      {entry.done > 0 && <span className="text-emerald-400">· {entry.done} done</span>}
+                    </div>
+
+                    {/* Cycle time per label */}
+                    {entry.avgCycleTimeDays != null && (
+                      <span className="text-[11px] text-[var(--theme-muted)]">
+                        {entry.avgCycleTimeDays.toFixed(1)}d avg
+                      </span>
+                    )}
+
+                    {/* Health indicator */}
+                    <span
+                      className={cn(
+                        'inline-flex h-2 w-2 rounded-full',
+                        entry.health === 'critical' && 'bg-red-500',
+                        entry.health === 'warning' && 'bg-amber-500',
+                        entry.health === 'healthy' && 'bg-emerald-500',
+                      )}
+                      title={`Health: ${entry.health}`}
+                    />
+
+                    {/* Insight */}
+                    {entry.insight && (
+                      <span className="text-[11px] text-[var(--theme-muted)]">{entry.insight}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {uniqueLabels.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
+              <span className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
+                Labels
+              </span>
+              <button
+                type="button"
+                onClick={() => setBoardFilter('all')}
+                aria-pressed={boardFilter === 'all'}
+                className={cn(
+                  PROJECT_BOARD_FILTER_BUTTON_CLASS,
+                  boardFilter === 'all'
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)] text-white'
+                    : 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-text)] hover:bg-[var(--theme-card)]',
+                )}
+              >
+                All
+              </button>
+              {uniqueLabels.map((label) => {
+                const filterValue = `label:${label}` as ProjectBoardFilter
+                const active = boardFilter === filterValue
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setBoardFilter(filterValue)}
+                    aria-pressed={active}
+                    className={cn(
+                      PROJECT_BOARD_FILTER_BUTTON_CLASS,
+                      active
+                        ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)] text-white'
+                        : 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-text)] hover:bg-[var(--theme-card)]',
+                    )}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           <div className={PROJECT_BOARD_COLUMNS_CLASS}>
             {PROJECT_DETAIL_BOARD_ORDER.map((status) => {
               const column = workItemsByStatus.find((entry) => entry.status === status)
@@ -939,6 +1159,9 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                               {item.blockedReason ? (
                                 <Tag>{WORK_ITEM_BLOCKED_REASON_LABELS[item.blockedReason]}</Tag>
                               ) : null}
+                              {item.labels.map((label) => (
+                                <span key={label} className="inline-flex items-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--theme-muted)]">{label}</span>
+                              ))}
                               {buildWorkItemOperatorSignals(item).map((signal) => (
                                 <span key={signal} className={PROJECT_BOARD_SIGNAL_CHIP_CLASS}>
                                   {signal}

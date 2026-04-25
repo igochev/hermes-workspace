@@ -85,6 +85,28 @@ The canonical workflow should now be treated as:
 For the exact current state, validated runtime details, and the prioritized next slices after this snapshot, continue from:
 - `docs/plans/2026-04-22-hermes-workspace-mission-control-continuation-handoff.md`
 
+## 2026-04-25 implementation snapshot
+
+The codebase has advanced beyond the 2026-04-24 state with the following shipped slices:
+
+### Slices K, L, M (shipped 2026-04-25)
+- **Slice K** — Notification watchdog: scheduled digest of pending approvals, blocked items, failed missions with Discord formatting and de-duplication
+- **Slice L** — Labels/tags + lightweight analytics: `labels: string[]` on work items, label badges on cards/detail, label filter UI, analytics counters (active/blocked/done this week)
+- **Slice M** — Label-based board analytics dashboard: 4-column metric grid (Avg Cycle Time, Throughput, Rework Rate, Status Summary), per-label breakdown with health indicators, conditional insight pills for rework thresholds
+
+### 2026-04-25 architectural shift (profiles/workflow re-architecture)
+- Builder fixed as first-class Hermes profile
+- Researcher upgraded from dummy to proper profile (gpt-4.1)
+- Planner profile created (gpt-5.4, openai-codex)
+- Dashboard root fixed, `zero-fork` mode restored
+- Two-phase Launch Build pipeline (Planner → Builder sequential)
+- Risk level field + automation on work items
+- Full regression baseline: `143/143` passing
+
+For the exact current state and prioritized next slices, continue from:
+- `docs/plans/2026-04-22-hermes-workspace-mission-control-continuation-handoff.md`
+- `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
+
 ## 2026-04-24 implementation audit snapshot
 
 The codebase has moved beyond the partially-complete routing state described in some older session notes.

@@ -47,6 +47,7 @@ export type WorkItemRecord = {
   riskLevel: WorkItemRiskLevel
   blockedReason?: WorkItemBlockedReason
   assignedProfile?: string
+  labels: Array<string>
   repoPathSnapshot: string
   planFilePath?: string
   missionId?: string
@@ -87,6 +88,7 @@ type CreateWorkItemInput = {
   riskLevel?: WorkItemRiskLevel
   blockedReason?: WorkItemBlockedReason
   assignedProfile?: string
+  labels?: Array<string>
   repoPathSnapshot: string
   planFilePath?: string
   reviewJobId?: string
@@ -294,6 +296,7 @@ function normalizeWorkItem(
     riskLevel: normalizeRiskLevel(workItem.riskLevel),
     blockedReason: normalizeBlockedReason((workItem as Partial<WorkItemRecord>).blockedReason),
     assignedProfile: asOptionalString(workItem.assignedProfile),
+    labels: asStringArray(workItem.labels),
     repoPathSnapshot: workItem.repoPathSnapshot.trim(),
     planFilePath: asOptionalString((workItem as Partial<WorkItemRecord>).planFilePath),
     reviewJobId: asOptionalString((workItem as Partial<WorkItemRecord>).reviewJobId),
@@ -369,6 +372,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     riskLevel: input.riskLevel,
     blockedReason: input.blockedReason,
     assignedProfile: input.assignedProfile,
+    labels: input.labels,
     repoPathSnapshot: input.repoPathSnapshot,
     missionId: input.missionId,
     missionJobId: input.missionJobId,

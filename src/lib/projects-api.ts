@@ -60,6 +60,7 @@ export type WorkItemRecord = {
   riskLevel: WorkItemRiskLevel
   blockedReason?: WorkItemBlockedReason
   assignedProfile?: string
+  labels: Array<string>
   repoPathSnapshot: string
   missionId?: string
   missionJobId?: string
@@ -129,6 +130,7 @@ export type CreateWorkItemInput = {
   riskLevel?: WorkItemRiskLevel
   blockedReason?: WorkItemBlockedReason
   assignedProfile?: string
+  labels?: Array<string>
   repoPathSnapshot?: string
   missionId?: string
   missionLink?: string
