@@ -4,7 +4,7 @@
 
 **Goal:** Preserve exact project state, completed slices, verified runtime behavior, and the next prioritized implementation slices so work can continue cleanly after session compaction or a fresh chat.
 
-**Architecture:** Hermes Workspace is the operator cockpit. Projects and Work Items are the authoritative Mission Control control plane. Conductor is the execution engine. Profiles provide role/phase behavior. The intended lifecycle is idea capture → planning/research → build → review/approval → deploy/done.
+**Architecture:** Hermes Workspace is the operator cockpit. Projects and Work Items are the authoritative Mission Control control plane. Conductor is the execution engine. Profiles provide role/phase behavior. The intended lifecycle is idea capture → Planner enrichment → CEO/policy approval → Builder implementation → Planner/Oracle structured review → deploy gate → evidence archive → retrospective learning.
 
 **Runtime repo:** `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
 
@@ -20,10 +20,12 @@
 - **Projects / Work Items** are the source of truth.
 - **Conductor** executes launched work; it is not the canonical entry path.
 - **Profiles** express role/phase routing behavior.
-- **Researcher** should own default planning/research work.
-- **Builder** should own implementation after planning.
-- Idea-only requests should start as Work Items, usually with `status=inbox` and `phase=research`.
-- Acceptance criteria should be draftable by planning, not always mandatory at initial capture time.
+- **Planner** is now the default planning/enrichment profile and should prepare rough ideas before Builder work.
+- **Builder** owns implementation after Planner-prepared scope is approved.
+- **Researcher** is an ad-hoc/Autopilot scout support role for web recon, comparisons, API changes, and feasibility checks.
+- Idea-only requests should start as Work Items or Autopilot Suggestions, usually with `status=inbox` and `phase=research` until Planner enrichment makes them ready.
+- Acceptance criteria should be drafted/refined by Planner, not forced at initial capture time.
+- New north-star roadmap for the next era: `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`. Recommended next slice: **Slice N — Idea Intake + Planner Enrichment**.
 
 ### 1.2 Live-verified runtime facts
 - Runtime repo in use: `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
@@ -693,15 +695,18 @@ Extended the label analytics from lightweight counters (Slice L) into a full das
 
 **Regression baseline:** `143/143` passing
 
-The next meaningful evolutions are:
+The next meaningful evolutions are now defined by the CEO/Architect north-star audit:
 
-1. **Slice M — Label-based board analytics dashboard** — ✅ **SHIPPED** (cycle time, throughput, rework rate, status summary)
+1. **Slice N — Idea Intake + Planner Enrichment** — rough ideas become Planner-prepared draft work items before Builder launch.
+2. **Slice P — Autopilot Suggestion Model + Inbox** — project-aware scout findings become reviewable suggestions, not immediate code changes.
+3. **Slice Q — Project Autopilot Scout Schedules** — easy daily/weekly improvement scouting per project.
+4. **Slice T — Structured Review Decision Parser** — review output becomes a real quality gate, not just job success/failure.
+5. **Slice R/S — Execution Runs + Supervisor** — durable run history plus stale/failure detection.
 
-The next queue items are:
+Detailed high-level roadmap:
+- `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`
 
-1. **Slice N+** — Identify from quality analysis (`docs/plans/2026-04-25-hermes-workspace-workflow-quality-analysis.md`)
-
-Detailed execution order and file-level scope:
+Detailed historic execution order and shipped slice scope:
 - `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
 
-If resuming later, continue from the above document.
+If resuming later, start from the high-level roadmap above, then turn Slice N into an executable implementation plan.
