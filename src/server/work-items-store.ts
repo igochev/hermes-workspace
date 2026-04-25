@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 export type WorkItemStatus = 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
 export type WorkItemPhase = 'research' | 'build' | 'review' | 'deploy'
 export type WorkItemPriority = 'high' | 'medium' | 'low'
+export type WorkItemRiskLevel = 'low' | 'medium' | 'high'
 
 export type WorkItemHistoryEntry = {
   id: string
@@ -22,6 +23,11 @@ export type WorkItemHistoryEntry = {
 
 export type WorkItemMissionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 
+export type WorkItemCriterionStatus = {
+  text: string
+  met: boolean
+}
+
 export type WorkItemRecord = {
   id: string
   projectId: string
@@ -30,8 +36,10 @@ export type WorkItemRecord = {
   status: WorkItemStatus
   phase?: WorkItemPhase
   priority: WorkItemPriority
+  riskLevel: WorkItemRiskLevel
   assignedProfile?: string
   repoPathSnapshot: string
+  planFilePath?: string
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -45,6 +53,7 @@ export type WorkItemRecord = {
   prUrl?: string
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
+  criteriaStatus: Array<WorkItemCriterionStatus>
   notes: Array<string>
   history: Array<WorkItemHistoryEntry>
   createdAt: string
@@ -63,8 +72,10 @@ type CreateWorkItemInput = {
   status?: WorkItemStatus
   phase?: WorkItemPhase
   priority?: WorkItemPriority
+  riskLevel?: WorkItemRiskLevel
   assignedProfile?: string
   repoPathSnapshot: string
+  planFilePath?: string
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -78,6 +89,7 @@ type CreateWorkItemInput = {
   prUrl?: string
   artifactPaths?: Array<string>
   acceptanceCriteria?: Array<string>
+  criteriaStatus?: Array<WorkItemCriterionStatus>
   notes?: Array<string>
   history?: Array<WorkItemHistoryEntry>
 }
@@ -145,6 +157,35 @@ function asStringArray(value: unknown): Array<string> {
     : []
 }
 
+function asCriteriaStatusArray(value: unknown): Array<WorkItemCriterionStatus> {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is { text?: unknown; met?: unknown } => Boolean(item) && typeof item === 'object')
+        .map((item) => ({
+          text: typeof item.text === 'string' ? item.text.trim() : '',
+          met: item.met === true,
+        }))
+        .filter((item) => item.text.length > 0)
+    : []
+}
+
+function buildCriteriaStatus(
+  acceptanceCriteria: Array<string>,
+  criteriaStatus: Array<WorkItemCriterionStatus>,
+): Array<WorkItemCriterionStatus> {
+  if (acceptanceCriteria.length === 0) return []
+
+  return acceptanceCriteria.map((criterion, index) => {
+    const indexed = criteriaStatus[index]
+    if (indexed && indexed.text === criterion) {
+      return { text: criterion, met: indexed.met }
+    }
+
+    const byText = criteriaStatus.find((item) => item.text === criterion)
+    return { text: criterion, met: byText?.met === true }
+  })
+}
+
 function normalizeStatus(value: unknown): WorkItemStatus {
   return value === 'ready' ||
     value === 'active' ||
@@ -166,6 +207,10 @@ function normalizePhase(value: unknown): WorkItemPhase | undefined {
 
 function normalizePriority(value: unknown): WorkItemPriority {
   return value === 'high' || value === 'low' ? value : 'medium'
+}
+
+function normalizeRiskLevel(value: unknown): WorkItemRiskLevel {
+  return value === 'low' || value === 'high' ? value : 'medium'
 }
 
 function asHistoryArray(value: unknown): Array<WorkItemHistoryEntry> {
@@ -201,6 +246,9 @@ function normalizeWorkItem(
   workItem: Partial<WorkItemRecord> &
     Pick<WorkItemRecord, 'id' | 'projectId' | 'title' | 'repoPathSnapshot' | 'createdAt' | 'updatedAt'>,
 ): WorkItemRecord {
+  const acceptanceCriteria = asStringArray(workItem.acceptanceCriteria)
+  const criteriaStatus = buildCriteriaStatus(acceptanceCriteria, asCriteriaStatusArray(workItem.criteriaStatus))
+
   return {
     id: workItem.id,
     projectId: workItem.projectId.trim(),
@@ -209,8 +257,10 @@ function normalizeWorkItem(
     status: normalizeStatus(workItem.status),
     phase: normalizePhase(workItem.phase),
     priority: normalizePriority(workItem.priority),
+    riskLevel: normalizeRiskLevel(workItem.riskLevel),
     assignedProfile: asOptionalString(workItem.assignedProfile),
     repoPathSnapshot: workItem.repoPathSnapshot.trim(),
+    planFilePath: asOptionalString((workItem as Partial<WorkItemRecord>).planFilePath),
     missionId: asOptionalString(workItem.missionId),
     missionJobId: asOptionalString((workItem as Partial<WorkItemRecord>).missionJobId),
     missionJobName: asOptionalString((workItem as Partial<WorkItemRecord>).missionJobName),
@@ -230,7 +280,8 @@ function normalizeWorkItem(
     branchName: asOptionalString(workItem.branchName),
     prUrl: asOptionalString(workItem.prUrl),
     artifactPaths: asStringArray(workItem.artifactPaths),
-    acceptanceCriteria: asStringArray(workItem.acceptanceCriteria),
+    acceptanceCriteria,
+    criteriaStatus,
     notes: asStringArray(workItem.notes),
     history: asHistoryArray(workItem.history),
     createdAt: workItem.createdAt,
@@ -267,6 +318,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     status: input.status,
     phase: input.phase,
     priority: input.priority,
+    riskLevel: input.riskLevel,
     assignedProfile: input.assignedProfile,
     repoPathSnapshot: input.repoPathSnapshot,
     missionId: input.missionId,
@@ -282,6 +334,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     prUrl: input.prUrl,
     artifactPaths: input.artifactPaths,
     acceptanceCriteria: input.acceptanceCriteria,
+    criteriaStatus: input.criteriaStatus,
     notes: input.notes,
     history: input.history,
     createdAt: now,

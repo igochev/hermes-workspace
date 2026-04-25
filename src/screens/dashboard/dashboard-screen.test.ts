@@ -210,6 +210,7 @@ function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
     status: overrides.status ?? 'inbox',
     phase: overrides.phase,
     priority: overrides.priority ?? 'medium',
+    riskLevel: overrides.riskLevel ?? 'medium',
     assignedProfile: overrides.assignedProfile,
     repoPathSnapshot: overrides.repoPathSnapshot ?? '/repos/mission-control',
     missionId: overrides.missionId,

@@ -16,8 +16,11 @@ import {
   deleteWorkItem,
   updateWorkItem,
   type WorkItemApprovalDecision,
+  type WorkItemCriterionStatus,
+  type WorkItemRiskLevel,
   WORK_ITEM_PHASE_LABELS,
   WORK_ITEM_PRIORITY_LABELS,
+  WORK_ITEM_RISK_LEVEL_LABELS,
   WORK_ITEM_STATUS_LABELS,
 } from '@/lib/projects-api'
 import { resolveWorkItemApproval } from '@/lib/work-item-approvals-api'
@@ -44,6 +47,10 @@ export type WorkItemDetailLifecycleAction =
   | 'request_review'
   | 'request_deploy_approval'
   | 'resume_build'
+  | 'cancel'
+  | 'back_to_research'
+  | 'back_to_build'
+  | 'back_to_inbox'
 
 export function stringifyWorkItemDetailListDraft(items: Array<string>): string {
   return items.join('\n')
@@ -56,6 +63,39 @@ export function parseWorkItemDetailListDraft(value: string): Array<string> {
     .filter((item) => item.length > 0)
 }
 
+export function buildWorkItemAcceptanceCriteriaStatus(
+  acceptanceCriteria: Array<string>,
+  criteriaStatus: Array<WorkItemCriterionStatus>,
+): Array<WorkItemCriterionStatus> {
+  if (acceptanceCriteria.length === 0) return []
+
+  return acceptanceCriteria.map((criterion, index) => {
+    const indexed = criteriaStatus[index]
+    if (indexed && indexed.text === criterion) {
+      return { text: criterion, met: indexed.met }
+    }
+
+    const byText = criteriaStatus.find((item) => item.text === criterion)
+    return { text: criterion, met: byText?.met === true }
+  })
+}
+
+export function getWorkItemAcceptanceCriteriaProgress(criteriaStatus: Array<WorkItemCriterionStatus>): {
+  metCount: number
+  totalCount: number
+} {
+  const totalCount = criteriaStatus.length
+  const metCount = criteriaStatus.filter((item) => item.met).length
+  return { metCount, totalCount }
+}
+
+export function getWorkItemAcceptanceCriteriaProgressLabel(progress: {
+  metCount: number
+  totalCount: number
+}): string {
+  return `${progress.metCount}/${progress.totalCount} criteria met`
+}
+
 export const WORK_ITEM_DETAIL_ACTION_GROUP_TITLES = {
   operator: 'Operator Workflow',
   execution: 'Execution Controls',
@@ -66,6 +106,8 @@ export function getWorkItemOperatorGuidance(state: {
   status: 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
   phase: 'research' | 'build' | 'review' | 'deploy' | undefined
   missionState?: 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
+  riskLevel?: 'low' | 'medium' | 'high'
+  acceptanceCriteriaProgress?: { metCount: number; totalCount: number }
 }): string {
   if (state.status === 'blocked' && state.phase === 'build' && state.missionState === 'failed') {
     return 'This work item is blocked by a failed build mission. Capture fixes, run Resume Build, and relaunch Build to continue delivery.'
@@ -80,7 +122,15 @@ export function getWorkItemOperatorGuidance(state: {
     return 'Planning is active. Refine acceptance criteria and notes, then mark the work item ready for build.'
   }
   if (state.status === 'ready') {
-    return 'Planning is complete. Launch Build when implementation should begin.'
+    const progressSuffix =
+      state.acceptanceCriteriaProgress && state.acceptanceCriteriaProgress.totalCount > 0
+        ? ` Acceptance criteria progress: ${state.acceptanceCriteriaProgress.metCount}/${state.acceptanceCriteriaProgress.totalCount} met.`
+        : ''
+
+    if (state.riskLevel === 'low') {
+      return `Planning is complete. This is a low-risk item — review will be auto-approved after build. Launch Build triggers the two-phase pipeline (Planner writes a plan, then Builder implements per the plan).${progressSuffix}`
+    }
+    return `Planning is complete. Launch Build triggers the two-phase pipeline (Planner writes a plan, then Builder implements per the plan).${progressSuffix}`
   }
   if (state.status === 'active' && state.phase === 'build' && state.missionState === 'running') {
     return 'Build mission is in flight. Sync execution for fresh evidence or request review once implementation is ready.'
@@ -152,7 +202,7 @@ export function getWorkItemPrimaryLaunchLabel(state: {
   phase: 'research' | 'build' | 'review' | 'deploy' | undefined
   status: 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
 }): string {
-  if (state.phase === 'research') return 'Plan with Researcher'
+  if (state.phase === 'research') return 'Plan with Planner'
   if (state.phase === 'review') return 'Launch Review'
   if (state.phase === 'deploy') return 'Launch Deploy'
   if (state.phase === 'build' && state.status === 'blocked') return 'Relaunch Build'
@@ -164,6 +214,10 @@ export function getWorkItemLifecycleActionLabel(action: WorkItemDetailLifecycleA
   if (action === 'mark_ready') return 'Mark Ready'
   if (action === 'request_review') return 'Request Review'
   if (action === 'request_deploy_approval') return 'Request Deploy Approval'
+  if (action === 'cancel') return 'Cancel Work Item'
+  if (action === 'back_to_research') return 'Back to Research'
+  if (action === 'back_to_build') return 'Back to Build'
+  if (action === 'back_to_inbox') return 'Back to Inbox'
   return 'Resume Build'
 }
 
@@ -171,11 +225,14 @@ export function getAvailableWorkItemLifecycleActions(state: {
   status: 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
   phase: 'research' | 'build' | 'review' | 'deploy' | undefined
 }): Array<WorkItemDetailLifecycleAction> {
-  if (state.status === 'inbox' && state.phase === 'research') return ['send_to_planning']
-  if (state.status === 'active' && state.phase === 'research') return ['mark_ready']
-  if (state.status === 'active' && state.phase === 'build') return ['request_review']
-  if (state.status === 'active' && state.phase === 'deploy') return ['request_deploy_approval']
-  if (state.status === 'blocked' && state.phase === 'build') return ['resume_build']
+  if (state.status === 'done' || state.status === 'cancelled') return []
+  if (state.status === 'inbox' && state.phase === 'research') return ['send_to_planning', 'cancel']
+  if (state.status === 'active' && state.phase === 'research') return ['mark_ready', 'back_to_inbox', 'cancel']
+  if (state.status === 'active' && state.phase === 'build') return ['request_review', 'back_to_research', 'cancel']
+  if (state.status === 'active' && state.phase === 'deploy') return ['request_deploy_approval', 'back_to_build', 'cancel']
+  if (state.status === 'active' && state.phase === 'review') return ['back_to_research', 'cancel']
+  if (state.status === 'blocked' && state.phase === 'build') return ['resume_build', 'back_to_research', 'cancel']
+  if (state.status === 'ready') return ['cancel']
   return []
 }
 
@@ -202,10 +259,13 @@ export function WorkItemDetailScreen({
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey })
       await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      const isTwoPhase = !!result.workItem.planFilePath
       toast(
-        result.launch.profile
-          ? `Launched ${result.launch.phase} via Conductor (${result.launch.profile})`
-          : `Launched ${result.launch.phase} via Conductor`,
+        isTwoPhase
+          ? `Launched two-phase pipeline (Planner → Builder). Plan path: ${result.workItem.planFilePath}`
+          : result.launch.profile
+            ? `Launched ${result.launch.phase} via Conductor (${result.launch.profile})`
+            : `Launched ${result.launch.phase} via Conductor`,
       )
     },
     onError: (error) => {
@@ -256,10 +316,11 @@ export function WorkItemDetailScreen({
   })
 
   const lifecycleMutation = useMutation({
-    mutationFn: ({ action }: { action: WorkItemLifecycleAction }) =>
+    mutationFn: ({ action, notes }: { action: WorkItemLifecycleAction; notes?: string }) =>
       applyWorkItemLifecycleAction(workItemId, {
         action,
         actor: 'D3n13r',
+        notes,
       }),
     onSuccess: async (result) => {
       queryClient.setQueryData(queryKey, {
@@ -268,6 +329,8 @@ export function WorkItemDetailScreen({
       })
       await queryClient.invalidateQueries({ queryKey })
       await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      setCancelReason('')
+      setShowCancelInput(false)
       toast('Lifecycle action applied')
     },
     onError: (error) => {
@@ -278,9 +341,18 @@ export function WorkItemDetailScreen({
   })
 
   const planningDetailsMutation = useMutation({
-    mutationFn: ({ acceptanceCriteria, notes }: { acceptanceCriteria: Array<string>; notes: Array<string> }) =>
+    mutationFn: ({
+      acceptanceCriteria,
+      criteriaStatus,
+      notes,
+    }: {
+      acceptanceCriteria: Array<string>
+      criteriaStatus: Array<WorkItemCriterionStatus>
+      notes: Array<string>
+    }) =>
       updateWorkItem(workItemId, {
         acceptanceCriteria,
+        criteriaStatus,
         notes,
       }),
     onSuccess: async (result) => {
@@ -292,6 +364,24 @@ export function WorkItemDetailScreen({
     },
     onError: (error) => {
       toast(error instanceof Error ? error.message : 'Failed to save planning details', {
+        type: 'error',
+      })
+    },
+  })
+
+  const criteriaStatusMutation = useMutation({
+    mutationFn: (criteriaStatus: Array<WorkItemCriterionStatus>) =>
+      updateWorkItem(workItemId, {
+        criteriaStatus,
+      }),
+    onSuccess: async (result) => {
+      queryClient.setQueryData(queryKey, result)
+      await queryClient.invalidateQueries({ queryKey })
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      toast('Acceptance criteria progress updated')
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to update acceptance criteria progress', {
         type: 'error',
       })
     },
@@ -311,10 +401,28 @@ export function WorkItemDetailScreen({
   }
 
   function savePlanningDetails() {
+    const acceptanceCriteria = parseWorkItemDetailListDraft(acceptanceCriteriaDraft)
+    const nextCriteriaStatus = buildWorkItemAcceptanceCriteriaStatus(
+      acceptanceCriteria,
+      workItem?.criteriaStatus ?? [],
+    )
+
     planningDetailsMutation.mutate({
-      acceptanceCriteria: parseWorkItemDetailListDraft(acceptanceCriteriaDraft),
+      acceptanceCriteria,
+      criteriaStatus: nextCriteriaStatus,
       notes: parseWorkItemDetailListDraft(notesDraft),
     })
+  }
+
+  function toggleAcceptanceCriterion(index: number) {
+    const criterion = acceptanceCriteriaStatus[index]
+    if (!criterion) return
+
+    const nextStatus = acceptanceCriteriaStatus.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, met: !item.met } : item,
+    )
+
+    criteriaStatusMutation.mutate(nextStatus)
   }
 
   const deleteMutation = useMutation({
@@ -338,6 +446,8 @@ export function WorkItemDetailScreen({
   const [isEditingPlanningDetails, setIsEditingPlanningDetails] = useState(false)
   const [acceptanceCriteriaDraft, setAcceptanceCriteriaDraft] = useState('')
   const [notesDraft, setNotesDraft] = useState('')
+  const [showCancelInput, setShowCancelInput] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
   const primaryLaunchLabel = getWorkItemPrimaryLaunchLabel({
     phase: workItem?.phase,
     status: workItem?.status ?? 'ready',
@@ -345,11 +455,21 @@ export function WorkItemDetailScreen({
   const lifecycleActions = workItem
     ? getAvailableWorkItemLifecycleActions({ status: workItem.status, phase: workItem.phase })
     : []
+  const acceptanceCriteriaStatus = workItem
+    ? buildWorkItemAcceptanceCriteriaStatus(workItem.acceptanceCriteria, workItem.criteriaStatus ?? [])
+    : []
+  const acceptanceCriteriaProgress = getWorkItemAcceptanceCriteriaProgress(acceptanceCriteriaStatus)
+  const acceptanceCriteriaProgressLabel =
+    acceptanceCriteriaProgress.totalCount > 0
+      ? getWorkItemAcceptanceCriteriaProgressLabel(acceptanceCriteriaProgress)
+      : ''
   const operatorGuidance = workItem
     ? getWorkItemOperatorGuidance({
         status: workItem.status,
         phase: workItem.phase,
         missionState: workItem.missionState,
+        riskLevel: workItem.riskLevel,
+        acceptanceCriteriaProgress,
       })
     : ''
   const executionSummary = getWorkItemExecutionSummary({
@@ -406,6 +526,7 @@ export function WorkItemDetailScreen({
                   <Badge>{WORK_ITEM_STATUS_LABELS[workItem.status]}</Badge>
                   {workItem.phase ? <Badge>{WORK_ITEM_PHASE_LABELS[workItem.phase]}</Badge> : null}
                   <Badge>{WORK_ITEM_PRIORITY_LABELS[workItem.priority]}</Badge>
+                  <Badge>{WORK_ITEM_RISK_LEVEL_LABELS[workItem.riskLevel]}</Badge>
                   {workItem.assignedProfile ? <Badge>{workItem.assignedProfile}</Badge> : null}
                 </div>
                 <h1 className="text-2xl font-medium text-ink">{workItem.title}</h1>
@@ -427,17 +548,65 @@ export function WorkItemDetailScreen({
                   {WORK_ITEM_DETAIL_ACTION_GROUP_TITLES.operator}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {lifecycleActions.map((action) => (
-                    <button
-                      key={action}
-                      type="button"
-                      onClick={() => lifecycleMutation.mutate({ action })}
-                      disabled={lifecycleMutation.isPending}
-                      className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]/80 disabled:opacity-60"
-                    >
-                      {lifecycleMutation.isPending ? 'Applying…' : getWorkItemLifecycleActionLabel(action)}
-                    </button>
-                  ))}
+                  {lifecycleActions.map((action) => {
+                    if (action === 'cancel' && showCancelInput) {
+                      return (
+                        <div key="cancel-input" className="flex w-full flex-col gap-2">
+                          <input
+                            type="text"
+                            value={cancelReason}
+                            onChange={(event) => setCancelReason(event.target.value)}
+                            placeholder="Why are you cancelling this work item?"
+                            className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-text)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--theme-accent)]/25"
+                            autoFocus
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                lifecycleMutation.mutate({ action: 'cancel', notes: cancelReason || undefined })
+                              }}
+                              disabled={lifecycleMutation.isPending || !cancelReason.trim()}
+                              className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                            >
+                              {lifecycleMutation.isPending ? 'Cancelling…' : 'Confirm Cancel'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCancelInput(false)
+                                setCancelReason('')
+                              }}
+                              className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]/80"
+                            >
+                              Back
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return (
+                      <button
+                        key={action}
+                        type="button"
+                        onClick={() => {
+                          if (action === 'cancel') {
+                            setShowCancelInput(true)
+                          } else {
+                            lifecycleMutation.mutate({ action })
+                          }
+                        }}
+                        disabled={lifecycleMutation.isPending}
+                        className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+                          action === 'cancel'
+                            ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                            : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card)]/80'
+                        }`}
+                      >
+                        {lifecycleMutation.isPending ? 'Applying…' : getWorkItemLifecycleActionLabel(action)}
+                      </button>
+                    )
+                  })}
                   {lifecycleActions.length === 0 ? (
                     <span className="text-sm text-[var(--theme-muted)]">
                       No workflow transition is available for the current phase/status.
@@ -522,6 +691,8 @@ export function WorkItemDetailScreen({
                 <Detail label="Mission Last Run" value={workItem.missionLastRunAt || '—'} />
                 <Detail label="Mission Last Error" value={workItem.missionLastError || '—'} />
                 <Detail label="Assigned Profile" value={workItem.assignedProfile || '—'} />
+                <Detail label="Risk Level" value={WORK_ITEM_RISK_LEVEL_LABELS[workItem.riskLevel]} />
+                <Detail label="Plan File Path" value={workItem.planFilePath || '—'} />
                 <Detail label="Launch Sessions" value={workItem.sessionKeys.join(', ') || '—'} />
                 <Detail label="Created" value={workItem.createdAt} />
                 <Detail label="Updated" value={workItem.updatedAt} />
@@ -530,9 +701,16 @@ export function WorkItemDetailScreen({
 
             <Panel title="Acceptance Criteria">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                <p className="max-w-2xl text-sm text-[var(--theme-muted)]">
-                  {WORK_ITEM_DETAIL_ACCEPTANCE_CRITERIA_HELP_TEXT}
-                </p>
+                <div className="space-y-2">
+                  <p className="max-w-2xl text-sm text-[var(--theme-muted)]">
+                    {WORK_ITEM_DETAIL_ACCEPTANCE_CRITERIA_HELP_TEXT}
+                  </p>
+                  {acceptanceCriteriaProgressLabel ? (
+                    <div className="inline-flex items-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2.5 py-1 text-xs font-medium text-[var(--theme-text)]">
+                      {acceptanceCriteriaProgressLabel}
+                    </div>
+                  ) : null}
+                </div>
                 {isEditingPlanningDetails ? null : (
                   <button
                     type="button"
@@ -570,16 +748,33 @@ export function WorkItemDetailScreen({
                     </button>
                   </div>
                 </div>
-              ) : workItem.acceptanceCriteria.length === 0 ? (
+              ) : acceptanceCriteriaStatus.length === 0 ? (
                 <EmptyCopy>No acceptance criteria recorded yet.</EmptyCopy>
               ) : (
                 <ul className="space-y-2">
-                  {workItem.acceptanceCriteria.map((criterion, index) => (
-                    <li
-                      key={`${criterion}-${index}`}
-                      className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-sm text-[var(--theme-text)]"
-                    >
-                      {criterion}
+                  {acceptanceCriteriaStatus.map((criterion, index) => (
+                    <li key={`${criterion.text}-${index}`}>
+                      <button
+                        type="button"
+                        onClick={() => toggleAcceptanceCriterion(index)}
+                        disabled={criteriaStatusMutation.isPending}
+                        className={`flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm transition-colors disabled:opacity-60 ${
+                          criterion.met
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                            : 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-text)] hover:bg-[var(--theme-card)]'
+                        }`}
+                      >
+                        <span
+                          className={`inline-flex h-5 w-5 items-center justify-center rounded border text-xs ${
+                            criterion.met
+                              ? 'border-emerald-500 bg-emerald-500 text-white'
+                              : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)]'
+                          }`}
+                        >
+                          {criterion.met ? '✓' : ''}
+                        </span>
+                        <span>{criterion.text}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -680,6 +875,11 @@ export function WorkItemDetailScreen({
                   icon={PlayIcon}
                   label="Session Prefix"
                   value={workItem.missionSessionKeyPrefix || 'No session prefix recorded'}
+                />
+                <EvidenceRow
+                  icon={PlayIcon}
+                  label="Plan File"
+                  value={workItem.planFilePath || 'No plan file recorded'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}

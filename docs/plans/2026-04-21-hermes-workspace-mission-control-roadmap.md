@@ -244,9 +244,105 @@ Grounded updates from the urgent runtime repair pass:
   - `/api/gateway-status` -> `dashboard.available=false`, `mode=portable`
 
 ### Updated immediate priority
-1. repair the underlying Hermes dashboard root asset/runtime issue (`web_dist/index.html` missing) so dashboard mode can be re-enabled cleanly
-2. add route-level fallback envelope support in `/api/work-items/:id` for unexpected syncExecution throws (non-fatal warning + baseline payload)
-3. add route-level regression tests to lock non-500 envelope behavior
+1. The underlying Hermes dashboard root issue was fixed — `web_dist/index.html` rebuilt, dashboard mode restored to `zero-fork`.
+2. Route-level fallback envelope support remains a conscious future improvement but is no longer blocking — syncExecution degradation works.
+3. **Done:** Phase routing rewired from `researcher` → `planner`, two-phase launch orchestration shipped, risk level field implemented.
+
+---
+
+### 2026-04-25 Slice A completion snapshot (shipped)
+
+Grounded updates from the first profiles/workflow re-architecture slice:
+
+**Phase routing defaults updated:**
+- All `research` phase routing references changed from `researcher` → `planner` across the codebase
+- UI button label: "Plan with Researcher" → "Plan with Planner"
+- Routing policy help text and defaults updated
+- 30 tests updated and passing for routing changes
+- `pnpm build` clean, service restarted and active
+
+**Impact:**
+- "Plan with Planner" now uses the new `planner` profile (gpt-5.4 flagship)
+- Researcher is demoted from phase-mapped profile to ad-hoc research support (stays on cheap gpt-4.1)
+- Per-project overrides still available via Workflow Policy panel
+- No data migration needed — existing per-project `phaseProfiles` can be updated via UI
+
+### 2026-04-25 Slice B completion snapshot (shipped)
+
+Grounded updates from the two-phase launch orchestration slice:
+
+**Two-phase pipeline implemented:**
+- Trigger condition: `status=ready` work item launched for `build` (operator clicks "Launch Build")
+- **Phase 1 — Plan:** Orchestrator runs as Planner profile (gpt-5.4), explores codebase, writes a plan to `docs/plans/{slug}-{workItemId}-plan.md`
+- **Phase 2 — Build:** Orchestrator reads the plan, spawns Builder profile workers (gpt-5.3-codex) for TDD implementation
+- Both `planner` and `builder` profiles resolved and included in ACP subprocess routing
+
+**Key files changed:**
+- `src/server/work-item-launch.ts` — `isTwoPhaseLaunchCandidate()`, `buildTwoPhaseLaunchGoal()`, two-phase path in `launchWorkItemIntoConductor()`
+- `src/server/work-items-store.ts` — `planFilePath` field on `WorkItemRecord`
+- `src/screens/projects/work-item-detail-screen.tsx` — Plan File Path display, two-phase toast, updated operator guidance
+
+**Verification:**
+- 6 new tests passing (work-item-launch.test.ts), 101 total
+- `pnpm build` clean, service restarted and active
+- Live at `http://localhost:3456` — two-phase pipelines deployable from detail screen
+
+### 2026-04-25 Slice C completion snapshot (shipped)
+
+Grounded updates from the risk level field slice:
+
+**Model change:**
+- Added `riskLevel: 'low' | 'medium' | 'high'` to `WorkItemRecord` and `CreateWorkItemInput`
+- Default: `'medium'` via `normalizeRiskLevel()` normalizer in `work-items-store.ts`
+
+**UI additions:**
+- New Work Item form: **Risk Level** select field (Low/Medium/High) in project detail create panel
+- Work Item Detail screen: risk level badge in header + Mission Control Summary entry
+- Project board cards: risk level tag alongside phase/priority tags
+
+**API support:**
+- POST `/api/work-items` accepts `riskLevel`
+- PATCH `/api/work-items/:id` accepts `riskLevel` for updates
+
+**Verification:**
+- 3 new tests in `work-items-store.test.ts` verifying default + custom values
+- 102/102 tests passing
+- `pnpm build` clean, service restarted and active
+- End-to-end API verification: create (riskLevel=low) → PATCH (riskLevel=high) → GET (returns riskLevel=high)
+- Existing work items automatically populate with `riskLevel: 'medium'`
+
+### 2026-04-25 Slice F completion snapshot (shipped)
+
+Grounded updates from the lifecycle completeness slice:
+
+**Lifecycle actions expanded:**
+- Added `cancel` transition with required reason notes → `status=cancelled`
+- Added `back_to_research` transition for active/blocked build states (plus active review fallback)
+- Added `back_to_build` transition for active deploy correction loops
+- Added `back_to_inbox` transition from active research
+
+**Route/UI alignment:**
+- Lifecycle action parsing updated in `/api/work-items/:workItemId/lifecycle`
+- Work-item detail operator controls updated for new backward/cancel actions
+
+**Validation hardening:**
+- cancel-without-reason now returns **HTTP 400** (previously surfaced as 500)
+
+**Verification:**
+- `pnpm vitest run src/server/work-item-lifecycle.test.ts src/server/work-item-approvals.test.ts src/screens/projects/work-item-detail-screen.test.ts`
+- `pnpm vitest run` → **120/120 tests passing**
+- `pnpm build`
+- `systemctl --user restart hermes-workspace.service` + `is-active` -> `active`
+- Live API verification via running app context:
+  - cancel with reason succeeds (`200`)
+  - cancel without reason fails with validation (`400`)
+
+### Updated next priority
+1. **Slice F — Lifecycle completeness** ✅ shipped (cancel + backward transitions + lifecycle API validation hardening)
+2. **Slice G — Acceptance criteria verification** ✅ shipped (criteriaStatus model + detail check-off + progress + PATCH partial-update hardening)
+3. **Planner-as-Reviewer** — after two-phase pipeline is stable, Planner reviews Builder's output against the plan it wrote
+4. **Route-level fallback envelope** — consider returning a non-fatal `executionSyncWarning` payload from `/api/work-items/:id`
+5. **Slice H — WIP awareness + blocked taxonomy** — WIP thresholds + structured blocked reason signals
 
 ---
 

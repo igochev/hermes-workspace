@@ -9,6 +9,7 @@ import {
   updateWorkItem,
   type WorkItemPhase,
   type WorkItemPriority,
+  type WorkItemRiskLevel,
   type WorkItemStatus,
 } from '../../server/work-items-store'
 
@@ -41,6 +42,10 @@ function isWorkItemPhase(value: unknown): value is WorkItemPhase {
 
 function isWorkItemPriority(value: unknown): value is WorkItemPriority {
   return value === 'high' || value === 'medium' || value === 'low'
+}
+
+function isWorkItemRiskLevel(value: unknown): value is WorkItemRiskLevel {
+  return value === 'low' || value === 'medium' || value === 'high'
 }
 
 function buildWorkItemPayload(workItemId: string) {
@@ -95,56 +100,73 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
 
         try {
           const body = (await request.json()) as Record<string, unknown>
-          const workItem = updateWorkItem(params.workItemId, {
-            title: typeof body.title === 'string' ? body.title : undefined,
-            description:
-              typeof body.description === 'string' ? body.description : undefined,
-            status: isWorkItemStatus(body.status) ? body.status : undefined,
-            phase: isWorkItemPhase(body.phase) ? body.phase : undefined,
-            priority: isWorkItemPriority(body.priority) ? body.priority : undefined,
-            assignedProfile:
-              body.assignedProfile === null || typeof body.assignedProfile === 'string'
-                ? (body.assignedProfile ?? undefined)
-                : undefined,
-            repoPathSnapshot:
-              typeof body.repoPathSnapshot === 'string'
-                ? body.repoPathSnapshot
-                : undefined,
-            missionId:
-              body.missionId === null || typeof body.missionId === 'string'
-                ? (body.missionId ?? undefined)
-                : undefined,
-            missionLink:
-              body.missionLink === null || typeof body.missionLink === 'string'
-                ? (body.missionLink ?? undefined)
-                : undefined,
-            sessionKeys: Array.isArray(body.sessionKeys)
-              ? body.sessionKeys.filter(
-                  (value): value is string => typeof value === 'string',
-                )
-              : undefined,
-            branchName:
-              body.branchName === null || typeof body.branchName === 'string'
-                ? (body.branchName ?? undefined)
-                : undefined,
-            prUrl:
-              body.prUrl === null || typeof body.prUrl === 'string'
-                ? (body.prUrl ?? undefined)
-                : undefined,
-            artifactPaths: Array.isArray(body.artifactPaths)
-              ? body.artifactPaths.filter(
-                  (value): value is string => typeof value === 'string',
-                )
-              : undefined,
-            acceptanceCriteria: Array.isArray(body.acceptanceCriteria)
-              ? body.acceptanceCriteria.filter(
-                  (value): value is string => typeof value === 'string',
-                )
-              : undefined,
-            notes: Array.isArray(body.notes)
-              ? body.notes.filter((value): value is string => typeof value === 'string')
-              : undefined,
-          })
+          const updates = {
+            ...(typeof body.title === 'string' ? { title: body.title } : {}),
+            ...(typeof body.description === 'string' ? { description: body.description } : {}),
+            ...(isWorkItemStatus(body.status) ? { status: body.status } : {}),
+            ...(isWorkItemPhase(body.phase) ? { phase: body.phase } : {}),
+            ...(isWorkItemPriority(body.priority) ? { priority: body.priority } : {}),
+            ...(isWorkItemRiskLevel(body.riskLevel) ? { riskLevel: body.riskLevel } : {}),
+            ...(body.assignedProfile === null || typeof body.assignedProfile === 'string'
+              ? { assignedProfile: (body.assignedProfile as string | null) ?? undefined }
+              : {}),
+            ...(typeof body.repoPathSnapshot === 'string'
+              ? { repoPathSnapshot: body.repoPathSnapshot }
+              : {}),
+            ...(body.missionId === null || typeof body.missionId === 'string'
+              ? { missionId: (body.missionId as string | null) ?? undefined }
+              : {}),
+            ...(body.missionLink === null || typeof body.missionLink === 'string'
+              ? { missionLink: (body.missionLink as string | null) ?? undefined }
+              : {}),
+            ...(Array.isArray(body.sessionKeys)
+              ? {
+                  sessionKeys: body.sessionKeys.filter(
+                    (value): value is string => typeof value === 'string',
+                  ),
+                }
+              : {}),
+            ...(body.branchName === null || typeof body.branchName === 'string'
+              ? { branchName: (body.branchName as string | null) ?? undefined }
+              : {}),
+            ...(body.prUrl === null || typeof body.prUrl === 'string'
+              ? { prUrl: (body.prUrl as string | null) ?? undefined }
+              : {}),
+            ...(Array.isArray(body.artifactPaths)
+              ? {
+                  artifactPaths: body.artifactPaths.filter(
+                    (value): value is string => typeof value === 'string',
+                  ),
+                }
+              : {}),
+            ...(Array.isArray(body.acceptanceCriteria)
+              ? {
+                  acceptanceCriteria: body.acceptanceCriteria.filter(
+                    (value): value is string => typeof value === 'string',
+                  ),
+                }
+              : {}),
+            ...(Array.isArray(body.criteriaStatus)
+              ? {
+                  criteriaStatus: body.criteriaStatus
+                    .filter(
+                      (value): value is { text?: unknown; met?: unknown } =>
+                        Boolean(value) && typeof value === 'object',
+                    )
+                    .map((value) => ({
+                      text: typeof value.text === 'string' ? value.text : '',
+                      met: value.met === true,
+                    })),
+                }
+              : {}),
+            ...(Array.isArray(body.notes)
+              ? {
+                  notes: body.notes.filter((value): value is string => typeof value === 'string'),
+                }
+              : {}),
+          }
+
+          const workItem = updateWorkItem(params.workItemId, updates)
 
           if (!workItem) return jsonResponse({ error: 'Work item not found' }, 404)
           return jsonResponse(buildWorkItemPayload(workItem.id))

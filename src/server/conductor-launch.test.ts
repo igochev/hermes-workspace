@@ -31,14 +31,14 @@ describe('conductor-launch', () => {
       maxParallel: 1,
       supervised: false,
       phaseProfiles: {
-        research: 'researcher',
+        research: 'planner',
         build: 'builder',
         review: '',
         deploy: '',
       },
     })
 
-    expect(prompt).toContain('research tasks → Hermes profile "researcher"')
+    expect(prompt).toContain('research tasks → Hermes profile "planner"')
     expect(prompt).toContain('build tasks → Hermes profile "builder"')
     expect(prompt).toContain('delegate_task using ACP subprocess transport')
     expect(prompt).toContain('acp_args: ["-p", "<profile>", "--acp", "--stdio"]')

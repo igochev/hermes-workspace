@@ -91,6 +91,77 @@ function buildNotesBlock(workItem: WorkItemRecord): string[] {
   return ['Operator notes:', ...workItem.notes.map((item) => `- ${item}`)]
 }
 
+function isTwoPhaseLaunchCandidate(workItem: WorkItemRecord, phase: WorkItemPhase): boolean {
+  // When a ready work item is launched for build, trigger the two-phase pipeline:
+  // Phase 1 = Plan (Planner writes plan), Phase 2 = Build (Builder implements)
+  return workItem.status === 'ready' && phase === 'build'
+}
+
+function buildTwoPhaseLaunchGoal(params: {
+  workItem: WorkItemRecord
+  project: ProjectRecord
+  plannerProfile: string | null
+  builderProfile: string | null
+  planFilePath: string
+}): string {
+  const { workItem, project, plannerProfile, builderProfile, planFilePath } = params
+  const repoPath = readOptionalString(workItem.repoPathSnapshot) || project.repoPath
+  const fullPlanPath = `${repoPath}/${planFilePath}`
+
+  return [
+    `Execute a TWO-PHASE Launch Build pipeline for work item "${workItem.title}" of project "${project.name}".`,
+    `Work item ID: ${workItem.id}`,
+    `Repository path: ${repoPath}`,
+    ...(project.defaultBranch ? [`Default branch: ${project.defaultBranch}`] : []),
+    ...(project.repoUrl ? [`Repository URL: ${project.repoUrl}`] : []),
+    '',
+    '======================================================================',
+    'PHASE 1 — Plan (Research / Planning)',
+    '======================================================================',
+    `Profile: ${plannerProfile || 'planner'}`,
+    '',
+    'Your FIRST task is to write a plan document at:',
+    `  ${fullPlanPath}`,
+    '',
+    'Phase 1 outcomes:',
+    '- Fully understand the work item description and acceptance criteria',
+    '- Explore the codebase at the repository path',
+    '- Write a comprehensive plan as a markdown file at the path above',
+    '- The plan MUST include: implementation approach, files to change, test strategy, and how to verify each acceptance criterion',
+    '- If acceptance criteria are incomplete, propose and draft them explicitly in the plan',
+    '- Identify any open questions, constraints, or recommended build slice breakdown',
+    '',
+    'Description:',
+    workItem.description || 'No additional description provided.',
+    '',
+    ...buildAcceptanceCriteriaBlock(workItem),
+    ...(workItem.notes.length > 0 ? ['', ...buildNotesBlock(workItem)] : []),
+    '',
+    '======================================================================',
+    'PHASE 2 — Build (Implementation)',
+    '======================================================================',
+    `Profile: ${builderProfile || 'builder'}`,
+    '',
+    'After Phase 1 is COMPLETE and the plan file is written, execute Phase 2:',
+    '',
+    'Phase 2 tasks:',
+    '- Read and follow the plan from Phase 1 at:',
+    `  ${fullPlanPath}`,
+    '- Implement per the plan using TDD approach (tests first, then implementation)',
+    '- Verify all acceptance criteria are met',
+    '- Commit changes and create a PR if the repo has a default branch configured',
+    '',
+    '======================================================================',
+    '',
+    'CRITICAL RULES:',
+    '- Execute Phase 1 FIRST, then Phase 2. Do NOT reorder or skip either phase.',
+    '- The plan file produced in Phase 1 is the authoritative contract for Phase 2.',
+    '- Keep both phases grounded in the real repository at the given path.',
+    '',
+    'Treat this as a tracked Mission Control two-phase launch. Reference the work item ID in all summaries.',
+  ].join('\n')
+}
+
 function buildPhaseOutcomeBlock(phase: WorkItemPhase): string[] {
   if (phase === 'research') {
     return [
@@ -152,14 +223,51 @@ export async function launchWorkItemIntoConductor(
 
   const requestPhaseProfiles = normalizePhaseProfiles(request.phaseProfiles)
   const phase = normalizeLaunchPhase(request.phase, workItem.phase)
-  const profile = resolveLaunchProfile(workItem, project, phase, requestPhaseProfiles)
-  const goal = buildWorkItemLaunchGoal({ workItem, project, phase, profile })
-  const launchPhaseProfiles = buildLaunchPhaseProfiles({
-    project,
-    requestPhaseProfiles,
-    phase,
-    profile,
-  })
+  const isTwoPhase = isTwoPhaseLaunchCandidate(workItem, phase)
+
+  // For two-phase pipeline, resolve both profiles and build combined goal
+  let resolvedProfile: string | null
+  let goal: string
+  let launchPhaseProfiles: ConductorPhaseProfiles
+  let planFilePath: string | undefined
+
+  if (isTwoPhase) {
+    const plannerProfile = resolveLaunchProfile(workItem, project, 'research', requestPhaseProfiles)
+    const builderProfile = resolveLaunchProfile(workItem, project, 'build', requestPhaseProfiles)
+    planFilePath = `docs/plans/${project.slug}-${workItem.id.slice(0, 8)}-plan.md`
+
+    goal = buildTwoPhaseLaunchGoal({
+      workItem,
+      project,
+      plannerProfile,
+      builderProfile,
+      planFilePath,
+    })
+
+    // Build phase profiles ensuring both research and build are covered
+    launchPhaseProfiles = buildLaunchPhaseProfiles({
+      project,
+      requestPhaseProfiles,
+      phase,
+      profile: builderProfile,
+    })
+    // Also ensure the planner profile is in research slot
+    if (plannerProfile && launchPhaseProfiles.research !== plannerProfile) {
+      launchPhaseProfiles.research = plannerProfile
+    }
+
+    // Use builder profile as the primary display profile
+    resolvedProfile = builderProfile
+  } else {
+    resolvedProfile = resolveLaunchProfile(workItem, project, phase, requestPhaseProfiles)
+    goal = buildWorkItemLaunchGoal({ workItem, project, phase, profile: resolvedProfile })
+    launchPhaseProfiles = buildLaunchPhaseProfiles({
+      project,
+      requestPhaseProfiles,
+      phase,
+      profile: resolvedProfile,
+    })
+  }
 
   const launch = await launchConductorMission({
     goal,
@@ -179,7 +287,8 @@ export async function launchWorkItemIntoConductor(
   const sessionKeys = Array.from(new Set([...workItem.sessionKeys, launch.sessionKey]))
   const missionLink = buildMissionLink(launch.jobId)
   const wasRecoveryLaunch = workItem.status === 'blocked' || workItem.missionState === 'failed'
-  const nextWorkItem = updateWorkItem(workItem.id, {
+
+  const workItemUpdates: Record<string, unknown> = {
     status: 'active',
     phase,
     missionId: launch.jobId,
@@ -191,17 +300,26 @@ export async function launchWorkItemIntoConductor(
     missionLastError: undefined,
     sessionKeys,
     repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
-  })
+  }
+
+  // For two-phase pipeline, set the plan file path on the work item
+  if (isTwoPhase && planFilePath) {
+    workItemUpdates.planFilePath = planFilePath
+  }
+
+  const nextWorkItem = updateWorkItem(workItem.id, workItemUpdates)
 
   if (!nextWorkItem) throw new Error('Failed to update work item after launch')
 
-  const note = wasRecoveryLaunch
-    ? profile
-      ? `Relaunched ${phase} via Conductor using profile ${profile} after failure recovery.`
-      : `Relaunched ${phase} via Conductor after failure recovery.`
-    : profile
-      ? `Launched ${phase} via Conductor using profile ${profile}.`
-      : `Launched ${phase} via Conductor.`
+  const note = isTwoPhase
+    ? `Launched two-phase pipeline (Phase 1: ${resolvedProfile} plan → Phase 2: build) via Conductor. Plan path: ${planFilePath}`
+    : wasRecoveryLaunch
+      ? resolvedProfile
+        ? `Relaunched ${phase} via Conductor using profile ${resolvedProfile} after failure recovery.`
+        : `Relaunched ${phase} via Conductor after failure recovery.`
+      : resolvedProfile
+        ? `Launched ${phase} via Conductor using profile ${resolvedProfile}.`
+        : `Launched ${phase} via Conductor.`
 
   const updatedWithHistory = appendWorkItemHistoryEntry(workItem.id, {
     action: 'launch',
@@ -211,7 +329,7 @@ export async function launchWorkItemIntoConductor(
     missionId: launch.jobId,
     sessionKey: launch.sessionKey,
     sessionKeyPrefix: launch.sessionKeyPrefix,
-    profile: profile ?? undefined,
+    profile: resolvedProfile ?? undefined,
   })
 
   if (!updatedWithHistory) throw new Error('Failed to record work item launch history')
@@ -222,7 +340,7 @@ export async function launchWorkItemIntoConductor(
     launch: {
       ...launch,
       phase,
-      profile,
+      profile: resolvedProfile,
     },
   }
 }

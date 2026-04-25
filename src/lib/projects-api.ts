@@ -36,6 +36,12 @@ export type ProjectSummary = ProjectRecord & {
 export type WorkItemStatus = 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
 export type WorkItemPhase = 'research' | 'build' | 'review' | 'deploy'
 export type WorkItemPriority = 'high' | 'medium' | 'low'
+export type WorkItemRiskLevel = 'low' | 'medium' | 'high'
+
+export type WorkItemCriterionStatus = {
+  text: string
+  met: boolean
+}
 
 export type WorkItemRecord = {
   id: string
@@ -45,6 +51,7 @@ export type WorkItemRecord = {
   status: WorkItemStatus
   phase?: WorkItemPhase
   priority: WorkItemPriority
+  riskLevel: WorkItemRiskLevel
   assignedProfile?: string
   repoPathSnapshot: string
   missionId?: string
@@ -60,6 +67,7 @@ export type WorkItemRecord = {
   prUrl?: string
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
+  criteriaStatus: Array<WorkItemCriterionStatus>
   notes: Array<string>
   approvals?: Array<{
     id: string
@@ -111,6 +119,7 @@ export type CreateWorkItemInput = {
   status?: WorkItemStatus
   phase?: WorkItemPhase
   priority?: WorkItemPriority
+  riskLevel?: WorkItemRiskLevel
   assignedProfile?: string
   repoPathSnapshot?: string
   missionId?: string
@@ -120,6 +129,7 @@ export type CreateWorkItemInput = {
   prUrl?: string
   artifactPaths?: Array<string>
   acceptanceCriteria?: Array<string>
+  criteriaStatus?: Array<WorkItemCriterionStatus>
   notes?: Array<string>
 }
 
@@ -143,6 +153,10 @@ export type WorkItemLifecycleAction =
   | 'request_review'
   | 'request_deploy_approval'
   | 'resume_build'
+  | 'cancel'
+  | 'back_to_research'
+  | 'back_to_build'
+  | 'back_to_inbox'
 
 async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T
@@ -272,4 +286,10 @@ export const WORK_ITEM_PRIORITY_LABELS: Record<WorkItemPriority, string> = {
   high: 'High',
   medium: 'Medium',
   low: 'Low',
+}
+
+export const WORK_ITEM_RISK_LEVEL_LABELS: Record<WorkItemRiskLevel, string> = {
+  low: 'Low Risk',
+  medium: 'Medium Risk',
+  high: 'High Risk',
 }

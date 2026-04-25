@@ -10,6 +10,7 @@ import {
   updateWorkItem,
   type WorkItemPhase,
   type WorkItemPriority,
+  type WorkItemRiskLevel,
 } from './work-items-store'
 
 export type WorkItemApprovalPhase = 'review' | 'deploy'
@@ -155,6 +156,10 @@ function priorityRank(priority: WorkItemPriority): number {
 function shouldAutoApproveReview(workItemId: string): boolean {
   const workItem = getWorkItem(workItemId)
   if (!workItem) return false
+
+  // Low-risk items auto-approve through review regardless of project policy
+  if (workItem.riskLevel === 'low') return true
+
   const project = getProject(workItem.projectId)
   if (!project?.reviewAutoApproval.enabled) return false
   return priorityRank(workItem.priority) <= priorityRank(project.reviewAutoApproval.maxPriority)

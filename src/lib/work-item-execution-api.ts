@@ -1,4 +1,4 @@
-import type { WorkItemLifecycleAction } from './projects-api'
+import type { WorkItemCriterionStatus, WorkItemLifecycleAction } from './projects-api'
 
 const WORK_ITEMS_BASE = '/api/work-items'
 
@@ -17,6 +17,10 @@ export type WorkItemExecutionPayload = {
     missionLastError?: string
     status: string
     phase?: string
+    riskLevel?: 'low' | 'medium' | 'high'
+    acceptanceCriteria: Array<string>
+    criteriaStatus: Array<WorkItemCriterionStatus>
+    notes: Array<string>
     history: Array<Record<string, unknown>>
     approvals?: Array<Record<string, unknown>>
   }

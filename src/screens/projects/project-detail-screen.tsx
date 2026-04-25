@@ -21,8 +21,10 @@ import {
   type CreateWorkItemInput,
   type PhaseProfiles,
   type ReviewAutoApprovalPolicy,
+  type WorkItemRiskLevel,
   WORK_ITEM_PHASE_LABELS,
   WORK_ITEM_PRIORITY_LABELS,
+  WORK_ITEM_RISK_LEVEL_LABELS,
   WORK_ITEM_STATUS_LABELS,
 } from '@/lib/projects-api'
 import {
@@ -46,6 +48,7 @@ const EMPTY_WORK_ITEM_FORM: Omit<CreateWorkItemInput, 'projectId'> = {
   status: 'inbox',
   phase: 'research',
   priority: 'medium',
+  riskLevel: 'medium',
   assignedProfile: '',
   repoPathSnapshot: '',
   acceptanceCriteria: [],
@@ -98,7 +101,7 @@ export const PROJECT_ROUTING_PRECEDENCE_LABELS = [
   '3. Global/request phase routing',
 ] as const
 export const PROJECT_PHASE_ROUTING_POLICY_LABELS: Record<keyof PhaseProfiles, string> = {
-  research: 'Research launches route to researcher by default.',
+  research: 'Research/planning phase routes to Planner profile by default.',
   build: 'Build launches route to builder by default.',
   review: 'Review launches route to reviewer by default.',
   deploy: 'Deploy launches route to deployer by default.',
@@ -359,6 +362,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
       status: form.status,
       phase: form.phase,
       priority: form.priority,
+      riskLevel: form.riskLevel,
       assignedProfile: form.assignedProfile?.trim() || undefined,
       repoPathSnapshot: form.repoPathSnapshot?.trim() || project.repoPath,
       acceptanceCriteria: form.acceptanceCriteria,
@@ -537,7 +541,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">Research Profile</label>
-                  <Input value={projectRouting.research} onChange={(event) => updateProjectRoutingField('research', event.target.value)} placeholder="researcher" nativeInput />
+                  <Input value={projectRouting.research} onChange={(event) => updateProjectRoutingField('research', event.target.value)} placeholder="planner" nativeInput />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">Build Profile</label>
@@ -677,6 +681,16 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                   ['high', 'High'],
                   ['medium', 'Medium'],
                   ['low', 'Low'],
+                ]}
+              />
+              <SelectField
+                label="Risk Level"
+                value={form.riskLevel ?? 'medium'}
+                onChange={(value) => updateField('riskLevel', value as WorkItemRiskLevel)}
+                options={[
+                  ['low', 'Low Risk'],
+                  ['medium', 'Medium Risk'],
+                  ['high', 'High Risk'],
                 ]}
               />
               <div className="space-y-1">
@@ -892,6 +906,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                             <div className="mt-3 flex flex-wrap gap-2">
                               {item.phase ? <Tag>{WORK_ITEM_PHASE_LABELS[item.phase]}</Tag> : null}
                               <Tag>{WORK_ITEM_PRIORITY_LABELS[item.priority]}</Tag>
+                              <Tag>{WORK_ITEM_RISK_LEVEL_LABELS[item.riskLevel]}</Tag>
                               {item.assignedProfile ? <Tag>{item.assignedProfile}</Tag> : null}
                               {buildWorkItemOperatorSignals(item).map((signal) => (
                                 <span key={signal} className={PROJECT_BOARD_SIGNAL_CHIP_CLASS}>

@@ -122,6 +122,41 @@ describe('projects-view-model', () => {
     ])
   })
 
+  it('sorts lower-risk items after higher-risk items at the same attention and priority', () => {
+    const sorted = sortWorkItemsForProjectBoard([
+      makeWorkItem({
+        id: 'medium-risk',
+        title: 'Medium risk',
+        status: 'active',
+        priority: 'medium',
+        riskLevel: 'medium',
+        updatedAt: '2026-04-21T00:00:01.000Z',
+      }),
+      makeWorkItem({
+        id: 'low-risk',
+        title: 'Low risk',
+        status: 'active',
+        priority: 'medium',
+        riskLevel: 'low',
+        updatedAt: '2026-04-21T00:00:02.000Z',
+      }),
+      makeWorkItem({
+        id: 'high-risk',
+        title: 'High risk',
+        status: 'active',
+        priority: 'medium',
+        riskLevel: 'high',
+        updatedAt: '2026-04-21T00:00:00.000Z',
+      }),
+    ])
+
+    expect(sorted.map((item) => item.id)).toEqual([
+      'high-risk',
+      'medium-risk',
+      'low-risk',
+    ])
+  })
+
   it('builds project urgency summary counters for the operator board header', () => {
     const summary = buildProjectBoardUrgencySummary([
       makeWorkItem({
@@ -306,6 +341,7 @@ function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
     status: overrides.status ?? 'inbox',
     phase: overrides.phase,
     priority: overrides.priority ?? 'medium',
+    riskLevel: overrides.riskLevel ?? 'medium',
     assignedProfile: overrides.assignedProfile,
     repoPathSnapshot: overrides.repoPathSnapshot ?? '/repos/mission-control',
     missionId: overrides.missionId,

@@ -2,6 +2,7 @@ import type {
   ProjectSummary,
   WorkItemPriority,
   WorkItemRecord,
+  WorkItemRiskLevel,
   WorkItemStatus,
 } from './projects-api'
 
@@ -27,6 +28,12 @@ export const PROJECT_BOARD_FLOW_ORDER: Array<WorkItemStatus> = [
 export const PROJECT_STATUS_ORDER = PROJECT_BOARD_FLOW_ORDER
 
 const PRIORITY_RANK: Record<WorkItemPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+}
+
+const RISK_LEVEL_RANK: Record<WorkItemRiskLevel, number> = {
   high: 0,
   medium: 1,
   low: 2,
@@ -114,6 +121,9 @@ export function sortWorkItemsForProjectBoard(workItems: Array<WorkItemRecord>): 
 
     const priorityDelta = PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority]
     if (priorityDelta !== 0) return priorityDelta
+
+    const riskDelta = RISK_LEVEL_RANK[left.riskLevel] - RISK_LEVEL_RANK[right.riskLevel]
+    if (riskDelta !== 0) return riskDelta
 
     const updatedDelta = Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
     if (updatedDelta !== 0) return updatedDelta

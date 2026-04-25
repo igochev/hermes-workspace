@@ -21,7 +21,11 @@ function isLifecycleAction(value: unknown): value is WorkItemLifecycleAction {
     value === 'mark_ready' ||
     value === 'request_review' ||
     value === 'request_deploy_approval' ||
-    value === 'resume_build'
+    value === 'resume_build' ||
+    value === 'cancel' ||
+    value === 'back_to_research' ||
+    value === 'back_to_build' ||
+    value === 'back_to_inbox'
   )
 }
 
@@ -56,9 +60,11 @@ export const Route = createFileRoute('/api/work-items/$workItemId/lifecycle')({
           const status =
             message === 'Work item not found' || message === 'Project not found'
               ? 404
-              : message.includes('only valid')
-                ? 409
-                : 500
+              : message.includes('requires')
+                ? 400
+                : message.includes('only valid')
+                  ? 409
+                  : 500
           return jsonResponse({ error: message }, status)
         }
       },

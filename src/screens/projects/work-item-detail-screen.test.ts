@@ -6,6 +6,9 @@ import {
   getWorkItemExecutionSummary,
   getWorkItemLifecycleActionLabel,
   getAvailableWorkItemLifecycleActions,
+  getWorkItemAcceptanceCriteriaProgress,
+  buildWorkItemAcceptanceCriteriaStatus,
+  getWorkItemAcceptanceCriteriaProgressLabel,
   getWorkItemOperatorGuidance,
   parseWorkItemDetailListDraft,
   WORK_ITEM_DETAIL_ACCEPTANCE_CRITERIA_HELP_TEXT,
@@ -38,7 +41,7 @@ describe('work item detail screen theme classes', () => {
   })
 
   it('uses workflow-specific launch labels instead of a generic conductor label', () => {
-    expect(getWorkItemPrimaryLaunchLabel({ phase: 'research', status: 'active' })).toBe('Plan with Researcher')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: 'research', status: 'active' })).toBe('Plan with Planner')
     expect(getWorkItemPrimaryLaunchLabel({ phase: 'build', status: 'active' })).toBe('Launch Build')
     expect(getWorkItemPrimaryLaunchLabel({ phase: 'build', status: 'blocked' })).toBe('Relaunch Build')
     expect(getWorkItemPrimaryLaunchLabel({ phase: 'review', status: 'active' })).toBe('Launch Review')
@@ -57,18 +60,28 @@ describe('work item detail screen theme classes', () => {
   it('derives lifecycle actions from current status and phase', () => {
     expect(getAvailableWorkItemLifecycleActions({ status: 'inbox', phase: 'research' })).toEqual([
       'send_to_planning',
+      'cancel',
     ])
     expect(getAvailableWorkItemLifecycleActions({ status: 'active', phase: 'research' })).toEqual([
       'mark_ready',
+      'back_to_inbox',
+      'cancel',
     ])
     expect(getAvailableWorkItemLifecycleActions({ status: 'active', phase: 'build' })).toEqual([
       'request_review',
+      'back_to_research',
+      'cancel',
     ])
     expect(getAvailableWorkItemLifecycleActions({ status: 'active', phase: 'deploy' })).toEqual([
       'request_deploy_approval',
+      'back_to_build',
+      'cancel',
     ])
-    expect(getAvailableWorkItemLifecycleActions({ status: 'blocked', phase: 'build' })).toEqual(['resume_build'])
-    expect(getAvailableWorkItemLifecycleActions({ status: 'ready', phase: undefined })).toEqual([])
+    expect(getAvailableWorkItemLifecycleActions({ status: 'active', phase: 'review' })).toEqual(['back_to_research', 'cancel'])
+    expect(getAvailableWorkItemLifecycleActions({ status: 'blocked', phase: 'build' })).toEqual(['resume_build', 'back_to_research', 'cancel'])
+    expect(getAvailableWorkItemLifecycleActions({ status: 'ready', phase: undefined })).toEqual(['cancel'])
+    expect(getAvailableWorkItemLifecycleActions({ status: 'done', phase: undefined })).toEqual([])
+    expect(getAvailableWorkItemLifecycleActions({ status: 'cancelled', phase: undefined })).toEqual([])
   })
 
   it('supports planning-oriented draft helpers for acceptance criteria and notes', () => {
@@ -87,12 +100,39 @@ describe('work item detail screen theme classes', () => {
     expect(parseWorkItemDetailListDraft('')).toEqual([])
   })
 
+  it('normalizes acceptance criteria status and exposes progress labels', () => {
+    const status = buildWorkItemAcceptanceCriteriaStatus(
+      ['Criterion A', 'Criterion B', 'Criterion C'],
+      [
+        { text: 'Criterion A', met: true },
+        { text: 'Criterion B', met: false },
+      ],
+    )
+
+    expect(status).toEqual([
+      { text: 'Criterion A', met: true },
+      { text: 'Criterion B', met: false },
+      { text: 'Criterion C', met: false },
+    ])
+
+    const progress = getWorkItemAcceptanceCriteriaProgress(status)
+    expect(progress).toEqual({ metCount: 1, totalCount: 3 })
+    expect(getWorkItemAcceptanceCriteriaProgressLabel(progress)).toBe('1/3 criteria met')
+  })
+
   it('exposes execution cockpit summaries and operator action groups for the current work state', () => {
     expect(WORK_ITEM_DETAIL_ACTION_GROUP_TITLES).toEqual({
       operator: 'Operator Workflow',
       execution: 'Execution Controls',
       administration: 'Administrative Actions',
     })
+    expect(
+      getWorkItemOperatorGuidance({
+        status: 'ready',
+        phase: undefined,
+        acceptanceCriteriaProgress: { metCount: 1, totalCount: 3 },
+      }),
+    ).toContain('Acceptance criteria progress: 1/3 met.')
     expect(
       getWorkItemOperatorGuidance({ status: 'active', phase: 'build', missionState: 'running' }),
     ).toBe('Build mission is in flight. Sync execution for fresh evidence or request review once implementation is ready.')

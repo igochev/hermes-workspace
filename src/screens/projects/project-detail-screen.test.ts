@@ -95,8 +95,8 @@ describe('project detail screen board constants', () => {
     expect(PROJECT_FORM_SELECT_CLASS).toContain('text-[var(--theme-text)]')
     expect(PROJECT_FORM_NATIVE_SELECT_STYLE).toEqual({ colorScheme: 'dark' })
     expect(
-      buildAssignedProfileOptions(['builder', 'researcher'], {
-        research: 'researcher',
+      buildAssignedProfileOptions(['builder', 'planner'], {
+        research: 'planner',
         build: 'builder',
         review: 'reviewer',
         deploy: '',
@@ -104,7 +104,7 @@ describe('project detail screen board constants', () => {
     ).toEqual([
       ['', 'Auto (Build → builder)'],
       ['builder', 'builder'],
-      ['researcher', 'researcher'],
+      ['planner', 'planner'],
       ['reviewer', 'reviewer'],
     ])
   })
@@ -123,18 +123,18 @@ describe('project detail screen board constants', () => {
     expect(PROJECT_PHASE_ROUTING_POLICY_LABELS).toEqual({
       build: 'Build launches route to builder by default.',
       deploy: 'Deploy launches route to deployer by default.',
-      research: 'Research launches route to researcher by default.',
+      research: 'Research/planning phase routes to Planner profile by default.',
       review: 'Review launches route to reviewer by default.',
     })
     expect(
       buildProjectWorkflowPolicyPhaseSummaries({
-        research: 'researcher',
+        research: 'planner',
         build: '',
         review: 'reviewer',
         deploy: '',
       }),
     ).toEqual([
-      'Research → researcher',
+      'Research → planner',
       'Build → Auto fallback',
       'Review → reviewer',
       'Deploy → Auto fallback',

@@ -247,4 +247,37 @@ describe('work-item-approvals', () => {
       note: 'Review auto-approved by policy; advanced work item to deploy.',
     })
   })
+
+  it('auto-approves review work items with low risk level regardless of project policy', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      reviewAutoApproval: {
+        enabled: false,
+        maxPriority: 'low',
+      },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Low-risk item bypasses policy',
+      status: 'active',
+      phase: 'review',
+      priority: 'high',
+      riskLevel: 'low',
+      repoPathSnapshot: project.repoPath,
+    })
+
+    const approval = requestWorkItemReviewApproval(workItem.id, {
+      requestedBy: 'operator',
+      notes: 'Low-risk review',
+    })
+
+    expect(approval.status).toBe('approved')
+    expect(approval.resolvedBy).toBe('policy')
+    expect(approval.resolutionNotes).toBe('Auto-approved by project review policy.')
+    expect(getWorkItem(workItem.id)).toMatchObject({
+      status: 'active',
+      phase: 'deploy',
+    })
+  })
 })

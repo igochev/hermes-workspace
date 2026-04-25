@@ -36,13 +36,13 @@ describe('buildPhaseProfileRoutingInstructions', () => {
 
   it('renders concrete routing instructions when mappings exist', () => {
     const lines = buildPhaseProfileRoutingInstructions({
-      research: 'researcher',
+      research: 'planner',
       build: 'builder',
       review: '',
       deploy: '',
     })
 
-    expect(lines.join('\n')).toContain('research tasks → Hermes profile "researcher"')
+    expect(lines.join('\n')).toContain('research tasks → Hermes profile "planner"')
     expect(lines.join('\n')).toContain('build tasks → Hermes profile "builder"')
     expect(lines.join('\n')).toContain('acp_command: "hermes"')
     expect(lines.join('\n')).toContain('acp_args: ["-p", "<profile>", "--acp", "--stdio"]')

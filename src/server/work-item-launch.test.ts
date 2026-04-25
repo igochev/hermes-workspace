@@ -131,7 +131,7 @@ describe('work-item-launch', () => {
     expect(goal).toContain('If acceptance criteria are incomplete, propose them explicitly')
   })
 
-  it('launches a work item into conductor and records mission linkage history', async () => {
+  it('launches a work item into conductor as a two-phase pipeline when status is ready', async () => {
     const project = createProject({
       name: 'Mission Control Demo',
       repoPath: '/repos/mission-control-demo',
@@ -160,17 +160,25 @@ describe('work-item-launch', () => {
 
     const result = await launchWorkItemIntoConductor(workItem.id, {
       phase: 'build',
-      phaseProfiles: { build: 'builder' },
+      phaseProfiles: { build: 'builder', research: 'planner' },
       maxParallel: 2,
       supervised: false,
     })
 
     expect(launchConductorMission).toHaveBeenCalledTimes(1)
+    // Should pass both build and research profiles for two-phase
     expect(launchConductorMission).toHaveBeenCalledWith(
       expect.objectContaining({
-        phaseProfiles: expect.objectContaining({ build: 'builder' }),
+        phaseProfiles: expect.objectContaining({ build: 'builder', research: 'planner' }),
       }),
     )
+    // Goal should be two-phase format
+    const callArgs = launchConductorMission.mock.calls[0][0]
+    expect(callArgs.goal).toContain('TWO-PHASE')
+    expect(callArgs.goal).toContain('Phase 1')
+    expect(callArgs.goal).toContain('Phase 2')
+    expect(callArgs.goal).toContain('docs/plans/')
+
     expect(result.launch.jobId).toBe('job-123')
     expect(result.launch.profile).toBe('builder')
     expect(result.workItem.status).toBe('active')
@@ -182,6 +190,7 @@ describe('work-item-launch', () => {
     expect(result.workItem.missionLink).toBe('/jobs?jobId=job-123')
     expect(result.workItem.missionState).toBe('scheduled')
     expect(result.workItem.sessionKeys).toContain('cron_job-123_pending')
+    expect(result.workItem.planFilePath).toMatch(/^docs\/plans\/.*-plan\.md$/)
     expect(result.workItem.history.at(-1)).toMatchObject({
       action: 'launch',
       phase: 'build',
@@ -191,6 +200,7 @@ describe('work-item-launch', () => {
       sessionKeyPrefix: 'cron_job-123_',
       profile: 'builder',
     })
+    expect(result.workItem.history.at(-1)?.note).toContain('two-phase pipeline')
 
     const persisted = getWorkItem(workItem.id)
     expect(persisted?.missionId).toBe('job-123')
@@ -200,6 +210,7 @@ describe('work-item-launch', () => {
     expect(persisted?.missionLink).toBe('/jobs?jobId=job-123')
     expect(persisted?.missionState).toBe('scheduled')
     expect(persisted?.history.at(-1)?.action).toBe('launch')
+    expect(persisted?.planFilePath).toMatch(/^docs\/plans\/.*-plan\.md$/)
   })
 
   it('records relaunch history when blocked failed build work is launched again', async () => {
@@ -261,7 +272,7 @@ describe('work-item-launch', () => {
     const workItem = createWorkItem({
       projectId: project.id,
       title: 'Use project-level build routing',
-      status: 'ready',
+      status: 'active',
       phase: 'build',
       priority: 'high',
       repoPathSnapshot: project.repoPath,

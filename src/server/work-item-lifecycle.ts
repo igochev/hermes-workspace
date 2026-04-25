@@ -7,6 +7,10 @@ export type WorkItemLifecycleAction =
   | 'request_review'
   | 'request_deploy_approval'
   | 'resume_build'
+  | 'cancel'
+  | 'back_to_research'
+  | 'back_to_build'
+  | 'back_to_inbox'
 
 export type ApplyWorkItemLifecycleTransitionInput = {
   action: WorkItemLifecycleAction
@@ -24,6 +28,33 @@ function readOptionalString(value: unknown): string | undefined {
 }
 
 function assertActionAllowed(workItem: WorkItemRecord, action: WorkItemLifecycleAction): void {
+  if (action === 'cancel') {
+    if (workItem.status === 'done' || workItem.status === 'cancelled') {
+      throw new Error('cancel is only valid for non-terminal work items (inbox, ready, active, blocked)')
+    }
+    return
+  }
+
+  if (action === 'back_to_research') {
+    if (
+      (workItem.status === 'active' && (workItem.phase === 'build' || workItem.phase === 'review')) ||
+      (workItem.status === 'blocked' && workItem.phase === 'build')
+    ) {
+      return
+    }
+    throw new Error('back_to_research is only valid for active build, active review, or blocked build work items')
+  }
+
+  if (action === 'back_to_build') {
+    if (workItem.status === 'active' && workItem.phase === 'deploy') return
+    throw new Error('back_to_build is only valid for active deploy work items')
+  }
+
+  if (action === 'back_to_inbox') {
+    if (workItem.status === 'active' && workItem.phase === 'research') return
+    throw new Error('back_to_inbox is only valid for active research work items')
+  }
+
   if (action === 'send_to_planning') {
     if (workItem.status === 'inbox' && workItem.phase === 'research') return
     throw new Error('send_to_planning is only valid for inbox research work items')
@@ -138,6 +169,90 @@ export function applyWorkItemLifecycleTransition(
     }
   }
 
+  if (input.action === 'cancel') {
+    if (!notes?.trim()) {
+      throw new Error('cancel requires a reason note explaining why the work item is being cancelled')
+    }
+    const updated = updateWorkItem(workItem.id, {
+      status: 'cancelled',
+      phase: undefined,
+    })
+    if (!updated) throw new Error('Failed to update work item lifecycle state')
+    const withHistory = appendWorkItemHistoryEntry(updated.id, {
+      action: 'status-change',
+      status: 'cancelled',
+      phase: undefined,
+      note: `Cancelled: ${notes}`,
+      missionId: updated.missionId,
+      sessionKey: updated.sessionKeys.at(-1),
+      sessionKeyPrefix: updated.missionSessionKeyPrefix,
+      profile: updated.assignedProfile,
+    })
+    if (!withHistory) throw new Error('Failed to record lifecycle history entry')
+    return { workItem: withHistory }
+  }
+
+  if (input.action === 'back_to_research') {
+    const updated = updateWorkItem(workItem.id, {
+      status: 'active',
+      phase: 'research',
+    })
+    if (!updated) throw new Error('Failed to update work item lifecycle state')
+    const withHistory = appendWorkItemHistoryEntry(updated.id, {
+      action: 'status-change',
+      status: 'active',
+      phase: 'research',
+      note: notes ? `Returned to research for additional planning: ${notes}` : 'Returned to research for additional planning.',
+      missionId: updated.missionId,
+      sessionKey: updated.sessionKeys.at(-1),
+      sessionKeyPrefix: updated.missionSessionKeyPrefix,
+      profile: updated.assignedProfile,
+    })
+    if (!withHistory) throw new Error('Failed to record lifecycle history entry')
+    return { workItem: withHistory }
+  }
+
+  if (input.action === 'back_to_build') {
+    const updated = updateWorkItem(workItem.id, {
+      status: 'active',
+      phase: 'build',
+    })
+    if (!updated) throw new Error('Failed to update work item lifecycle state')
+    const withHistory = appendWorkItemHistoryEntry(updated.id, {
+      action: 'status-change',
+      status: 'active',
+      phase: 'build',
+      note: notes ? `Returned to build for fixes: ${notes}` : 'Returned to build for fixes.',
+      missionId: updated.missionId,
+      sessionKey: updated.sessionKeys.at(-1),
+      sessionKeyPrefix: updated.missionSessionKeyPrefix,
+      profile: updated.assignedProfile,
+    })
+    if (!withHistory) throw new Error('Failed to record lifecycle history entry')
+    return { workItem: withHistory }
+  }
+
+  if (input.action === 'back_to_inbox') {
+    const updated = updateWorkItem(workItem.id, {
+      status: 'inbox',
+      phase: 'research',
+    })
+    if (!updated) throw new Error('Failed to update work item lifecycle state')
+    const withHistory = appendWorkItemHistoryEntry(updated.id, {
+      action: 'status-change',
+      status: 'inbox',
+      phase: 'research',
+      note: notes ? `Returned to inbox for refinement: ${notes}` : 'Returned to inbox for refinement.',
+      missionId: updated.missionId,
+      sessionKey: updated.sessionKeys.at(-1),
+      sessionKeyPrefix: updated.missionSessionKeyPrefix,
+      profile: updated.assignedProfile,
+    })
+    if (!withHistory) throw new Error('Failed to record lifecycle history entry')
+    return { workItem: withHistory }
+  }
+
+  // Default: request_review (must be last — fallthrough action)
   let updated = updateWorkItem(workItem.id, {
     status: 'active',
     phase: 'review',

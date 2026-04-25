@@ -6,6 +6,7 @@ import {
   listWorkItems,
   type WorkItemPhase,
   type WorkItemPriority,
+  type WorkItemRiskLevel,
   type WorkItemStatus,
 } from '../../server/work-items-store'
 
@@ -38,6 +39,10 @@ function isWorkItemPhase(value: unknown): value is WorkItemPhase {
 
 function isWorkItemPriority(value: unknown): value is WorkItemPriority {
   return value === 'high' || value === 'medium' || value === 'low'
+}
+
+function isWorkItemRiskLevel(value: unknown): value is WorkItemRiskLevel {
+  return value === 'low' || value === 'medium' || value === 'high'
 }
 
 export const Route = createFileRoute('/api/work-items')({
@@ -89,6 +94,7 @@ export const Route = createFileRoute('/api/work-items')({
             status: isWorkItemStatus(body.status) ? body.status : undefined,
             phase: isWorkItemPhase(body.phase) ? body.phase : undefined,
             priority: isWorkItemPriority(body.priority) ? body.priority : undefined,
+            riskLevel: isWorkItemRiskLevel(body.riskLevel) ? body.riskLevel : undefined,
             assignedProfile:
               typeof body.assignedProfile === 'string'
                 ? body.assignedProfile
@@ -116,6 +122,17 @@ export const Route = createFileRoute('/api/work-items')({
               ? body.acceptanceCriteria.filter(
                   (value): value is string => typeof value === 'string',
                 )
+              : [],
+            criteriaStatus: Array.isArray(body.criteriaStatus)
+              ? body.criteriaStatus
+                  .filter(
+                    (value): value is { text?: unknown; met?: unknown } =>
+                      Boolean(value) && typeof value === 'object',
+                  )
+                  .map((value) => ({
+                    text: typeof value.text === 'string' ? value.text : '',
+                    met: value.met === true,
+                  }))
               : [],
             notes: Array.isArray(body.notes)
               ? body.notes.filter((value): value is string => typeof value === 'string')

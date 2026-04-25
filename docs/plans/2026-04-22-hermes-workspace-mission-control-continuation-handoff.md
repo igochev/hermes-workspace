@@ -336,12 +336,94 @@ These are the grounded slice states after live QA and diff inspection on 2026-04
   - `GET /api/work-items/a522005a-103b-4740-8c20-c6ee84c315d1?syncExecution=true` returns `200`, no `error`
   - detail page, approvals inbox, and dashboard all load normally after restart
 
+### Slice 7 — Two-phase Launch Build orchestration (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- Two-phase pipeline is triggered when `status=ready` work item is launched for `build` (i.e., operator clicks "Launch Build")
+- `launchWorkItemIntoConductor` detects candidates via `isTwoPhaseLaunchCandidate()` and builds a combined goal with Phase 1 (Plan) and Phase 2 (Build) via `buildTwoPhaseLaunchGoal()`
+- `planFilePath` added to `WorkItemRecord`, persisted on launch, and surfaced in UI (Mission Control Summary + Delivery Evidence panels)
+- Builder's goal includes "Read and follow the plan from Phase 1 at: {planFilePath}"
+- Both `planner` (research) and `builder` (build) profiles resolved and included in `phaseProfiles` for ACP subprocess routing
+- UI enhancements:
+  - Operator guidance for ready items explains two-phase pipeline behavior
+  - Launch toast shows "Launched two-phase pipeline (Planner → Builder). Plan path: ..."
+  - Plan File Path visible in Mission Control Summary and Delivery Evidence panels
+- Tests: 6 passing (work-item-launch.test.ts), 101 total, all green
+- `pnpm build` clean, service restarted and active at `http://localhost:3456`
+
+### Slice C — Risk level field for future auto-approval (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- `riskLevel: 'low' | 'medium' | 'high'` added to `WorkItemRecord` and `CreateWorkItemInput`
+- Default: `'medium'` via `normalizeRiskLevel()` normalizer in `work-items-store.ts`
+- API routes (POST + PATCH) accept `riskLevel` for create and update
+- New Work Item form includes a Risk Level select (Low/Medium/High)
+- Work item detail screen shows risk level badge in header + Mission Control Summary entry
+- Project board cards show risk level tag alongside phase and priority tags
+- Tests: 3 new tests in `work-items-store.test.ts` verifying default + custom values
+- End-to-end verification: create (riskLevel=low) → PATCH (riskLevel=high) → GET (returns riskLevel=high)
+- Existing work items auto-populated with `riskLevel: 'medium'`
+- `pnpm build` clean, 102/102 tests passing, service restarted and active
+
+### Slice E — riskLevel automation (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- riskLevel wired into board sorting — low-risk items sort lower within same attention + priority tier
+- riskLevel wired into review auto-approval — low-risk items (`riskLevel=low`) auto-approve through review regardless of project policy
+- riskLevel wired into operator guidance — ready items show "low-risk — review will be auto-approved"
+- 2 new tests: `projects-view-model.test.ts` (sort order), `work-item-approvals.test.ts` (auto-approval)
+- 104/104 tests passing, `pnpm build` clean, service restarted and active
+- End-to-end verification: low-risk item in `active/build` → request review → auto-approved to `active/deploy`
+
+### Slice F — Lifecycle completeness (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- Added lifecycle actions in `work-item-lifecycle.ts` + route parsing + work-item detail UI:
+  - `cancel`
+  - `back_to_research`
+  - `back_to_build`
+  - `back_to_inbox`
+- `cancel` now requires a reason note and transitions to `status=cancelled` with lifecycle history.
+- `back_to_research` now supports active/blocked build states (plus active review) for explicit planning fallback.
+- `back_to_build` now supports active deploy state for explicit return-to-build correction loops.
+- Added/updated coverage:
+  - `src/server/work-item-lifecycle.test.ts`
+  - `src/screens/projects/work-item-detail-screen.test.ts`
+- Full regression status after Slice F verification: **120/120 tests passing** (`pnpm vitest run`).
+- Provider/runtime error root cause discovered during live verification:
+  - service was running against stale `dist` references and threw `ERR_MODULE_NOT_FOUND` for old `_tanstack-start-manifest` hash
+  - resolved by rebuilding + restarting `hermes-workspace.service`
+- API robustness fix for lifecycle validation:
+  - cancel-without-reason now returns `400` (was surfacing as `500`)
+  - file: `src/routes/api/work-items.$workItemId.lifecycle.ts`
+
+### Slice G — Acceptance criteria verification (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- Added `criteriaStatus` tracking to work-item model (`src/server/work-items-store.ts`) with auto-alignment to `acceptanceCriteria`.
+- Added per-criterion check-off UI + progress badge (`X/Y criteria met`) in `src/screens/projects/work-item-detail-screen.tsx`.
+- Added progress helper coverage in `src/screens/projects/work-item-detail-screen.test.ts` and model coverage in `src/server/work-items-store.test.ts`.
+- Added API support for `criteriaStatus` in work-item create/update routes.
+- Fixed PATCH partial-update behavior in `src/routes/api/work-items.$workItemId.ts` to avoid wiping unrelated fields when updating only `criteriaStatus`.
+- Full regression status after Slice G verification: **122/122 tests passing** (`pnpm vitest run`).
+- Live verification completed on running app:
+  - criteria progress shows on detail page (e.g. `0/2 criteria met`)
+  - per-criterion toggle updates API state and progress (`0/2 -> 1/2`)
+  - criteria preserved after toggle-only PATCH
+
 ### Next practical priority
-Phase 6 and two post-phase hardening passes are complete. The immediate queue is:
-1. **Route-level fallback envelope for syncExecution edge failures**
-   - consider returning a non-fatal `executionSyncWarning` payload from `/api/work-items/:id` when sync throws unexpectedly, while preserving baseline work-item payload
-2. **Expand reliability regression coverage around API envelope behavior**
-   - add route-level tests to lock non-500 behavior for syncExecution dependency failures
+Slice A (phase routing rewire), Slice B (two-phase orchestration), **Slice C (risk level field)**, **Slice E (riskLevel automation)**, **Slice F (lifecycle completeness)**, and **Slice G (acceptance criteria verification)** are complete. The immediate queue is:
+1. **Planner-as-Reviewer** (future, after two-phase pipeline is stable)
+   - Planner reviews Builder's output against the plan it wrote
+2. **Route-level fallback envelope for syncExecution edge failures**
+   - Consider returning a non-fatal `executionSyncWarning` payload from `/api/work-items/:id`
+3. **Slice H — WIP awareness + blocked taxonomy**
+   - WIP thresholds + structured blocked reason signals on board/detail
 
 ---
 
@@ -383,12 +465,16 @@ These matter because the next slice should extend them rather than fight them:
   3. request/global phase profiles
 - `work-item-detail-screen.tsx` already exposes workflow-specific launch labels, planning-detail editing, lifecycle actions, approval handling, mission evidence, and execution sync.
 - `projects-view-model.ts` already encodes the board as a workflow progression rather than a generic status dump.
-- `work-item-lifecycle.ts` now owns explicit workflow transitions for planning, review, deploy approval, and blocked-build recovery:
+- `work-item-lifecycle.ts` now owns explicit workflow transitions for planning, review, deploy approval, blocked-build recovery, and backward/cancel paths:
   - `send_to_planning`
   - `mark_ready`
   - `request_review`
   - `request_deploy_approval`
   - `resume_build`
+  - `cancel`
+  - `back_to_research`
+  - `back_to_build`
+  - `back_to_inbox`
 - `work-item-approvals.ts` now resolves phase-specific governance:
   - review approval → `active/deploy`
   - deploy approval → `done`
@@ -437,21 +523,39 @@ When resuming this project in a new or compacted chat:
    - `src/server/work-item-launch.ts`
    - `src/server/work-item-lifecycle.ts`
    - `src/server/work-item-approvals.ts`
-4. re-check the current slice status in section 4 before choosing work; do not assume older slice ordering is still current
-5. if no reprioritization is given, continue from the current section 4 immediate queue (runtime-dependency resilience + fallback regression coverage)
-6. then continue with whatever follow-on Mission Control priority is explicitly documented after that pass
+   - `src/server/work-items-store.ts` (data model — riskLevel + criteriaStatus fields)
+4. read `docs/plans/2026-04-25-hermes-workspace-profiles-workflow-rearchitecture.md` for the current architecture
+5. re-check the current slice status in section 4 before choosing work; do not assume older slice ordering is still current
+6. if no reprioritization is given, continue from the current section 4 immediate queue:
+   - **Planner-as-Reviewer**
+   - **Route-level fallback envelope for syncExecution edge failures**
+   - **Slice H — WIP awareness + blocked taxonomy**
 7. keep using the inspect → tests → patch → targeted tests → build → restart → live verify workflow
 
 ---
 
 ## 8. Bottom line
 
-The project is already past the original roadmap’s earliest slices. The routing foundation, project/work-item control plane, approvals inbox, workflow policy, and Mission Control dashboard are in place.
+The project is already past the original roadmap's earliest slices. The routing foundation, project/work-item control plane, approvals inbox, workflow policy, Mission Control dashboard, two-phase launch pipeline, and risk level field are all in place.
 
-The next meaningful evolution after Phase 6 is to harden operational reliability in the same workflow:
+### 2026-04-25 architectural shift
 
-**idea capture → planning with Researcher → build with Builder → review/approval → deploy/approval → done**
+A major profiles/workflow re-architecture was completed on 2026-04-25:
 
-with detail-path sync resilience and continued operator visibility when runtime dependencies fail.
+1. **Profile architecture corrected** — Builder fixed as first-class profile; lesson saved
+2. **Researcher upgraded** from dummy to proper profile (gpt-4.1, gateway running)
+3. **Planner profile created** — new flagship profile (gpt-5.4, openai-codex)
+4. **Dashboard root fixed** — `web_dist/index.html` rebuilt, `zero-fork` mode restored
+5. **Two-phase Launch Build pipeline implemented** — Launch Build triggers Planner → Builder sequentially
+6. **Risk level field implemented** — `riskLevel: 'low' | 'medium' | 'high'` on work items, default `medium`, UI across create/detail/board
+7. **riskLevel automation** — low-risk items auto-approve through review, sort lower on board, guidance mentions auto-approval
 
-If resuming later, continue from the section 4 immediate queue (runtime-dependency resilience + fallback regression coverage).
+See `docs/plans/2026-04-25-hermes-workspace-profiles-workflow-rearchitecture.md` for full details.
+
+The next meaningful evolutions are:
+
+1. **Planner-as-Reviewer** — Planner reviews Builder's output against the plan it wrote
+2. **Route-level fallback envelope for syncExecution edge failures** — non-fatal `executionSyncWarning` payload candidate
+3. **Slice H — WIP awareness + blocked taxonomy** — WIP thresholds + structured blocked reason signals
+
+If resuming later, continue from the above document.

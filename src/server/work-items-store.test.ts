@@ -57,6 +57,7 @@ describe('work-items-store', () => {
       'Page renders project cards',
     ])
     expect(workItem.notes).toEqual(['Initial Phase 1 placeholder'])
+    expect(workItem.riskLevel).toBe('medium')
     expect(workItem.history).toEqual([])
     expect(workItem.missionLink).toBeUndefined()
     expect(workItem.sessionKeys).toEqual([])
@@ -64,6 +65,66 @@ describe('work-items-store', () => {
 
     expect(listWorkItems({ projectId: 'project-1' })).toEqual([workItem])
     expect(getWorkItem(workItem.id)).toEqual(workItem)
+  })
+
+  it('normalizes risk level defaults and accepts custom values', () => {
+    const defaultRisk = createWorkItem({
+      projectId: 'project-risk',
+      title: 'Default risk',
+      repoPathSnapshot: '/repos/risk',
+    })
+    expect(defaultRisk.riskLevel).toBe('medium')
+
+    const highRisk = createWorkItem({
+      projectId: 'project-risk',
+      title: 'High risk item',
+      riskLevel: 'high',
+      repoPathSnapshot: '/repos/risk',
+    })
+    expect(highRisk.riskLevel).toBe('high')
+
+    const lowRisk = createWorkItem({
+      projectId: 'project-risk',
+      title: 'Low risk item',
+      riskLevel: 'low',
+      repoPathSnapshot: '/repos/risk',
+    })
+    expect(lowRisk.riskLevel).toBe('low')
+  })
+
+  it('tracks per-criterion status and re-aligns status when criteria change', () => {
+    const workItem = createWorkItem({
+      projectId: 'project-criteria',
+      title: 'Criteria status test',
+      repoPathSnapshot: '/repos/criteria',
+      acceptanceCriteria: ['Criterion A', 'Criterion B'],
+    })
+
+    expect(workItem.criteriaStatus).toEqual([
+      { text: 'Criterion A', met: false },
+      { text: 'Criterion B', met: false },
+    ])
+
+    const marked = updateWorkItem(workItem.id, {
+      criteriaStatus: [
+        { text: 'Criterion A', met: true },
+        { text: 'Criterion B', met: true },
+      ],
+    })
+
+    expect(marked?.criteriaStatus).toEqual([
+      { text: 'Criterion A', met: true },
+      { text: 'Criterion B', met: true },
+    ])
+
+    const realigned = updateWorkItem(workItem.id, {
+      acceptanceCriteria: ['Criterion B', 'Criterion C'],
+    })
+
+    expect(realigned?.criteriaStatus).toEqual([
+      { text: 'Criterion B', met: true },
+      { text: 'Criterion C', met: false },
+    ])
   })
 
   it('updates work items and can remove all work items for a deleted project', () => {

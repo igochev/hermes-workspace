@@ -36,7 +36,7 @@ describe('projects-store', () => {
       description: 'Primary Hermes Mission Control repo',
       defaultBranch: 'main',
       phaseProfiles: {
-        research: 'researcher',
+          research: 'planner',
         build: 'builder',
       },
     })
@@ -47,7 +47,7 @@ describe('projects-store', () => {
     expect(project.description).toBe('Primary Hermes Mission Control repo')
     expect(project.defaultBranch).toBe('main')
     expect(project.phaseProfiles).toEqual({
-      research: 'researcher',
+          research: 'planner',
       build: 'builder',
       review: '',
       deploy: '',
@@ -82,7 +82,7 @@ describe('projects-store', () => {
       repoUrl: 'https://github.com/igochev/hermes-workspace',
       defaultBranch: 'develop',
       phaseProfiles: {
-        research: 'researcher',
+          research: 'planner',
         build: 'project-builder',
         review: 'reviewer',
       },
@@ -99,7 +99,7 @@ describe('projects-store', () => {
     expect(updated?.repoUrl).toBe('https://github.com/igochev/hermes-workspace')
     expect(updated?.defaultBranch).toBe('develop')
     expect(updated?.phaseProfiles).toEqual({
-      research: 'researcher',
+          research: 'planner',
       build: 'project-builder',
       review: 'reviewer',
       deploy: '',
