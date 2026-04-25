@@ -8,9 +8,10 @@ import {
   type WorkItemRecord,
 } from './work-items-store'
 import { type CronRun } from '../components/cron-manager/cron-types'
-import { requestWorkItemReviewApproval } from './work-item-approvals'
+import { requestWorkItemReviewApproval, resolveWorkItemApprovalDecision } from './work-item-approvals'
 import { getHermesJobById, getHermesJobRuns, listHermesJobs, type HermesJobInfo } from './hermes-jobs'
-import { buildMissionLink } from './conductor-launch'
+import { buildMissionLink, launchConductorMission } from './conductor-launch'
+import { launchPlannerReview } from './work-item-launch'
 
 export type SyncedExecutionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 
@@ -254,6 +255,30 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
         notes: 'Execution succeeded; awaiting review approval.',
       })
       transitionApplied = 'build->review'
+
+      // Launch Planner-as-Reviewer mission for two-phase pipeline items
+      if (updated.planFilePath) {
+        const project = getProject(updated.projectId)
+        if (project) {
+          launchPlannerReview(updated, project).then((reviewLaunch) => {
+            if (reviewLaunch) {
+              updateWorkItem(updated.id, {
+                reviewJobId: reviewLaunch.reviewJobId,
+                reviewState: reviewLaunch.reviewState,
+              })
+              appendWorkItemHistoryEntry(updated.id, {
+                action: 'status-change',
+                status: 'active',
+                phase: 'review',
+                note: `Planner review mission launched (${reviewLaunch.reviewJobId}). Reviewing build output against plan at ${updated.planFilePath}.`,
+                missionId: reviewLaunch.reviewJobId,
+                sessionKey: updated.sessionKeys.at(-1),
+                profile: updated.assignedProfile,
+              })
+            }
+          })
+        }
+      }
     }
   } else if (state === 'failed') {
     const transition = transitionForFailure(updated, readOptionalString(job?.last_error))
@@ -261,6 +286,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       updated = updateWorkItem(updated.id, {
         status: transition.status,
         phase: transition.phase,
+        blockedReason: 'mission_failed',
         ...missionFields,
       })
       if (!updated) throw new Error('Failed to update work item after failure transition')
@@ -275,6 +301,75 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       })
       if (!updated) throw new Error('Failed to append failure history entry')
       transitionApplied = 'active->blocked'
+    }
+  }
+
+  // Auto-resolve Planner review approval when review mission completes
+  if (
+    updated.status === 'active' &&
+    updated.phase === 'review' &&
+    updated.reviewJobId &&
+    !updated.reviewDecision
+  ) {
+    try {
+      const { listWorkItemApprovals } = await import('./work-item-approvals')
+      const pendingApprovals = listWorkItemApprovals(updated.id)
+      const pendingReview = pendingApprovals.find(
+        (a) => a.phase === 'review' && a.status === 'pending',
+      )
+      if (pendingReview) {
+        let reviewJob: HermesJobInfo | null = null
+        try {
+          reviewJob = await getHermesJobById(updated.reviewJobId)
+        } catch {
+          reviewJob = null
+        }
+        if (reviewJob) {
+          const reviewState = deriveExecutionState(reviewJob)
+          if (reviewState === 'succeeded') {
+            resolveWorkItemApprovalDecision(pendingReview.id, {
+              decision: 'approved',
+              resolvedBy: 'planner',
+              notes: 'Planner review approved the build output against the plan. Automatically advancing to deploy.',
+            })
+            updated = updateWorkItem(updated.id, {
+              reviewState: 'succeeded' as const,
+              reviewDecision: 'approved' as const,
+            }) ?? updated
+            appendWorkItemHistoryEntry(updated.id, {
+              action: 'status-change',
+              status: 'active',
+              phase: 'deploy',
+              note: 'Planner review passed; automatically advanced work item to deploy.',
+              missionId: updated.missionId,
+              sessionKey: updated.sessionKeys.at(-1),
+              profile: updated.assignedProfile,
+            })
+          } else if (reviewState === 'failed') {
+            const errorNote = readOptionalString(reviewJob.last_error) || 'Planner review identified issues.'
+            resolveWorkItemApprovalDecision(pendingReview.id, {
+              decision: 'changes_requested',
+              resolvedBy: 'planner',
+              notes: `Planner review found issues: ${errorNote}. Returning work item to build for fixes.`,
+            })
+            updated = updateWorkItem(updated.id, {
+              reviewState: 'failed' as const,
+              reviewDecision: 'changes_requested' as const,
+            }) ?? updated
+            appendWorkItemHistoryEntry(updated.id, {
+              action: 'status-change',
+              status: 'active',
+              phase: 'build',
+              note: `Planner review rejected build output: ${errorNote}. Returned to build for fixes.`,
+              missionId: updated.missionId,
+              sessionKey: updated.sessionKeys.at(-1),
+              profile: updated.assignedProfile,
+            })
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — skip auto-resolve on this sync cycle
     }
   }
 

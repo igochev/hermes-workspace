@@ -165,6 +165,80 @@ describe('work-item-approvals', () => {
     })
   })
 
+  it('returns rejected deploy approvals to active build for correction', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Deploy rejected should return to build',
+      status: 'active',
+      phase: 'deploy',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+    })
+    const approval = requestWorkItemApproval(workItem.id, {
+      requestedBy: 'operator',
+      notes: 'Ready for deploy approval',
+      phase: 'deploy',
+    })
+
+    const result = resolveWorkItemApprovalDecision(approval.id, {
+      decision: 'rejected',
+      resolvedBy: 'D3n13r',
+      notes: 'Deploy failed smoke checks',
+    })
+
+    expect(result.approval.phase).toBe('deploy')
+    expect(result.approval.status).toBe('rejected')
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('build')
+    expect(result.workItem.history.at(-1)).toMatchObject({
+      action: 'status-change',
+      status: 'active',
+      phase: 'build',
+      note: 'Deploy rejected; returned work item to build for correction and relaunch.',
+    })
+  })
+
+  it('returns deploy changes-requested approvals to active build for correction', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Deploy changes requested should return to build',
+      status: 'active',
+      phase: 'deploy',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+    })
+    const approval = requestWorkItemApproval(workItem.id, {
+      requestedBy: 'operator',
+      notes: 'Ready for deploy approval',
+      phase: 'deploy',
+    })
+
+    const result = resolveWorkItemApprovalDecision(approval.id, {
+      decision: 'changes_requested',
+      resolvedBy: 'D3n13r',
+      notes: 'Need rollback guard update',
+    })
+
+    expect(result.approval.phase).toBe('deploy')
+    expect(result.approval.status).toBe('changes_requested')
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('build')
+    expect(result.workItem.history.at(-1)).toMatchObject({
+      action: 'status-change',
+      status: 'active',
+      phase: 'build',
+      note: 'Deploy requested changes; returned work item to build for correction and relaunch.',
+    })
+  })
+
   it('lists approvals inbox entries with project and work item context, pending first', () => {
     const project = createProject({
       name: 'Mission Control Demo',

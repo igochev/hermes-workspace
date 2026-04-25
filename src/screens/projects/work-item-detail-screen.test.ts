@@ -9,8 +9,11 @@ import {
   getWorkItemAcceptanceCriteriaProgress,
   buildWorkItemAcceptanceCriteriaStatus,
   getWorkItemAcceptanceCriteriaProgressLabel,
+  getWorkItemBlockedReasonGuidance,
   getWorkItemOperatorGuidance,
   parseWorkItemDetailListDraft,
+  WORK_ITEM_BLOCKED_REASON_FIELD_LABEL,
+  WORK_ITEM_BLOCKED_REASON_HELP_TEXT,
   WORK_ITEM_DETAIL_ACCEPTANCE_CRITERIA_HELP_TEXT,
   WORK_ITEM_DETAIL_ACTION_GROUP_TITLES,
   WORK_ITEM_DETAIL_AUTO_SYNC_MODE,
@@ -21,6 +24,9 @@ import {
   WORK_ITEM_DETAIL_PANEL_CLASS,
   stringifyWorkItemDetailListDraft,
   getWorkItemPrimaryLaunchLabel,
+  getWorkItemExecutionSyncWarningMessage,
+  WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE,
+  reviewDecisionLabel,
 } from './work-item-detail-screen'
 
 describe('work item detail screen theme classes', () => {
@@ -126,6 +132,11 @@ describe('work item detail screen theme classes', () => {
       execution: 'Execution Controls',
       administration: 'Administrative Actions',
     })
+    expect(WORK_ITEM_BLOCKED_REASON_FIELD_LABEL).toBe('Blocked reason')
+    expect(WORK_ITEM_BLOCKED_REASON_HELP_TEXT).toBe(
+      'Classify why this work item is blocked so board triage and recovery guidance stay actionable.',
+    )
+    expect(getWorkItemBlockedReasonGuidance('review_feedback')).toContain('review')
     expect(
       getWorkItemOperatorGuidance({
         status: 'ready',
@@ -139,6 +150,13 @@ describe('work item detail screen theme classes', () => {
     expect(getWorkItemOperatorGuidance({ status: 'blocked', phase: 'build', missionState: 'failed' })).toBe(
       'This work item is blocked by a failed build mission. Capture fixes, run Resume Build, and relaunch Build to continue delivery.',
     )
+    expect(
+      getWorkItemOperatorGuidance({
+        status: 'blocked',
+        phase: 'build',
+        blockedReason: 'blocked_by_dependency',
+      }),
+    ).toContain('dependency')
     expect(getWorkItemExecutionSummary({ missionState: 'failed', latestRunStatus: 'failed' })).toBe(
       'Mission failed — inspect the latest run, capture follow-up notes, run Resume Build, and relaunch Build when ready.',
     )
@@ -149,5 +167,22 @@ describe('work item detail screen theme classes', () => {
       ]),
     ).toBe('2 approvals need attention — pending review approval and changes requested.')
     expect(getWorkItemApprovalSummary([])).toBe('No approvals are currently blocking this work item.')
+  })
+
+  it('formats non-fatal execution sync warnings for operator-visible banner copy', () => {
+    expect(WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE).toBe('Execution sync warning')
+    expect(getWorkItemExecutionSyncWarningMessage('Hermes dashboard timed out')).toBe(
+      'Execution data may be stale: Hermes dashboard timed out',
+    )
+    expect(getWorkItemExecutionSyncWarningMessage('  ')).toBeNull()
+  })
+
+  it('returns user-facing labels for planner review decisions', () => {
+    expect(reviewDecisionLabel('approved')).toBe('✅ Approved — advance to deploy')
+    expect(reviewDecisionLabel('changes_requested')).toBe(
+      '🔧 Changes Requested — return to build',
+    )
+    expect(reviewDecisionLabel('unknown')).toBe('unknown')
+    expect(reviewDecisionLabel('')).toBe('—')
   })
 })

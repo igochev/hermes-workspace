@@ -7,6 +7,7 @@ import {
   type WorkItemPhase,
   type WorkItemPriority,
   type WorkItemRiskLevel,
+  type WorkItemBlockedReason,
   type WorkItemStatus,
 } from '../../server/work-items-store'
 
@@ -43,6 +44,16 @@ function isWorkItemPriority(value: unknown): value is WorkItemPriority {
 
 function isWorkItemRiskLevel(value: unknown): value is WorkItemRiskLevel {
   return value === 'low' || value === 'medium' || value === 'high'
+}
+
+function isWorkItemBlockedReason(value: unknown): value is WorkItemBlockedReason {
+  return (
+    value === 'mission_failed' ||
+    value === 'review_feedback' ||
+    value === 'blocked_by_dependency' ||
+    value === 'external' ||
+    value === 'other'
+  )
 }
 
 export const Route = createFileRoute('/api/work-items')({
@@ -95,6 +106,9 @@ export const Route = createFileRoute('/api/work-items')({
             phase: isWorkItemPhase(body.phase) ? body.phase : undefined,
             priority: isWorkItemPriority(body.priority) ? body.priority : undefined,
             riskLevel: isWorkItemRiskLevel(body.riskLevel) ? body.riskLevel : undefined,
+            blockedReason: isWorkItemBlockedReason(body.blockedReason)
+              ? body.blockedReason
+              : undefined,
             assignedProfile:
               typeof body.assignedProfile === 'string'
                 ? body.assignedProfile

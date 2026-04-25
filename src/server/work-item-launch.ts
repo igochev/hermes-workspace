@@ -11,6 +11,7 @@ import {
   updateWorkItem,
   type WorkItemPhase,
   type WorkItemRecord,
+  type WorkItemReviewDecision,
 } from './work-items-store'
 import {
   buildMissionLink,
@@ -177,6 +178,92 @@ function buildPhaseOutcomeBlock(phase: WorkItemPhase): string[] {
     'Primary outcome for this launch:',
     '- execute the requested phase with concrete repo-grounded outputs',
   ]
+}
+
+export function buildPlannerReviewGoal(workItem: WorkItemRecord, project: ProjectRecord): string {
+  const repoPath = readOptionalString(workItem.repoPathSnapshot) || project.repoPath
+  const fullPlanPath = workItem.planFilePath ? `${repoPath}/${workItem.planFilePath}` : 'no plan file recorded'
+  const criteriaLines = buildAcceptanceCriteriaBlock(workItem)
+  const criteriaProgress = workItem.criteriaStatus.length > 0
+    ? `Criteria completion: ${workItem.criteriaStatus.filter((c) => c.met).length}/${workItem.criteriaStatus.length} criteria met.`
+    : 'No criteria status tracked.'
+
+  return [
+    `You are acting as a **Reviewer** for Hermes Mission Control. Review the build output for work item "${workItem.title}" of project "${project.name}".`,
+    `Work item ID: ${workItem.id}`,
+    `Repository path: ${repoPath}`,
+    ...(project.defaultBranch ? [`Default branch: ${project.defaultBranch}`] : []),
+    ...(project.repoUrl ? [`Repository URL: ${project.repoUrl}`] : []),
+    '',
+    '======================================================================',
+    'REVIEW CONTEXT',
+    '======================================================================',
+    '',
+    'Description:',
+    workItem.description || 'No additional description provided.',
+    '',
+    ...criteriaLines,
+    criteriaProgress,
+    '',
+    `Plan file path: ${fullPlanPath}`,
+    '',
+    '======================================================================',
+    'YOUR TASK',
+    '======================================================================',
+    '',
+    '1. Review the Builder output against the plan authored at the path above.',
+    '2. Check each acceptance criterion against what was actually implemented.',
+    '3. Verify that the implementation follows the plan approach and all criteria are demonstrably met.',
+    '',
+    '======================================================================',
+    'DECISION',
+    '======================================================================',
+    '',
+    'You MUST end your output with a clear DECISION line on its own line:',
+    '',
+    '  DECISION: APPROVED',
+    '  (advance the work item to deploy — criteria are met and implementation is sound)',
+    '',
+    '  OR',
+    '',
+    '  DECISION: CHANGES_REQUESTED',
+    '  (return the work item to build — criteria are not fully met or implementation has issues)',
+    '',
+    'Include a brief rationale for your decision in a SUMMARY section before the DECISION line.',
+    '',
+    ...(workItem.notes.length > 0 ? ['', ...buildNotesBlock(workItem)] : []),
+    '',
+    'Treat this as a tracked Mission Control Planner review. Reference the work item ID in all summaries.',
+  ].join('\n')
+}
+
+export function launchPlannerReview(workItem: WorkItemRecord, project: ProjectRecord): Promise<{
+  reviewJobId: string
+  reviewState: 'scheduled'
+} | null> {
+  if (!workItem.planFilePath) return Promise.resolve(null)
+
+  const goal = buildPlannerReviewGoal(workItem, project)
+  const phase = 'review'
+  const profile = resolveLaunchProfile(workItem, project, phase, normalizePhaseProfiles({}))
+  if (!profile) return Promise.resolve(null)
+
+  const launchPhaseProfiles = buildLaunchPhaseProfiles({
+    project,
+    requestPhaseProfiles: normalizePhaseProfiles({}),
+    phase,
+    profile,
+  })
+
+  return launchConductorMission({
+    goal,
+    phaseProfiles: launchPhaseProfiles,
+    name: `work-item-review-${project.slug}-${workItem.id.slice(0, 8)}`,
+    deliver: 'local',
+  }).then((launch) => ({
+    reviewJobId: launch.jobId,
+    reviewState: 'scheduled' as const,
+  })).catch(() => null)
 }
 
 export function buildWorkItemLaunchGoal(params: {

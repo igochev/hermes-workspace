@@ -33,7 +33,7 @@ active/review ───[approve]────────────→ active/d
 active/review ───[changes/reject]─────→ active/build (returned)
 active/deploy ───[request_deploy_approval] → pending deploy approval
 pending deploy ──[approve]────────────→ done
-pending deploy ──[changes/reject]─────→ active/deploy (stays)
+pending deploy ──[changes/reject]─────→ active/build (returned)
 blocked/build ───[resume_build]───────→ active/build
 ```
 
@@ -156,13 +156,15 @@ blocked/build ───[resume_build]───────→ active/build
 - Update operator guidance text per reason
 - Allow custom notes alongside the reason
 
-### 2.7 🔔 No notification system
+### 2.7 🔔 No notification system — ✅ **SHIPPED**
 
 **Current state:** The operator must poll the dashboard or project board to discover:
 - Pending approvals (review or deploy)
 - Failed missions
 - Review changes requested
 - Deploy approval resolution
+
+**Resolution:** Slice K shipped a `GET /api/work-item-notification-digest` endpoint that aggregates pending approvals, blocked items, and failed missions with a Discord-formatted output and file-based de-dup window. Operators can schedule periodic delivery via Hermes cron.
 
 **Impact:**
 - Time-sensitive governance bottlenecks can go unnoticed
@@ -209,15 +211,15 @@ blocked/build ───[resume_build]───────→ active/build
 | # | Improvement | Files | Est. effort | Status |
 |---|-------------|-------|-------------|--------|
 | 5 | **Acceptance criteria check-off** — per-criterion met/not-met tracking | `work-items-store.ts`, `work-item-detail-screen.tsx`, `work-items.$workItemId.ts` | ~70 lines | ✅ **Shipped** |
-| 6 | **Board column WIP warning** — visual indicator when active exceeds threshold | `project-detail-screen.tsx`, `projects-view-model.ts` | ~30 lines | ⏳ Next |
-| 7 | **Deploy rejection → return to build** — not stuck in deploy | `work-item-approvals.ts` | ~10 lines | ⏳ Next |
+| 6 | **Board column WIP warning** — visual indicator when active exceeds threshold | `project-detail-screen.tsx`, `projects-view-model.ts` | ~30 lines | ✅ **Shipped** |
+| 7 | **Deploy rejection → return to build** — not stuck in deploy | `work-item-approvals.ts` | ~10 lines | ✅ **Shipped** |
 
 ### Tier 3 — Higher impact, higher effort (future)
 
 | # | Improvement | Est. effort |
 |---|-------------|-------------|
 | 8 | **Blocked reason taxonomy** — structured blocked-reason field + UI | ~80 lines |
-| 9 | **Cron-based notification system** — periodic approval/mission alerts | ~100 lines + cron setup |
+| 9 | **Cron-based notification system** — periodic approval/mission alerts | ✅ **SHIPPED** — digest endpoint + de-dup |
 | 10 | **Labels/tags system** — flexible categorization + board filter | ~80 lines |
 | 11 | **Analytics pane** — cycle time, throughput, rework rate | ~150 lines |
 
@@ -248,17 +250,44 @@ blocked/build ───[resume_build]───────→ active/build
 - ✅ Hardened PATCH route partial updates so criteria-status updates do not wipe unrelated work-item fields
 - ✅ Verification: targeted tests + full regression (`122/122`), `pnpm build`, service restart, live UI/API check with toggle + restore
 
-### Slice H — WIP awareness + blocked taxonomy
-- Add WIP thresholds and visual warnings
-- Add structured blocked-reason field
-- Wire into operator guidance and board signals
+### Slice H — WIP awareness + blocked taxonomy (shipped 2026-04-25)
+- ✅ H1 shipped: WIP threshold + board/detail warning surfaces (`WIP high`, launch-pressure hint)
+- ✅ H2 shipped: structured blocked-reason taxonomy (`mission_failed | review_feedback | blocked_by_dependency | external | other`)
+- ✅ Wired into operator guidance and board signals (reason chips + detail guidance)
+- ✅ Verification: targeted tests (`58/58`), full regression (`124/124`), `pnpm build`, service restart (`active`), live project verification
+- Execution details tracked in `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
+
+### Slice I1 — Deploy rejection returns to build (shipped 2026-04-25)
+- ✅ Updated deploy approval resolution so `rejected` and `changes_requested` both return to `status=active`, `phase=build`
+- ✅ Added explicit correction-loop history notes for both deploy rejection paths
+- ✅ Added test-first coverage in `src/server/work-item-approvals.test.ts`
+- ✅ Verification: targeted tests (`40/40`), full regression (`126/126`), `pnpm build`, service restart (`active`), live API verification with temporary deploy item (cleaned up)
+
+### Slice I2 — execution sync fallback envelope (shipped 2026-04-25)
+- ✅ Updated `src/routes/api/work-items.$workItemId.ts` fallback path: recoverable sync failures now return HTTP 200 base payload + `executionSyncWarning` instead of HTTP 500
+- ✅ Added route-level fallback regression coverage in `src/server/work-item-detail-route.test.ts`
+- ✅ Added warning copy contract + banner surface in `src/screens/projects/work-item-detail-screen.tsx`
+- ✅ Added helper assertions in `src/screens/projects/work-item-detail-screen.test.ts`
+- ✅ Verification: targeted tests (`16/16`), full regression (`128/128`), `pnpm build`, service restart (`active`), live API verification with temporary target-project item (cleaned up)
+
+### Slice J — Planner-as-Reviewer (shipped 2026-04-25)
+- ✅ Added autonomous Planner review pass triggered after build->review transition for two-phase pipeline items
+- ✅ `buildPlannerReviewGoal()` produces structured review prompt with plan path, criteria status, and explicit decision instruction
+- ✅ `launchPlannerReview()` fires Conductor review mission using `planner` profile
+- ✅ Execution sync auto-resolves pending approval on review completion (succeeded→deploy, failed→return to build)
+- ✅ Verification: targeted tests (3 new), full regression (`131/131`), service restart, live API verification
+
+### Slice K — Notification watchdog (shipped 2026-04-25)
+- ✅ Created `src/server/work-item-notification-digest.ts` with digest generator, Discord formatter, and file-based de-dup
+- ✅ Created `GET /api/work-item-notification-digest` endpoint with `?format=discord` mode
+- ✅ Verification: 7 new tests, full regression (`138/138`), `pnpm build`, service restart, live API verification with pending approval scenario
 
 ---
 
 ## 5. Verification criteria for each tier
 
 After implementing any slice:
-1. All existing tests pass (122+ as of 2026-04-25)
+1. All existing tests pass (138+ as of 2026-04-25)
 2. Added tests cover new behavior
 3. `pnpm build` clean
 4. Service restarts and is `active`

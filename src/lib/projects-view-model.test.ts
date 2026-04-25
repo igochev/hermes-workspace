@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  PROJECT_ACTIVE_WIP_WARNING_THRESHOLD,
   PROJECT_BOARD_FLOW_ORDER,
   buildProjectBoardUrgencySummary,
   buildProjectStatsLine,
+  buildProjectWipHint,
   buildWorkItemOperatorSignals,
   buildWorkItemRecoveryHint,
   filterWorkItemsForProjectBoard,
   getWorkItemUrgencyTone,
   groupWorkItemsByStatus,
+  isProjectWipHigh,
   sortWorkItemsForProjectBoard,
   type ProjectSummary,
   type WorkItemRecord,
@@ -29,6 +32,14 @@ describe('projects-view-model', () => {
     }
 
     expect(buildProjectStatsLine(project)).toBe('5 work items · 2 active · 1 done')
+  })
+
+  it('flags high WIP pressure once active work reaches threshold', () => {
+    expect(PROJECT_ACTIVE_WIP_WARNING_THRESHOLD).toBe(3)
+    expect(isProjectWipHigh(2)).toBe(false)
+    expect(isProjectWipHigh(3)).toBe(true)
+    expect(buildProjectWipHint(2)).toBeNull()
+    expect(buildProjectWipHint(3)).toBe('WIP is high; finish one active item first.')
   })
 
   it('groups work items into the canonical Mission Control status order', () => {

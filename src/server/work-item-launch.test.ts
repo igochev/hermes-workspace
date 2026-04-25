@@ -16,6 +16,7 @@ import {
   getWorkItem,
 } from './work-items-store'
 import {
+  buildPlannerReviewGoal,
   buildWorkItemLaunchGoal,
   launchWorkItemIntoConductor,
 } from './work-item-launch'
@@ -342,5 +343,95 @@ describe('work-item-launch', () => {
     )
     expect(result.launch.profile).toBe('researcher')
     expect(result.workItem.history.at(-1)?.profile).toBe('researcher')
+  })
+})
+
+describe('buildPlannerReviewGoal', () => {
+  it('returns a goal string with plan path, acceptance criteria, and decision instructions', () => {
+    const project = {
+      id: 'project-1',
+      name: 'Mission Control Demo',
+      slug: 'mission-control-demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+      repoUrl: 'https://github.com/example/demo',
+      phaseProfiles: { research: '', build: '', review: '', deploy: '' },
+      reviewAutoApproval: { enabled: false, maxPriority: 'medium' as const },
+      createdAt: '2026-04-25T12:00:00Z',
+      updatedAt: '2026-04-25T12:00:00Z',
+    }
+    const workItem = {
+      id: 'work-item-1',
+      projectId: 'project-1',
+      title: 'Planner review test item',
+      description: 'This is a test item for Planner review.',
+      status: 'active' as const,
+      phase: 'review' as const,
+      priority: 'high' as const,
+      riskLevel: 'medium' as const,
+      repoPathSnapshot: '/repos/mission-control-demo',
+      planFilePath: 'docs/plans/phase-3-plan.md',
+      acceptanceCriteria: ['Feature A is implemented', 'Feature B passes all tests'],
+      criteriaStatus: [
+        { text: 'Feature A is implemented', met: true },
+        { text: 'Feature B passes all tests', met: false },
+      ],
+      notes: ['Operator note: check edge cases'],
+      sessionKeys: [],
+      artifactPaths: [],
+      history: [],
+      createdAt: '2026-04-25T12:00:00Z',
+      updatedAt: '2026-04-25T12:00:00Z',
+    }
+
+    const goal = buildPlannerReviewGoal(workItem, project)
+
+    expect(goal).toContain('Reviewer')
+    expect(goal).toContain('Planner review test item')
+    expect(goal).toContain('docs/plans/phase-3-plan.md')
+    expect(goal).toContain('Feature A is implemented')
+    expect(goal).toContain('Feature B passes all tests')
+    expect(goal).toContain('1/2 criteria met')
+    expect(goal).toContain('DECISION: APPROVED')
+    expect(goal).toContain('DECISION: CHANGES_REQUESTED')
+    expect(goal).toContain('Operator note')
+  })
+
+  it('handles items with no plan file path or criteria gracefully', () => {
+    const project = {
+      id: 'project-1',
+      name: 'Mission Control Demo',
+      slug: 'mission-control-demo',
+      repoPath: '/repos/mission-control-demo',
+      phaseProfiles: { research: '', build: '', review: '', deploy: '' },
+      reviewAutoApproval: { enabled: false, maxPriority: 'medium' as const },
+      createdAt: '2026-04-25T13:00:00Z',
+      updatedAt: '2026-04-25T13:00:00Z',
+    }
+    const workItem = {
+      id: 'work-item-2',
+      projectId: 'project-1',
+      title: 'No plan item',
+      description: '',
+      status: 'active' as const,
+      phase: 'build' as const,
+      priority: 'medium' as const,
+      riskLevel: 'low' as const,
+      repoPathSnapshot: '/repos/mission-control-demo',
+      acceptanceCriteria: [],
+      criteriaStatus: [],
+      notes: [],
+      sessionKeys: [],
+      artifactPaths: [],
+      history: [],
+      createdAt: '2026-04-25T13:00:00Z',
+      updatedAt: '2026-04-25T13:00:00Z',
+    }
+
+    const goal = buildPlannerReviewGoal(workItem, project)
+
+    expect(goal).toContain('no plan file recorded')
+    expect(goal).toContain('none recorded')
+    expect(goal).toContain('No criteria status tracked')
   })
 })

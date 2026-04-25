@@ -37,6 +37,12 @@ export type WorkItemStatus = 'inbox' | 'ready' | 'active' | 'blocked' | 'done' |
 export type WorkItemPhase = 'research' | 'build' | 'review' | 'deploy'
 export type WorkItemPriority = 'high' | 'medium' | 'low'
 export type WorkItemRiskLevel = 'low' | 'medium' | 'high'
+export type WorkItemBlockedReason =
+  | 'mission_failed'
+  | 'review_feedback'
+  | 'blocked_by_dependency'
+  | 'external'
+  | 'other'
 
 export type WorkItemCriterionStatus = {
   text: string
@@ -52,6 +58,7 @@ export type WorkItemRecord = {
   phase?: WorkItemPhase
   priority: WorkItemPriority
   riskLevel: WorkItemRiskLevel
+  blockedReason?: WorkItemBlockedReason
   assignedProfile?: string
   repoPathSnapshot: string
   missionId?: string
@@ -120,6 +127,7 @@ export type CreateWorkItemInput = {
   phase?: WorkItemPhase
   priority?: WorkItemPriority
   riskLevel?: WorkItemRiskLevel
+  blockedReason?: WorkItemBlockedReason
   assignedProfile?: string
   repoPathSnapshot?: string
   missionId?: string
@@ -292,4 +300,12 @@ export const WORK_ITEM_RISK_LEVEL_LABELS: Record<WorkItemRiskLevel, string> = {
   low: 'Low Risk',
   medium: 'Medium Risk',
   high: 'High Risk',
+}
+
+export const WORK_ITEM_BLOCKED_REASON_LABELS: Record<WorkItemBlockedReason, string> = {
+  mission_failed: 'Mission failed',
+  review_feedback: 'Review feedback',
+  blocked_by_dependency: 'Blocked by dependency',
+  external: 'External',
+  other: 'Other',
 }

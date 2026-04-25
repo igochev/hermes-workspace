@@ -337,12 +337,143 @@ Grounded updates from the lifecycle completeness slice:
   - cancel with reason succeeds (`200`)
   - cancel without reason fails with validation (`400`)
 
-### Updated next priority
-1. **Slice F — Lifecycle completeness** ✅ shipped (cancel + backward transitions + lifecycle API validation hardening)
-2. **Slice G — Acceptance criteria verification** ✅ shipped (criteriaStatus model + detail check-off + progress + PATCH partial-update hardening)
-3. **Planner-as-Reviewer** — after two-phase pipeline is stable, Planner reviews Builder's output against the plan it wrote
-4. **Route-level fallback envelope** — consider returning a non-fatal `executionSyncWarning` payload from `/api/work-items/:id`
-5. **Slice H — WIP awareness + blocked taxonomy** — WIP thresholds + structured blocked reason signals
+### 2026-04-25 Slice H1/H2 completion snapshot (shipped)
+
+Grounded updates from WIP awareness + blocked-reason taxonomy slices:
+
+**Flow control + WIP awareness:**
+- Added WIP threshold helpers in `src/lib/projects-view-model.ts` (`PROJECT_ACTIVE_WIP_WARNING_THRESHOLD=3`, `isProjectWipHigh`, `buildProjectWipHint`).
+- Surfaced `WIP high` warning badge + launch-pressure hint on project detail board (`src/screens/projects/project-detail-screen.tsx`).
+
+**Blocked taxonomy + actionable guidance:**
+- Added structured taxonomy (`mission_failed | review_feedback | blocked_by_dependency | external | other`) across:
+  - `src/lib/projects-api.ts`
+  - `src/server/work-items-store.ts`
+  - `src/routes/api/work-items.ts`
+  - `src/routes/api/work-items.$workItemId.ts`
+  - `src/server/work-item-execution.ts`
+- Added reason-aware board/detail surfaces and guidance in:
+  - `src/screens/projects/project-detail-screen.tsx`
+  - `src/screens/projects/work-item-detail-screen.tsx`
+
+**Verification:**
+- Targeted tests: `58/58` passing
+- Full regression: `124/124` passing
+- `pnpm build` clean
+- `systemctl --user restart hermes-workspace.service` + `is-active` -> `active`
+- Live verification on `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906` confirmed:
+  - WIP warning rendered when active count exceeded threshold
+  - blocked-reason label/guidance rendered on work-item detail
+- Temporary live verification mutation on demo work item was restored (`status=active`, `phase=build`, `blockedReason=null`).
+
+### 2026-04-25 Slice I1 completion snapshot (shipped)
+
+Grounded updates from deploy rejection return-to-build slice:
+
+**Approval transition fix:**
+- Updated deploy approval resolution so both `rejected` and `changes_requested` decisions now transition work item to `status=active`, `phase=build`.
+- Added explicit correction-loop history notes in `src/server/work-item-approvals.ts`:
+  - `Deploy rejected; returned work item to build for correction and relaunch.`
+  - `Deploy requested changes; returned work item to build for correction and relaunch.`
+
+**Verification:**
+- Targeted tests:
+  - `pnpm test src/server/work-item-approvals.test.ts src/server/work-item-lifecycle.test.ts src/screens/projects/work-item-detail-screen.test.ts`
+  - `40/40` passing
+- Full regression: `126/126` passing
+- `pnpm build` clean
+- `systemctl --user restart hermes-workspace.service` + `is-active` -> `active`
+- Live API verification on target project:
+  - Created temporary deploy-phase work item
+  - Requested deploy approval then resolved as `rejected`
+  - Verified result `status=active`, `phase=build` with correction-loop history note
+  - Deleted temporary verification work item
+
+### 2026-04-25 Slice I2 completion snapshot (shipped)
+
+Grounded updates from route-level execution sync fallback envelope:
+
+**Route/API fallback:**
+- Updated `src/routes/api/work-items.$workItemId.ts` so `GET ?syncExecution=true` no longer returns 500 for recoverable sync failures.
+- When sync throws, route now returns HTTP 200 with base payload and:
+  - `executionSyncWarning: string`
+
+**UI warning surfacing:**
+- Added warning contract in `src/screens/projects/work-item-detail-screen.tsx`:
+  - `WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE`
+  - `getWorkItemExecutionSyncWarningMessage(...)`
+- Added warning banner + warning toast path while keeping work-item detail usable.
+
+**Verification:**
+- Targeted tests:
+  - `pnpm test src/server/work-item-execution.test.ts src/server/work-item-detail-route.test.ts src/screens/projects/work-item-detail-screen.test.ts`
+  - `16/16` passing
+- Full regression: `128/128` passing
+- `pnpm build` clean
+- `systemctl --user restart hermes-workspace.service` + `is-active` -> `active`
+- Live API verification on target project:
+  - created temporary work item
+  - called `GET /api/work-items/:id?syncExecution=true`
+  - verified HTTP 200 payload remained usable
+  - deleted temporary verification work item
+
+### 2026-04-25 Slice J completion snapshot (shipped)
+
+Grounded updates from the Planner-as-Reviewer autonomous quality gate:
+
+**Planner review mission launch:**
+- When `syncWorkItemExecutionState` detects build->review transition for work items with `planFilePath`, a Planner review Conductor mission is launched automatically.
+- `buildPlannerReviewGoal()` produces a structured prompt with plan path, acceptance criteria, per-criterion status, and explicit `DECISION: APPROVED` / `DECISION: CHANGES_REQUESTED` instruction.
+- `launchPlannerReview()` fires the mission using the resolved `planner` profile.
+
+**Auto-resolution on review completion:**
+- During subsequent execution sync cycles, when the work item is in `active/review` phase with a `reviewJobId`:
+  - Review job `succeeded` → approval auto-resolved as `approved`, work item advances to `active/deploy` with history entry.
+  - Review job `failed` → approval auto-resolved as `changes_requested`, work item returns to `active/build` with error context.
+
+**Data model additions:**
+- `reviewJobId?: string`, `reviewState?: WorkItemReviewState`, `reviewDecision?: WorkItemReviewDecision` added to `WorkItemRecord`, `CreateWorkItemInput`, and `normalizeWorkItem`.
+
+**PATCH route support:**
+- `planFilePath`, `reviewJobId`, `reviewState`, `reviewDecision` now accepted in PATCH `/api/work-items/:id`.
+
+**UI additions:**
+- Planner Review Status section in Mission Control Summary panel on work-item detail.
+- `reviewDecisionLabel()` helper for user-facing decision copy.
+
+**Verification:**
+- New tests: `buildPlannerReviewGoal` (2), `reviewDecisionLabel` (1)
+- Full regression: `131/131` passing (`pnpm test`)
+- `pnpm build` clean
+- `systemctl --user restart hermes-workspace.service` + `is-active` -> `active`
+- Live API verification on target project confirmed `reviewJobId`/`reviewState`/`reviewDecision` round-trip and `syncExecution` return.
+
+### 2026-04-25 Slice K completion snapshot (shipped)
+
+Grounded updates from the notification watchdog slice:
+
+**Digest generator:**
+- `src/server/work-item-notification-digest.ts` with `buildStatusDigest()` — aggregates pending review/deploy approvals, blocked items, and failed missions across all projects.
+- File-based de-dup using SHA-256 hash of canonical state (`digestStateHasChanged()` / `persistDigestHash()`).
+- `formatDigestForDiscord()` — structured Discord-ready output with emoji-coded sections (⏳ pending, 🚧 blocked, ❌ failed) and age indicators.
+- `formatDigestAge()` — human-readable duration.
+
+**API endpoint:**
+- `GET /api/work-item-notification-digest` — returns full JSON digest + `hasChanged` + pre-formatted Discord message.
+- `GET ?format=discord` — returns only the formatted message for direct cron delivery.
+
+**Verification:**
+- 7 new tests in `work-item-notification-digest.test.ts`
+- Full regression: `138/138` passing
+- `pnpm build` clean, service restarted and active
+- Live API verification confirmed digest returns correct pending approval data with `hasChanged=true`
+
+### Updated next priority (Dream Mission Control queue)
+1. **Slice K — notification watchdog** — ✅ **SHIPPED** (status digest, de-dup, Discord-formatted output)
+2. **Slice L — labels + lightweight analytics** — cross-cutting categorization and throughput/blocked visibility
+
+Detailed implementation slices and acceptance criteria are tracked in:
+- `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
 
 ---
 

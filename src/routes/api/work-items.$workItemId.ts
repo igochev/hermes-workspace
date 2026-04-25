@@ -10,6 +10,7 @@ import {
   type WorkItemPhase,
   type WorkItemPriority,
   type WorkItemRiskLevel,
+  type WorkItemBlockedReason,
   type WorkItemStatus,
 } from '../../server/work-items-store'
 
@@ -48,6 +49,16 @@ function isWorkItemRiskLevel(value: unknown): value is WorkItemRiskLevel {
   return value === 'low' || value === 'medium' || value === 'high'
 }
 
+function isWorkItemBlockedReason(value: unknown): value is WorkItemBlockedReason {
+  return (
+    value === 'mission_failed' ||
+    value === 'review_feedback' ||
+    value === 'blocked_by_dependency' ||
+    value === 'external' ||
+    value === 'other'
+  )
+}
+
 function buildWorkItemPayload(workItemId: string) {
   const workItem = getWorkItem(workItemId)
   if (!workItem) return null
@@ -81,10 +92,13 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
               execution: result.execution,
             })
           } catch (error) {
-            return jsonResponse(
-              { error: error instanceof Error ? error.message : 'Failed to sync work item execution' },
-              500,
-            )
+            const payload = buildWorkItemPayload(params.workItemId)
+            if (!payload) return jsonResponse({ error: 'Work item not found' }, 404)
+            return jsonResponse({
+              ...payload,
+              executionSyncWarning:
+                error instanceof Error ? error.message : 'Failed to sync work item execution',
+            })
           }
         }
 
@@ -107,6 +121,11 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
             ...(isWorkItemPhase(body.phase) ? { phase: body.phase } : {}),
             ...(isWorkItemPriority(body.priority) ? { priority: body.priority } : {}),
             ...(isWorkItemRiskLevel(body.riskLevel) ? { riskLevel: body.riskLevel } : {}),
+            ...(body.blockedReason === null
+              ? { blockedReason: undefined }
+              : isWorkItemBlockedReason(body.blockedReason)
+                ? { blockedReason: body.blockedReason }
+                : {}),
             ...(body.assignedProfile === null || typeof body.assignedProfile === 'string'
               ? { assignedProfile: (body.assignedProfile as string | null) ?? undefined }
               : {}),
@@ -163,6 +182,22 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
               ? {
                   notes: body.notes.filter((value): value is string => typeof value === 'string'),
                 }
+              : {}),
+            ...(body.planFilePath === null || typeof body.planFilePath === 'string'
+              ? { planFilePath: (body.planFilePath as string | null) ?? undefined }
+              : {}),
+            ...(body.reviewJobId === null || typeof body.reviewJobId === 'string'
+              ? { reviewJobId: (body.reviewJobId as string | null) ?? undefined }
+              : {}),
+            ...(body.reviewState === 'scheduled' ||
+              body.reviewState === 'running' ||
+              body.reviewState === 'succeeded' ||
+              body.reviewState === 'failed' ||
+              body.reviewState === 'unknown'
+              ? { reviewState: body.reviewState }
+              : {}),
+            ...(body.reviewDecision === 'approved' || body.reviewDecision === 'changes_requested'
+              ? { reviewDecision: body.reviewDecision }
               : {}),
           }
 

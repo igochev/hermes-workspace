@@ -92,6 +92,36 @@ describe('work-items-store', () => {
     expect(lowRisk.riskLevel).toBe('low')
   })
 
+  it('normalizes blocked reason taxonomy and preserves explicit values', () => {
+    const withReason = createWorkItem({
+      projectId: 'project-blocked',
+      title: 'Blocked by dependency',
+      status: 'blocked',
+      phase: 'build',
+      blockedReason: 'blocked_by_dependency',
+      repoPathSnapshot: '/repos/blocked',
+    })
+
+    expect(withReason.blockedReason).toBe('blocked_by_dependency')
+
+    const updated = updateWorkItem(withReason.id, {
+      blockedReason: 'external',
+    })
+
+    expect(updated?.blockedReason).toBe('external')
+
+    const normalizedFallback = createWorkItem({
+      projectId: 'project-blocked',
+      title: 'Blocked fallback',
+      status: 'blocked',
+      phase: 'build',
+      blockedReason: 'invalid_reason' as never,
+      repoPathSnapshot: '/repos/blocked',
+    })
+
+    expect(normalizedFallback.blockedReason).toBe('other')
+  })
+
   it('tracks per-criterion status and re-aligns status when criteria change', () => {
     const workItem = createWorkItem({
       projectId: 'project-criteria',

@@ -336,11 +336,11 @@ function approvalResolutionTransition(
 
   return {
     status: 'active',
-    phase: 'deploy',
+    phase: 'build',
     note:
       decision === 'rejected'
-        ? 'Deploy rejected; kept work item in deploy for follow-up and relaunch.'
-        : 'Deploy requested changes; kept work item in deploy for follow-up and relaunch.',
+        ? 'Deploy rejected; returned work item to build for correction and relaunch.'
+        : 'Deploy requested changes; returned work item to build for correction and relaunch.',
   }
 }
 

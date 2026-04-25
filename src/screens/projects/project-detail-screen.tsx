@@ -22,6 +22,7 @@ import {
   type PhaseProfiles,
   type ReviewAutoApprovalPolicy,
   type WorkItemRiskLevel,
+  WORK_ITEM_BLOCKED_REASON_LABELS,
   WORK_ITEM_PHASE_LABELS,
   WORK_ITEM_PRIORITY_LABELS,
   WORK_ITEM_RISK_LEVEL_LABELS,
@@ -30,11 +31,14 @@ import {
 import {
   PROJECT_STATUS_ORDER,
   PROJECT_BOARD_FLOW_ORDER,
+  PROJECT_ACTIVE_WIP_WARNING_THRESHOLD,
   buildProjectBoardUrgencySummary,
+  buildProjectWipHint,
   buildWorkItemOperatorSignals,
   buildWorkItemRecoveryHint,
   filterWorkItemsForProjectBoard,
   getWorkItemUrgencyTone,
+  isProjectWipHigh,
   sortWorkItemsForProjectBoard,
   type ProjectBoardFilter,
   type ProjectBoardUrgencySummary,
@@ -94,6 +98,8 @@ export const PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL = 'Workflow Policy'
 export const PROJECT_WORKFLOW_POLICY_PANEL_TITLE = 'Project Workflow Policy'
 export const PROJECT_WORKFLOW_POLICY_SAVE_LABEL = 'Save Workflow Policy'
 export const PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING = 'Deploy governance'
+export const PROJECT_WIP_WARNING_BADGE_LABEL = 'WIP high'
+export const PROJECT_WIP_WARNING_LAUNCH_HINT = 'WIP is high; finish one active item first.'
 export const PROJECT_ROUTING_POLICY_EMPTY_VALUE = 'Auto fallback'
 export const PROJECT_ROUTING_PRECEDENCE_LABELS = [
   '1. Work item override',
@@ -274,6 +280,15 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
     () => buildProjectDeployGovernanceSummary(projectRouting),
     [projectRouting],
   )
+  const activeWorkItemCount = useMemo(
+    () => workItems.filter((item) => item.status === 'active').length,
+    [workItems],
+  )
+  const projectWipLaunchHint = useMemo(
+    () => buildProjectWipHint(activeWorkItemCount, PROJECT_ACTIVE_WIP_WARNING_THRESHOLD),
+    [activeWorkItemCount],
+  )
+  const projectHasHighWip = isProjectWipHigh(activeWorkItemCount, PROJECT_ACTIVE_WIP_WARNING_THRESHOLD)
   const workItemsByStatus = useMemo(() => {
     const filteredWorkItems = filterWorkItemsForProjectBoard(workItems, boardFilter)
     return PROJECT_STATUS_ORDER.map((status) => ({
@@ -474,8 +489,21 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
             <MetricCard label="Repo Path" value={project.repoPath} />
             <MetricCard label="Repo URL" value={project.repoUrl || '—'} />
             <MetricCard label="Default Branch" value={project.defaultBranch || '—'} />
-            <MetricCard label="Work Items" value={`${project.workItemCount}`} />
+            <MetricCard
+              label="Work Items"
+              value={`${project.workItemCount}`}
+              hint={projectWipLaunchHint ?? undefined}
+            />
           </div>
+
+          {projectHasHighWip && projectWipLaunchHint ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              <span className="rounded-full border border-amber-500/40 bg-amber-500/20 px-2 py-0.5 font-semibold uppercase tracking-wide">
+                {PROJECT_WIP_WARNING_BADGE_LABEL}
+              </span>
+              <span>{projectWipLaunchHint}</span>
+            </div>
+          ) : null}
 
           {showProjectRouting ? (
             <div className="mt-5 space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4">
@@ -908,6 +936,9 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                               <Tag>{WORK_ITEM_PRIORITY_LABELS[item.priority]}</Tag>
                               <Tag>{WORK_ITEM_RISK_LEVEL_LABELS[item.riskLevel]}</Tag>
                               {item.assignedProfile ? <Tag>{item.assignedProfile}</Tag> : null}
+                              {item.blockedReason ? (
+                                <Tag>{WORK_ITEM_BLOCKED_REASON_LABELS[item.blockedReason]}</Tag>
+                              ) : null}
                               {buildWorkItemOperatorSignals(item).map((signal) => (
                                 <span key={signal} className={PROJECT_BOARD_SIGNAL_CHIP_CLASS}>
                                   {signal}

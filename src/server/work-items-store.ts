@@ -7,6 +7,12 @@ export type WorkItemStatus = 'inbox' | 'ready' | 'active' | 'blocked' | 'done' |
 export type WorkItemPhase = 'research' | 'build' | 'review' | 'deploy'
 export type WorkItemPriority = 'high' | 'medium' | 'low'
 export type WorkItemRiskLevel = 'low' | 'medium' | 'high'
+export type WorkItemBlockedReason =
+  | 'mission_failed'
+  | 'review_feedback'
+  | 'blocked_by_dependency'
+  | 'external'
+  | 'other'
 
 export type WorkItemHistoryEntry = {
   id: string
@@ -22,6 +28,8 @@ export type WorkItemHistoryEntry = {
 }
 
 export type WorkItemMissionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
+export type WorkItemReviewState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
+export type WorkItemReviewDecision = 'approved' | 'changes_requested'
 
 export type WorkItemCriterionStatus = {
   text: string
@@ -37,6 +45,7 @@ export type WorkItemRecord = {
   phase?: WorkItemPhase
   priority: WorkItemPriority
   riskLevel: WorkItemRiskLevel
+  blockedReason?: WorkItemBlockedReason
   assignedProfile?: string
   repoPathSnapshot: string
   planFilePath?: string
@@ -48,6 +57,9 @@ export type WorkItemRecord = {
   missionState?: WorkItemMissionState
   missionLastRunAt?: string
   missionLastError?: string
+  reviewJobId?: string
+  reviewState?: WorkItemReviewState
+  reviewDecision?: WorkItemReviewDecision
   sessionKeys: Array<string>
   branchName?: string
   prUrl?: string
@@ -73,9 +85,13 @@ type CreateWorkItemInput = {
   phase?: WorkItemPhase
   priority?: WorkItemPriority
   riskLevel?: WorkItemRiskLevel
+  blockedReason?: WorkItemBlockedReason
   assignedProfile?: string
   repoPathSnapshot: string
   planFilePath?: string
+  reviewJobId?: string
+  reviewState?: WorkItemReviewState
+  reviewDecision?: WorkItemReviewDecision
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -213,6 +229,24 @@ function normalizeRiskLevel(value: unknown): WorkItemRiskLevel {
   return value === 'low' || value === 'high' ? value : 'medium'
 }
 
+function normalizeBlockedReason(value: unknown): WorkItemBlockedReason | undefined {
+  if (
+    value === 'mission_failed' ||
+    value === 'review_feedback' ||
+    value === 'blocked_by_dependency' ||
+    value === 'external' ||
+    value === 'other'
+  ) {
+    return value
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return 'other'
+  }
+
+  return undefined
+}
+
 function asHistoryArray(value: unknown): Array<WorkItemHistoryEntry> {
   return Array.isArray(value)
     ? value
@@ -258,9 +292,23 @@ function normalizeWorkItem(
     phase: normalizePhase(workItem.phase),
     priority: normalizePriority(workItem.priority),
     riskLevel: normalizeRiskLevel(workItem.riskLevel),
+    blockedReason: normalizeBlockedReason((workItem as Partial<WorkItemRecord>).blockedReason),
     assignedProfile: asOptionalString(workItem.assignedProfile),
     repoPathSnapshot: workItem.repoPathSnapshot.trim(),
     planFilePath: asOptionalString((workItem as Partial<WorkItemRecord>).planFilePath),
+    reviewJobId: asOptionalString((workItem as Partial<WorkItemRecord>).reviewJobId),
+    reviewState:
+      (workItem as Partial<WorkItemRecord>).reviewState === 'scheduled' ||
+      (workItem as Partial<WorkItemRecord>).reviewState === 'running' ||
+      (workItem as Partial<WorkItemRecord>).reviewState === 'succeeded' ||
+      (workItem as Partial<WorkItemRecord>).reviewState === 'failed' ||
+      (workItem as Partial<WorkItemRecord>).reviewState === 'unknown'
+        ? (workItem as Partial<WorkItemRecord>).reviewState
+        : undefined,
+    reviewDecision: (workItem as Partial<WorkItemRecord>).reviewDecision === 'approved' ||
+      (workItem as Partial<WorkItemRecord>).reviewDecision === 'changes_requested'
+      ? (workItem as Partial<WorkItemRecord>).reviewDecision
+      : undefined,
     missionId: asOptionalString(workItem.missionId),
     missionJobId: asOptionalString((workItem as Partial<WorkItemRecord>).missionJobId),
     missionJobName: asOptionalString((workItem as Partial<WorkItemRecord>).missionJobName),
@@ -319,6 +367,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     phase: input.phase,
     priority: input.priority,
     riskLevel: input.riskLevel,
+    blockedReason: input.blockedReason,
     assignedProfile: input.assignedProfile,
     repoPathSnapshot: input.repoPathSnapshot,
     missionId: input.missionId,

@@ -416,14 +416,105 @@ These are the grounded slice states after live QA and diff inspection on 2026-04
   - per-criterion toggle updates API state and progress (`0/2 -> 1/2`)
   - criteria preserved after toggle-only PATCH
 
+### Slice H1/H2 — WIP awareness + blocked-reason taxonomy (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- Added WIP awareness helpers + threshold in `src/lib/projects-view-model.ts`:
+  - `PROJECT_ACTIVE_WIP_WARNING_THRESHOLD = 3`
+  - `isProjectWipHigh(...)`
+  - `buildProjectWipHint(...)`
+- Added project-level WIP warning rendering in `src/screens/projects/project-detail-screen.tsx`:
+  - `WIP high` badge + launch-pressure hint
+  - WIP hint attached to Work Items metric card
+- Added blocked-reason taxonomy (`mission_failed | review_feedback | blocked_by_dependency | external | other`) across API/store/lifecycle/execution:
+  - `src/lib/projects-api.ts`
+  - `src/server/work-items-store.ts`
+  - `src/routes/api/work-items.ts`
+  - `src/routes/api/work-items.$workItemId.ts`
+  - `src/server/work-item-execution.ts`
+- Added blocked-reason board/detail UX in:
+  - `src/screens/projects/project-detail-screen.tsx` (reason chip on cards)
+  - `src/screens/projects/work-item-detail-screen.tsx` (Blocked reason + reason-specific guidance)
+- Temporary live verification mutation was restored after verification:
+  - demo work item `23e75c5f-29e7-49bf-8098-49687ee14a7b` returned to `status=active`, `phase=build`, `blockedReason=null`
+
+**Verification:**
+- Targeted tests: `58/58` passing
+- Full regression: `124/124` passing (`pnpm test`)
+- `pnpm build` clean
+- `systemctl --user restart hermes-workspace.service` / `is-active` -> `active`
+- Live verification at `http://localhost:3456/projects/46b401f9-9243-472f-b5b7-04bf34596906` confirmed WIP warning and blocked-reason surfaces
+
+### Slice I1 — deploy rejection returns to build (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- Updated deploy approval resolution logic in `src/server/work-item-approvals.ts`.
+- `deploy` approvals now transition as:
+  - `approved` -> `status=done`, `phase=undefined`
+  - `rejected` -> `status=active`, `phase=build`
+  - `changes_requested` -> `status=active`, `phase=build`
+- Added explicit correction-loop history notes:
+  - `Deploy rejected; returned work item to build for correction and relaunch.`
+  - `Deploy requested changes; returned work item to build for correction and relaunch.`
+- Added test-first coverage in `src/server/work-item-approvals.test.ts` for both deploy rejection variants.
+
+**Verification:**
+- Targeted tests:
+  - `pnpm test src/server/work-item-approvals.test.ts src/server/work-item-lifecycle.test.ts src/screens/projects/work-item-detail-screen.test.ts`
+  - `40/40` passing
+- Full regression: `126/126` passing (`pnpm test`)
+- `pnpm build` clean
+- `systemctl --user restart hermes-workspace.service` / `is-active` -> `active`
+- Live API verification on target project created a temporary deploy-phase item, requested deploy approval, resolved as `rejected`, and confirmed `active/build` + correction-loop history note (temporary item removed).
+
+### Slice I2 — sync fallback envelope (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- Updated `src/routes/api/work-items.$workItemId.ts` so `GET ?syncExecution=true` returns base payload + `executionSyncWarning` when sync throws, instead of HTTP 500.
+- Added route-level regression coverage in `src/server/work-item-detail-route.test.ts`.
+- Updated work-item detail warning surface in `src/screens/projects/work-item-detail-screen.tsx`:
+  - `WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE`
+  - `getWorkItemExecutionSyncWarningMessage(...)`
+  - warning banner while keeping page usable.
+- Added helper assertions in `src/screens/projects/work-item-detail-screen.test.ts`.
+
+**Verification:**
+- Targeted tests: `16/16` passing
+- Full regression: `128/128` passing
+- `pnpm build` clean, service restarted and active
+- Live API verification confirmed HTTP 200 fallback with `executionSyncWarning`
+
+### Slice J — Planner-as-Reviewer (shipped 2026-04-25)
+**Status:** complete and live-verified.
+
+**Grounded status:**
+- Autonomous Planner review pass triggers after build->review transition for work items with `planFilePath` (two-phase pipeline).
+- `buildPlannerReviewGoal()` generates structured review prompt with plan path, acceptance criteria, per-criterion status, and explicit decision instruction.
+- `launchPlannerReview()` fires a Conductor mission using the resolved `planner` profile.
+- `syncWorkItemExecutionState` launches the review mission on build->review and auto-resolves the pending approval when the review job completes:
+  - review job `succeeded` → approval `approved`, item advances to `active/deploy`
+  - review job `failed` → approval `changes_requested`, item returns to `active/build`
+- Data model additions: `reviewJobId`, `reviewState`, `reviewDecision` on `WorkItemRecord`.
+- PATCH route supports all review fields.
+- UI: Planner Review Status section in Mission Control Summary panel, `reviewDecisionLabel()` helper.
+
+**Verification:**
+- New tests: 2 (`buildPlannerReviewGoal`) + 1 (`reviewDecisionLabel`)
+- Full regression: `131/131` passing
+- `pnpm build` clean, service restarted and active
+- Live API verification confirmed `reviewJobId`/`reviewState`/`reviewDecision` round-trip and `syncExecution` return
+
 ### Next practical priority
-Slice A (phase routing rewire), Slice B (two-phase orchestration), **Slice C (risk level field)**, **Slice E (riskLevel automation)**, **Slice F (lifecycle completeness)**, and **Slice G (acceptance criteria verification)** are complete. The immediate queue is:
-1. **Planner-as-Reviewer** (future, after two-phase pipeline is stable)
-   - Planner reviews Builder's output against the plan it wrote
-2. **Route-level fallback envelope for syncExecution edge failures**
-   - Consider returning a non-fatal `executionSyncWarning` payload from `/api/work-items/:id`
-3. **Slice H — WIP awareness + blocked taxonomy**
-   - WIP thresholds + structured blocked reason signals on board/detail
+Slice A (phase routing rewire), Slice B (two-phase orchestration), **Slice C (risk level field)**, **Slice E (riskLevel automation)**, **Slice F (lifecycle completeness)**, **Slice G (acceptance criteria verification)**, **Slice H1/H2 (WIP + blocked taxonomy)**, **Slice I1 (deploy rejection return-to-build)**, **Slice I2 (sync fallback envelope)**, **Slice J (Planner-as-Reviewer)**, and **Slice K (Notification watchdog)** are complete. The immediate queue is:
+1. **Slice K — notification watchdog** — ✅ **SHIPPED** (status digest, de-dup, Discord-formatted output)
+2. **Slice L — labels/analytics**
+   - cross-cutting categorization + lightweight throughput/blocked insights
+
+Detailed execution breakdown is tracked in:
+- `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
 
 ---
 
@@ -479,6 +570,7 @@ These matter because the next slice should extend them rather than fight them:
   - review approval → `active/deploy`
   - deploy approval → `done`
   - review changes/rejected → `active/build` relaunch posture
+  - deploy changes/rejected → `active/build` correction + relaunch posture
 
 ---
 
@@ -527,9 +619,9 @@ When resuming this project in a new or compacted chat:
 4. read `docs/plans/2026-04-25-hermes-workspace-profiles-workflow-rearchitecture.md` for the current architecture
 5. re-check the current slice status in section 4 before choosing work; do not assume older slice ordering is still current
 6. if no reprioritization is given, continue from the current section 4 immediate queue:
-   - **Planner-as-Reviewer**
-   - **Route-level fallback envelope for syncExecution edge failures**
-   - **Slice H — WIP awareness + blocked taxonomy**
+   - **Slice K — notification watchdog** — ✅ shipped
+   - **Slice L — labels/analytics**
+   - use `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md` as the execution checklist
 7. keep using the inspect → tests → patch → targeted tests → build → restart → live verify workflow
 
 ---
@@ -554,8 +646,9 @@ See `docs/plans/2026-04-25-hermes-workspace-profiles-workflow-rearchitecture.md`
 
 The next meaningful evolutions are:
 
-1. **Planner-as-Reviewer** — Planner reviews Builder's output against the plan it wrote
-2. **Route-level fallback envelope for syncExecution edge failures** — non-fatal `executionSyncWarning` payload candidate
-3. **Slice H — WIP awareness + blocked taxonomy** — WIP thresholds + structured blocked reason signals
+1. **Slice L — labels/analytics** — cross-cutting categorization and lightweight throughput/blocked visibility
+
+Detailed execution order and file-level scope:
+- `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
 
 If resuming later, continue from the above document.

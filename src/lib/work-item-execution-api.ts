@@ -25,7 +25,8 @@ export type WorkItemExecutionPayload = {
     approvals?: Array<Record<string, unknown>>
   }
   project: Record<string, unknown> | null
-  execution: {
+  executionSyncWarning?: string
+  execution?: {
     state: WorkItemExecutionState
     job: {
       id: string

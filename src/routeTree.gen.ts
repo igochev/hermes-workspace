@@ -33,6 +33,7 @@ import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projec
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiWorkItemsRouteImport } from './routes/api/work-items'
+import { Route as ApiWorkItemNotificationDigestRouteImport } from './routes/api/work-item-notification-digest'
 import { Route as ApiWorkItemApprovalsRouteImport } from './routes/api/work-item-approvals'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
@@ -231,6 +232,12 @@ const ApiWorkItemsRoute = ApiWorkItemsRouteImport.update({
   path: '/api/work-items',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkItemNotificationDigestRoute =
+  ApiWorkItemNotificationDigestRouteImport.update({
+    id: '/api/work-item-notification-digest',
+    path: '/api/work-item-notification-digest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiWorkItemApprovalsRoute = ApiWorkItemApprovalsRouteImport.update({
   id: '/api/work-item-approvals',
   path: '/api/work-item-approvals',
@@ -676,6 +683,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
+  '/api/work-item-notification-digest': typeof ApiWorkItemNotificationDigestRoute
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -777,6 +785,7 @@ export interface FileRoutesByTo {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
+  '/api/work-item-notification-digest': typeof ApiWorkItemNotificationDigestRoute
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -880,6 +889,7 @@ export interface FileRoutesById {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
+  '/api/work-item-notification-digest': typeof ApiWorkItemNotificationDigestRoute
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -985,6 +995,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/work-item-approvals'
+    | '/api/work-item-notification-digest'
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -1086,6 +1097,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/work-item-approvals'
+    | '/api/work-item-notification-digest'
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -1188,6 +1200,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/work-item-approvals'
+    | '/api/work-item-notification-digest'
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -1292,6 +1305,7 @@ export interface RootRouteChildren {
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiWorkItemApprovalsRoute: typeof ApiWorkItemApprovalsRouteWithChildren
+  ApiWorkItemNotificationDigestRoute: typeof ApiWorkItemNotificationDigestRoute
   ApiWorkItemsRoute: typeof ApiWorkItemsRouteWithChildren
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
@@ -1485,6 +1499,13 @@ declare module '@tanstack/react-router' {
       path: '/api/work-items'
       fullPath: '/api/work-items'
       preLoaderRoute: typeof ApiWorkItemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-item-notification-digest': {
+      id: '/api/work-item-notification-digest'
+      path: '/api/work-item-notification-digest'
+      fullPath: '/api/work-item-notification-digest'
+      preLoaderRoute: typeof ApiWorkItemNotificationDigestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/work-item-approvals': {
@@ -2256,6 +2277,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiWorkItemApprovalsRoute: ApiWorkItemApprovalsRouteWithChildren,
+  ApiWorkItemNotificationDigestRoute: ApiWorkItemNotificationDigestRoute,
   ApiWorkItemsRoute: ApiWorkItemsRouteWithChildren,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,

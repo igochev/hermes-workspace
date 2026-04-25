@@ -18,6 +18,8 @@ import {
   PROJECT_WORKFLOW_POLICY_SAVE_LABEL,
   PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL,
   PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING,
+  PROJECT_WIP_WARNING_BADGE_LABEL,
+  PROJECT_WIP_WARNING_LAUNCH_HINT,
   buildProjectDeployGovernanceSummary,
   PROJECT_URGENCY_SUMMARY_FILTERS,
   PROJECT_URGENCY_SUMMARY_LABELS,
@@ -114,6 +116,8 @@ describe('project detail screen board constants', () => {
     expect(PROJECT_WORKFLOW_POLICY_PANEL_TITLE).toBe('Project Workflow Policy')
     expect(PROJECT_WORKFLOW_POLICY_SAVE_LABEL).toBe('Save Workflow Policy')
     expect(PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING).toBe('Deploy governance')
+    expect(PROJECT_WIP_WARNING_BADGE_LABEL).toBe('WIP high')
+    expect(PROJECT_WIP_WARNING_LAUNCH_HINT).toBe('WIP is high; finish one active item first.')
     expect(PROJECT_ROUTING_POLICY_EMPTY_VALUE).toBe('Auto fallback')
     expect(PROJECT_ROUTING_PRECEDENCE_LABELS).toEqual([
       '1. Work item override',

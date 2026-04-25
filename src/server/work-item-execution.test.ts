@@ -165,6 +165,7 @@ describe('work-item-execution', () => {
     expect(result.workItem.missionJobName).toBe('work-item-build-demo')
     expect(result.workItem.missionState).toBe('failed')
     expect(result.workItem.missionLastError).toBe('Worker failed verification')
+    expect(result.workItem.blockedReason).toBe('mission_failed')
     expect(result.workItem.history.at(-1)).toMatchObject({
       action: 'status-change',
       status: 'blocked',

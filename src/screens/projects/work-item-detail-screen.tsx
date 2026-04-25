@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -16,8 +16,10 @@ import {
   deleteWorkItem,
   updateWorkItem,
   type WorkItemApprovalDecision,
+  type WorkItemBlockedReason,
   type WorkItemCriterionStatus,
   type WorkItemRiskLevel,
+  WORK_ITEM_BLOCKED_REASON_LABELS,
   WORK_ITEM_PHASE_LABELS,
   WORK_ITEM_PRIORITY_LABELS,
   WORK_ITEM_RISK_LEVEL_LABELS,
@@ -40,6 +42,43 @@ export const WORK_ITEM_DETAIL_ACCEPTANCE_CRITERIA_HELP_TEXT =
   'Planning can draft or refine acceptance criteria here before build execution.'
 export const WORK_ITEM_DETAIL_NOTES_HELP_TEXT =
   'Capture planning output, operator guidance, or open questions as one note per line.'
+export const WORK_ITEM_BLOCKED_REASON_FIELD_LABEL = 'Blocked reason'
+export const WORK_ITEM_BLOCKED_REASON_HELP_TEXT =
+  'Classify why this work item is blocked so board triage and recovery guidance stay actionable.'
+export const WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL = 'Open Conductor'
+export const WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE = 'Execution sync warning'
+
+export function getWorkItemExecutionSyncWarningMessage(warning?: string): string | null {
+  if (!warning || warning.trim().length === 0) return null
+  return `Execution data may be stale: ${warning.trim()}`
+}
+
+export function getWorkItemBlockedReasonGuidance(
+  blockedReason?: WorkItemBlockedReason,
+): string {
+  if (!blockedReason) {
+    return 'Select a blocked reason when status is Blocked to keep triage and recovery hints precise.'
+  }
+
+  if (blockedReason === 'mission_failed') {
+    return 'Mission failed — capture the failing run details, record fix notes, then resume build and relaunch.'
+  }
+  if (blockedReason === 'review_feedback') {
+    return 'review feedback is blocking progress — capture requested changes and route back to build after updates.'
+  }
+  if (blockedReason === 'blocked_by_dependency') {
+    return 'A dependency is blocking this item — track the upstream owner/status and relaunch once unblocked.'
+  }
+  if (blockedReason === 'external') {
+    return 'An external dependency is blocking this item — record the external owner/timeline for follow-up.'
+  }
+
+  return 'Document the blocker in notes so the next operator can resume with clear context.'
+}
+
+export function buildWorkItemConductorHref(workItemId: string): string {
+  return `/conductor?mode=work-item&id=${encodeURIComponent(workItemId)}`
+}
 
 export type WorkItemDetailLifecycleAction =
   | 'send_to_planning'
@@ -107,13 +146,14 @@ export function getWorkItemOperatorGuidance(state: {
   phase: 'research' | 'build' | 'review' | 'deploy' | undefined
   missionState?: 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
   riskLevel?: 'low' | 'medium' | 'high'
+  blockedReason?: WorkItemBlockedReason
   acceptanceCriteriaProgress?: { metCount: number; totalCount: number }
 }): string {
   if (state.status === 'blocked' && state.phase === 'build' && state.missionState === 'failed') {
     return 'This work item is blocked by a failed build mission. Capture fixes, run Resume Build, and relaunch Build to continue delivery.'
   }
   if (state.status === 'blocked') {
-    return 'This work item is blocked. Review the latest error or approval feedback, then update notes before relaunching.'
+    return getWorkItemBlockedReasonGuidance(state.blockedReason)
   }
   if (state.status === 'inbox' && state.phase === 'research') {
     return 'Capture the request, send it to planning, and launch Researcher when you want a grounded plan.'
@@ -221,6 +261,12 @@ export function getWorkItemLifecycleActionLabel(action: WorkItemDetailLifecycleA
   return 'Resume Build'
 }
 
+export function reviewDecisionLabel(decision: string): string {
+  if (decision === 'approved') return '✅ Approved — advance to deploy'
+  if (decision === 'changes_requested') return '🔧 Changes Requested — return to build'
+  return decision || '—'
+}
+
 export function getAvailableWorkItemLifecycleActions(state: {
   status: 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
   phase: 'research' | 'build' | 'review' | 'deploy' | undefined
@@ -281,12 +327,15 @@ export function WorkItemDetailScreen({
       queryClient.setQueryData(queryKey, {
         workItem: result.workItem,
         project: result.project,
+        execution: result.execution,
+        executionSyncWarning: result.executionSyncWarning,
       })
       await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      if (result.executionSyncWarning) return
       toast(
-        result.execution.transitionApplied
+        result.execution?.transitionApplied
           ? `Execution synced: ${result.execution.transitionApplied}`
-          : `Execution synced: ${result.execution.state}`,
+          : `Execution synced: ${result.execution?.state ?? 'unknown'}`,
       )
     },
     onError: (error) => {
@@ -443,6 +492,9 @@ export function WorkItemDetailScreen({
   const workItem = payload?.workItem ?? null
   const project = payload?.project ?? null
   const execution = payload?.execution ?? syncMutation.data?.execution ?? null
+  const executionSyncWarning = getWorkItemExecutionSyncWarningMessage(
+    payload?.executionSyncWarning ?? syncMutation.data?.executionSyncWarning,
+  )
   const [isEditingPlanningDetails, setIsEditingPlanningDetails] = useState(false)
   const [acceptanceCriteriaDraft, setAcceptanceCriteriaDraft] = useState('')
   const [notesDraft, setNotesDraft] = useState('')
@@ -469,6 +521,7 @@ export function WorkItemDetailScreen({
         phase: workItem.phase,
         missionState: workItem.missionState,
         riskLevel: workItem.riskLevel,
+        blockedReason: workItem.blockedReason,
         acceptanceCriteriaProgress,
       })
     : ''
@@ -477,6 +530,11 @@ export function WorkItemDetailScreen({
     latestRunStatus: execution?.latestRun?.status ?? null,
   })
   const approvalSummary = getWorkItemApprovalSummary(workItem?.approvals ?? [])
+
+  useEffect(() => {
+    if (!executionSyncWarning) return
+    toast(executionSyncWarning, { type: 'warning' })
+  }, [executionSyncWarning])
 
   if (workItemQuery.isLoading) {
     return (
@@ -510,6 +568,12 @@ export function WorkItemDetailScreen({
   return (
     <div className="min-h-full bg-surface text-ink">
       <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+        {executionSyncWarning ? (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            <div className="font-semibold">{WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE}</div>
+            <div className="mt-1">{executionSyncWarning}</div>
+          </div>
+        ) : null}
         <header className={WORK_ITEM_DETAIL_HEADER_CLASS}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-3 min-w-0">
@@ -647,6 +711,12 @@ export function WorkItemDetailScreen({
                     <HugeiconsIcon icon={PlayIcon} size={14} />
                     {launchMutation.isPending ? 'Launching…' : primaryLaunchLabel}
                   </button>
+                  <a
+                    href={buildWorkItemConductorHref(workItem.id)}
+                    className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]/80"
+                  >
+                    {WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL}
+                  </a>
                 </div>
               </div>
 
@@ -690,9 +760,30 @@ export function WorkItemDetailScreen({
                 <Detail label="Mission State" value={workItem.missionState || 'unknown'} />
                 <Detail label="Mission Last Run" value={workItem.missionLastRunAt || '—'} />
                 <Detail label="Mission Last Error" value={workItem.missionLastError || '—'} />
+                <Detail
+                  label={WORK_ITEM_BLOCKED_REASON_FIELD_LABEL}
+                  value={
+                    workItem.blockedReason
+                      ? WORK_ITEM_BLOCKED_REASON_LABELS[workItem.blockedReason]
+                      : '—'
+                  }
+                />
+                <Detail label="Blocked guidance" value={getWorkItemBlockedReasonGuidance(workItem.blockedReason)} />
                 <Detail label="Assigned Profile" value={workItem.assignedProfile || '—'} />
                 <Detail label="Risk Level" value={WORK_ITEM_RISK_LEVEL_LABELS[workItem.riskLevel]} />
                 <Detail label="Plan File Path" value={workItem.planFilePath || '—'} />
+                {workItem.reviewJobId ? (
+                  <>
+                    <Detail label="Planner Review Job" value={workItem.reviewJobId} />
+                    <Detail label="Planner Review State" value={workItem.reviewState || 'scheduled'} />
+                    {workItem.reviewDecision ? (
+                      <Detail
+                        label="Planner Review Decision"
+                        value={reviewDecisionLabel(workItem.reviewDecision)}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
                 <Detail label="Launch Sessions" value={workItem.sessionKeys.join(', ') || '—'} />
                 <Detail label="Created" value={workItem.createdAt} />
                 <Detail label="Updated" value={workItem.updatedAt} />

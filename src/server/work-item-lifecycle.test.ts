@@ -174,6 +174,7 @@ describe('work-item-lifecycle', () => {
       status: 'blocked',
       phase: 'build',
       priority: 'high',
+      blockedReason: 'mission_failed',
       repoPathSnapshot: project.repoPath,
       missionState: 'failed',
       missionLastError: 'Build failed on test suite',
@@ -187,6 +188,7 @@ describe('work-item-lifecycle', () => {
 
     expect(result.workItem.status).toBe('active')
     expect(result.workItem.phase).toBe('build')
+    expect(result.workItem.blockedReason).toBe('mission_failed')
     expect(result.workItem.missionState).toBe('unknown')
     expect(result.workItem.missionLastError).toBeUndefined()
     expect(result.workItem.history.at(-1)).toMatchObject({

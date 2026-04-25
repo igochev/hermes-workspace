@@ -27,6 +27,24 @@ export const PROJECT_BOARD_FLOW_ORDER: Array<WorkItemStatus> = [
 
 export const PROJECT_STATUS_ORDER = PROJECT_BOARD_FLOW_ORDER
 
+export const PROJECT_ACTIVE_WIP_WARNING_THRESHOLD = 3
+
+export function isProjectWipHigh(
+  activeCount: number,
+  threshold: number = PROJECT_ACTIVE_WIP_WARNING_THRESHOLD,
+): boolean {
+  return activeCount >= threshold
+}
+
+export function buildProjectWipHint(
+  activeCount: number,
+  threshold: number = PROJECT_ACTIVE_WIP_WARNING_THRESHOLD,
+): string | null {
+  return isProjectWipHigh(activeCount, threshold)
+    ? 'WIP is high; finish one active item first.'
+    : null
+}
+
 const PRIORITY_RANK: Record<WorkItemPriority, number> = {
   high: 0,
   medium: 1,
