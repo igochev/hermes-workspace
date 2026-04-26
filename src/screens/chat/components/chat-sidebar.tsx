@@ -53,6 +53,7 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { StatusDot } from '@/components/status-indicator'
+import type { SessionEventsRefreshStatus } from '@/screens/chat/hooks/use-session-events-refresh'
 import {
   MenuContent,
   MenuItem,
@@ -122,9 +123,39 @@ type ChatSidebarProps = {
   sessionsFetching: boolean
   sessionsError: string | null
   onRetrySessions: () => void
+  sessionRefreshStatus?: SessionEventsRefreshStatus
 }
 
+export function SessionFreshnessBadge({
+  status,
+}: {
+  status: SessionEventsRefreshStatus
+}) {
+  const labelByStatus: Record<SessionEventsRefreshStatus, string> = {
+    live: 'Live',
+    reconnecting: 'Reconnecting',
+    polling: 'Polling',
+  }
+  const dotClassByStatus: Record<SessionEventsRefreshStatus, string> = {
+    live: 'bg-emerald-400',
+    reconnecting: 'bg-amber-400',
+    polling: 'bg-sky-400',
+  }
 
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-primary-200/60 bg-primary-100/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-600 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-300"
+      aria-label={`Session refresh: ${labelByStatus[status]}`}
+      title={`Session refresh: ${labelByStatus[status]}`}
+    >
+      <span
+        aria-hidden="true"
+        className={cn('size-1.5 rounded-full', dotClassByStatus[status])}
+      />
+      <span>{labelByStatus[status]}</span>
+    </span>
+  )
+}
 
 // ── Reusable nav item ───────────────────────────────────────────────────
 
@@ -503,6 +534,7 @@ function ChatSidebarComponent({
   sessionsFetching,
   sessionsError,
   onRetrySessions,
+  sessionRefreshStatus,
 }: ChatSidebarProps) {
   const {
     settingsOpen,
@@ -885,16 +917,21 @@ function ChatSidebarComponent({
               exit={{ opacity: 0 }}
               transition={transition}
             >
-              <Link
-                to="/chat"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'sm' }),
-                  'w-full pl-1.5 justify-start gap-2',
-                )}
-              >
-                <img src="/hermes-avatar.webp" alt="Hermes" className="size-6 rounded-lg" />
-                <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--theme-text)' }}>Hermes Workspace</span>
-              </Link>
+              <div className="flex items-center gap-1 pr-10">
+                <Link
+                  to="/chat"
+                  className={cn(
+                    buttonVariants({ variant: 'ghost', size: 'sm' }),
+                    'min-w-0 flex-1 pl-1.5 justify-start gap-2',
+                  )}
+                >
+                  <img src="/hermes-avatar.webp" alt="Hermes" className="size-6 rounded-lg" />
+                  <span className="truncate text-sm font-semibold tracking-tight" style={{ color: 'var(--theme-text)' }}>Hermes Workspace</span>
+                </Link>
+                {sessionRefreshStatus ? (
+                  <SessionFreshnessBadge status={sessionRefreshStatus} />
+                ) : null}
+              </div>
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -1198,7 +1235,7 @@ function areSessionsEqual(
   return true
 }
 
-function areSidebarPropsEqual(
+export function areSidebarPropsEqual(
   prevProps: ChatSidebarProps,
   nextProps: ChatSidebarProps,
 ): boolean {
@@ -1209,6 +1246,8 @@ function areSidebarPropsEqual(
   if (prevProps.sessionsFetching !== nextProps.sessionsFetching) return false
   if (prevProps.sessionsError !== nextProps.sessionsError) return false
   if (prevProps.onRetrySessions !== nextProps.onRetrySessions) return false
+  if (prevProps.sessionRefreshStatus !== nextProps.sessionRefreshStatus)
+    return false
   if (!areSessionsEqual(prevProps.sessions, nextProps.sessions)) return false
   return true
 }

@@ -334,6 +334,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 sessionsFetching={sessionsFetching}
                 sessionsError={sessionsError}
                 onRetrySessions={refetchSessions}
+                sessionRefreshStatus={sessionEventsRefresh.status}
               />
             </div>
           )}
