@@ -60,6 +60,7 @@ export type WorkItemStatus = 'inbox' | 'ready' | 'active' | 'blocked' | 'done' |
 export type WorkItemPhase = 'research' | 'build' | 'review' | 'deploy'
 export type WorkItemPriority = 'high' | 'medium' | 'low'
 export type WorkItemRiskLevel = 'low' | 'medium' | 'high'
+export type WorkItemAutopilotBuildIntent = 'build-after-accepted-plan'
 export type WorkItemBlockedReason =
   | 'mission_failed'
   | 'review_feedback'
@@ -133,6 +134,7 @@ export type WorkItemRecord = {
   sourceSuggestionId?: string
   sourceSuggestionTitle?: string
   sourceSuggestionEvidence: Array<string>
+  autopilotBuildIntent?: WorkItemAutopilotBuildIntent
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -218,6 +220,7 @@ export type CreateWorkItemInput = {
   sourceSuggestionId?: string
   sourceSuggestionTitle?: string
   sourceSuggestionEvidence?: Array<string>
+  autopilotBuildIntent?: WorkItemAutopilotBuildIntent
   missionId?: string
   missionLink?: string
   sessionKeys?: Array<string>

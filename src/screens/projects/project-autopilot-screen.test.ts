@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY,
   PROJECT_AUTOPILOT_SAFETY_COPY,
   PROJECT_AUTOPILOT_SCHEDULE_OPTIONS,
   PROJECT_AUTOPILOT_SCOUT_SOURCES,
@@ -26,5 +27,11 @@ describe('project autopilot screen constants', () => {
     expect(PROJECT_AUTOPILOT_SCOUT_SOURCES).toContain('stale-docs-scout')
     expect(PROJECT_AUTOPILOT_SCOUT_SOURCES).toContain('architecture-debt-scout')
     expect(PROJECT_AUTOPILOT_SAVE_BUTTON_LABEL).toBe('Save Autopilot Schedule')
+  })
+
+  it('summarizes delegation policy and safety boundary for project autopilot', () => {
+    expect(PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY).toContain('Convert + Plan')
+    expect(PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY).toContain('accepted planner draft')
+    expect(PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY).toContain('No code is launched')
   })
 })

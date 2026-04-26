@@ -4,8 +4,12 @@ import {
   AUTOPILOT_SUGGESTION_ACTION_LABELS,
   AUTOPILOT_SUGGESTION_CONVERT_BUTTON_LABEL,
   AUTOPILOT_SUGGESTIONS_EMPTY_COPY,
+  AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUILD_BUTTON_LABEL,
+  AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUTTON_LABEL,
+  AUTOPILOT_SUGGESTION_DELEGATION_SAFETY_COPY,
   AUTOPILOT_SUGGESTIONS_FILTER_OPTIONS,
   AUTOPILOT_SUGGESTIONS_QUERY_KEY,
+  applyAutopilotSuggestionFilters,
 } from './autopilot-suggestions-screen'
 import {
   AUTOPILOT_SUGGESTION_EFFORT_LABELS,
@@ -46,5 +50,56 @@ describe('autopilot suggestions screen constants', () => {
     expect(AUTOPILOT_SUGGESTION_RISK_LABELS.low).toBe('Low risk')
     expect(AUTOPILOT_SUGGESTION_EFFORT_LABELS.large).toBe('Large effort')
     expect(AUTOPILOT_SUGGESTION_SOURCE_LABELS['failing-tests-scout']).toBe('Failing tests scout')
+  })
+
+  it('filters suggestions by status, project, source, and impact or risk', () => {
+    const baseSuggestion = {
+      id: 'suggestion-1',
+      projectId: 'project-a',
+      title: 'Improve tests',
+      rationale: 'CI evidence',
+      evidence: ['CI retry rate'],
+      suggestedAcceptanceCriteria: ['Add guardrails'],
+      impact: 'high' as const,
+      risk: 'low' as const,
+      effort: 'small' as const,
+      labels: ['ci'],
+      source: 'failing-tests-scout' as const,
+      status: 'new' as const,
+      createdAt: '2026-04-26T00:00:00.000Z',
+      updatedAt: '2026-04-26T00:00:00.000Z',
+    }
+    const suggestions = [
+      baseSuggestion,
+      {
+        ...baseSuggestion,
+        id: 'suggestion-2',
+        projectId: 'project-b',
+        source: 'stale-docs-scout' as const,
+        impact: 'low' as const,
+        risk: 'high' as const,
+        status: 'accepted' as const,
+      },
+    ]
+
+    expect(applyAutopilotSuggestionFilters(suggestions, { status: 'new' }).map((item) => item.id)).toEqual([
+      'suggestion-1',
+    ])
+    expect(applyAutopilotSuggestionFilters(suggestions, { projectId: 'project-b' }).map((item) => item.id)).toEqual([
+      'suggestion-2',
+    ])
+    expect(
+      applyAutopilotSuggestionFilters(suggestions, { source: 'failing-tests-scout', impact: 'high', risk: 'low' }).map(
+        (item) => item.id,
+      ),
+    ).toEqual(['suggestion-1'])
+  })
+
+  it('defines delegation action labels and safety copy for policy-gated conversion', () => {
+    expect(AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUTTON_LABEL).toBe('Convert + Plan')
+    expect(AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUILD_BUTTON_LABEL).toBe('Convert + Plan + Build Queued')
+    expect(AUTOPILOT_SUGGESTION_DELEGATION_SAFETY_COPY).toContain(
+      'No code is launched until policy/operator conditions are met.',
+    )
   })
 })

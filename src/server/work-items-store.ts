@@ -30,6 +30,7 @@ export type WorkItemHistoryEntry = {
 export type WorkItemMissionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 export type WorkItemReviewState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 export type WorkItemReviewDecision = 'approved' | 'changes_requested' | 'manual_review'
+export type WorkItemAutopilotBuildIntent = 'build-after-accepted-plan'
 
 export type WorkItemStructuredReviewDecision = 'approved' | 'changes_requested' | 'manual_review'
 export type WorkItemReviewQualityGateStatus = 'pass' | 'fail' | 'manual_review'
@@ -56,6 +57,7 @@ export type WorkItemRecord = {
   sourceSuggestionId?: string
   sourceSuggestionTitle?: string
   sourceSuggestionEvidence: Array<string>
+  autopilotBuildIntent?: WorkItemAutopilotBuildIntent
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -107,6 +109,7 @@ type CreateWorkItemInput = {
   sourceSuggestionId?: string
   sourceSuggestionTitle?: string
   sourceSuggestionEvidence?: Array<string>
+  autopilotBuildIntent?: WorkItemAutopilotBuildIntent
   reviewJobId?: string
   reviewState?: WorkItemReviewState
   reviewDecision?: WorkItemReviewDecision
@@ -329,6 +332,10 @@ function normalizeWorkItem(
     sourceSuggestionEvidence: asStringArray(
       (workItem as Partial<WorkItemRecord>).sourceSuggestionEvidence,
     ),
+    autopilotBuildIntent:
+      (workItem as Partial<WorkItemRecord>).autopilotBuildIntent === 'build-after-accepted-plan'
+        ? (workItem as Partial<WorkItemRecord>).autopilotBuildIntent
+        : undefined,
     reviewJobId: asOptionalString((workItem as Partial<WorkItemRecord>).reviewJobId),
     reviewState:
       (workItem as Partial<WorkItemRecord>).reviewState === 'scheduled' ||
@@ -430,6 +437,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     sourceSuggestionId: input.sourceSuggestionId,
     sourceSuggestionTitle: input.sourceSuggestionTitle,
     sourceSuggestionEvidence: input.sourceSuggestionEvidence,
+    autopilotBuildIntent: input.autopilotBuildIntent,
     reviewJobId: input.reviewJobId,
     reviewState: input.reviewState,
     reviewDecision: input.reviewDecision,

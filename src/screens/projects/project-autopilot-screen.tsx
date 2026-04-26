@@ -17,6 +17,8 @@ import { fetchProject } from '@/lib/projects-api'
 
 export const PROJECT_AUTOPILOT_SAFETY_COPY =
   'Autopilot is suggestions only — no direct code changes, commits, branches, PRs, or automatic work-item creation.'
+export const PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY =
+  'Delegation policy: Convert + Plan may request Planner enrichment; Build Queued waits for an accepted planner draft. No code is launched until policy/operator conditions are met.'
 export const PROJECT_AUTOPILOT_SAVE_BUTTON_LABEL = 'Save Autopilot Schedule'
 export const PROJECT_AUTOPILOT_SCHEDULE_OPTIONS = [
   ['manual', 'Manual'],
@@ -113,6 +115,9 @@ export function ProjectAutopilotScreen({ projectId }: { projectId: string }) {
           </Link>
           <h1 className="mt-2 text-2xl font-medium text-ink">{projectName} — Autopilot</h1>
           <p className="mt-2 text-sm text-[var(--theme-muted)]">{PROJECT_AUTOPILOT_SAFETY_COPY}</p>
+          <p className="mt-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-xs text-[var(--theme-text)]">
+            {PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY}
+          </p>
         </header>
 
         <section className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-sm">
@@ -219,6 +224,7 @@ export function ProjectAutopilotScreen({ projectId }: { projectId: string }) {
                 <li key={suggestion.id} className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
                   <p className="text-sm font-medium text-ink">{suggestion.title}</p>
                   <p className="mt-1 text-xs text-[var(--theme-muted)]">{suggestion.status} • {suggestion.source}</p>
+                  <p className="mt-1 text-xs text-[var(--theme-text)]">Convert + Plan is available from the global suggestions inbox.</p>
                 </li>
               ))}
             </ul>

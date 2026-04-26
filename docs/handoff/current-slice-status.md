@@ -23,6 +23,9 @@
 - Slice X/Y Task 6 — Full slice verification and live smoke ✅
 - Slice Z/AA Task 1 — Pure Autopilot delegation recommendation helper/tests (`src/server/autopilot-delegation-policy.ts`, `src/server/autopilot-delegation-policy.test.ts`) ✅
 - Slice Z/AA Task 2 — Work-item source suggestion provenance persisted through conversion/create/update (`src/server/work-items-store.ts`, `src/server/work-items-store.test.ts`, `src/lib/projects-api.ts`, `src/routes/api/autopilot-suggestions.$suggestionId.convert.ts`, `src/server/autopilot-suggestions-routes.test.ts`) ✅
+- Slice Z/AA Task 3 — Convert + Plan route/action reuses Planner request path, returns planning draft identifiers, and records policy-gated post-plan build intent without launching build (`src/routes/api/autopilot-suggestions.$suggestionId.convert.ts`, `src/lib/autopilot-suggestions-api.ts`, `src/server/autopilot-suggestions-routes.test.ts`) ✅
+- Slice Z/AA Task 4 — Real state-backed suggestions filters for status/project/source/impact/risk (`src/screens/projects/autopilot-suggestions-screen.tsx`, `src/screens/projects/autopilot-suggestions-screen.test.ts`) ✅
+- Slice Z/AA Task 5 — Delegation recommendation metadata/copy and Convert/Convert+Plan/Convert+Plan+Build Queued UI actions (`src/screens/projects/autopilot-suggestions-screen.tsx`, `src/screens/projects/project-autopilot-screen.tsx`, related tests) ✅
 
 ## Current State
 
@@ -44,10 +47,13 @@
 - Prettier note: `pnpm exec prettier --check` still reports existing style issues in large legacy `src/screens/chat/components/chat-sidebar.tsx`; broad formatting was intentionally avoided to keep the diff merge-safe.
 - Slice Z/AA Task 1 RED confirmed with missing `autopilot-delegation-policy` module; Task 2 RED confirmed with missing source suggestion provenance on work items/conversion.
 - Slice Z/AA Tasks 1-2 verification: `pnpm test src/server/autopilot-delegation-policy.test.ts src/server/work-items-store.test.ts src/server/autopilot-suggestions-routes.test.ts` passes (14/14); `pnpm build` passes with existing Vite sourcemap/dynamic-import/chunk-size warnings.
+- Slice Z/AA Task 3 RED confirmed with route returning inbox work item/no planning draft for planning modes; Task 4 RED confirmed missing `applyAutopilotSuggestionFilters`; Task 5 RED confirmed missing delegation action/copy constants.
+- Slice Z/AA Tasks 3-5 implementation notes: Convert+Plan now calls existing `prepareWorkItemWithPlanner` path; build-queued mode sets `autopilotBuildIntent: 'build-after-accepted-plan'` only and does not launch Builder/code; suggestion cards show helper-derived recommended action, confidence, evidence quality, risk warning/operator copy; filters are state-backed.
+- Slice Z/AA Tasks 3-5 verification: focused `pnpm test src/server/autopilot-suggestions-routes.test.ts src/screens/projects/autopilot-suggestions-screen.test.ts src/screens/projects/project-autopilot-screen.test.ts src/server/autopilot-delegation-policy.test.ts src/server/work-item-planning.test.ts` passes (26/26); full `pnpm vitest run` passes (313/313); `pnpm build` passes with existing Vite sourcemap/dynamic-import/chunk-size warnings.
 
 ## Next Steps
 
-**Next:** Builder should implement Slice Z/AA Task 3 from `docs/plans/2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` (Convert + Plan route/action).
+**Next:** Builder should run Slice Z/AA Task 6 verification/live smoke from `docs/plans/2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` (service restart, API/UI smoke, Convert + Plan smoke), then point handoff to Slice AB/AC if clean.
 
 ## Notes
 

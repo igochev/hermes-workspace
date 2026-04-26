@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/components/ui/toast'
+import { recommendAutopilotDelegationAction } from '@/server/autopilot-delegation-policy'
 import { fetchProjects } from '@/lib/projects-api'
 import {
   acceptAutopilotSuggestion,
@@ -15,7 +17,10 @@ import {
   convertAutopilotSuggestion,
   fetchAutopilotSuggestions,
   rejectAutopilotSuggestion,
+  type AutopilotSuggestionImpact,
   type AutopilotSuggestionRecord,
+  type AutopilotSuggestionRisk,
+  type AutopilotSuggestionSource,
   type AutopilotSuggestionStatus,
 } from '@/lib/autopilot-suggestions-api'
 
@@ -23,6 +28,10 @@ export const AUTOPILOT_SUGGESTIONS_QUERY_KEY = ['mission-control', 'autopilot-su
 export const AUTOPILOT_SUGGESTIONS_EMPTY_COPY =
   'No autopilot suggestions yet. Run a scout or create a manual suggestion to seed the inbox.'
 export const AUTOPILOT_SUGGESTION_CONVERT_BUTTON_LABEL = 'Convert to Work Item'
+export const AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUTTON_LABEL = 'Convert + Plan'
+export const AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUILD_BUTTON_LABEL = 'Convert + Plan + Build Queued'
+export const AUTOPILOT_SUGGESTION_DELEGATION_SAFETY_COPY =
+  'No code is launched until policy/operator conditions are met.'
 export const AUTOPILOT_SUGGESTION_ACTION_LABELS = {
   accept: 'Accept',
   reject: 'Reject',
@@ -39,8 +48,58 @@ export const AUTOPILOT_SUGGESTIONS_FILTER_OPTIONS: Array<{
   { value: 'archived', label: 'Archived' },
 ]
 
+
+export const AUTOPILOT_SUGGESTIONS_SOURCE_FILTER_OPTIONS = Object.entries(
+  AUTOPILOT_SUGGESTION_SOURCE_LABELS,
+).map(([value, label]) => ({ value: value as AutopilotSuggestionSource, label }))
+
+export const AUTOPILOT_SUGGESTIONS_IMPACT_FILTER_OPTIONS = Object.entries(
+  AUTOPILOT_SUGGESTION_IMPACT_LABELS,
+).map(([value, label]) => ({ value: value as AutopilotSuggestionImpact, label }))
+
+export const AUTOPILOT_SUGGESTIONS_RISK_FILTER_OPTIONS = Object.entries(
+  AUTOPILOT_SUGGESTION_RISK_LABELS,
+).map(([value, label]) => ({ value: value as AutopilotSuggestionRisk, label }))
+
+export type AutopilotSuggestionFilters = {
+  status?: AutopilotSuggestionStatus | 'all'
+  projectId?: string | 'all'
+  source?: AutopilotSuggestionSource | 'all'
+  impact?: AutopilotSuggestionImpact | 'all'
+  risk?: AutopilotSuggestionRisk | 'all'
+}
+
+export function applyAutopilotSuggestionFilters(
+  suggestions: Array<AutopilotSuggestionRecord>,
+  filters: AutopilotSuggestionFilters,
+): Array<AutopilotSuggestionRecord> {
+  return suggestions.filter((suggestion) => {
+    if (filters.status && filters.status !== 'all' && suggestion.status !== filters.status) return false
+    if (filters.projectId && filters.projectId !== 'all' && suggestion.projectId !== filters.projectId) return false
+    if (filters.source && filters.source !== 'all' && suggestion.source !== filters.source) return false
+    if (filters.impact && filters.impact !== 'all' && suggestion.impact !== filters.impact) return false
+    if (filters.risk && filters.risk !== 'all' && suggestion.risk !== filters.risk) return false
+    return true
+  })
+}
+
+function formatRecommendedAction(action: ReturnType<typeof recommendAutopilotDelegationAction>['recommendedAction']): string {
+  if (action === 'work-item') return 'Convert to Work Item'
+  if (action === 'work-item-and-plan') return 'Convert + Plan'
+  if (action === 'work-item-plan-build-queued') return 'Convert + Plan + Build Queued'
+  return 'Manual review before planning'
+}
+
+
 export function AutopilotSuggestionsScreen() {
   const queryClient = useQueryClient()
+  const [filters, setFilters] = useState<AutopilotSuggestionFilters>({
+    status: 'all',
+    projectId: 'all',
+    source: 'all',
+    impact: 'all',
+    risk: 'all',
+  })
 
   const suggestionsQuery = useQuery({
     queryKey: AUTOPILOT_SUGGESTIONS_QUERY_KEY,
@@ -64,12 +123,14 @@ export function AutopilotSuggestionsScreen() {
       action,
     }: {
       id: string
-      action: 'accept' | 'reject' | 'archive' | 'convert'
+      action: 'accept' | 'reject' | 'archive' | 'convert' | 'convert-plan' | 'convert-plan-build'
     }) => {
       if (action === 'accept') return acceptAutopilotSuggestion(id)
       if (action === 'reject') return rejectAutopilotSuggestion(id, 'Operator triage rejection')
       if (action === 'archive') return archiveAutopilotSuggestion(id)
-      return convertAutopilotSuggestion(id)
+      if (action === 'convert-plan') return convertAutopilotSuggestion(id, 'work-item-and-plan')
+      if (action === 'convert-plan-build') return convertAutopilotSuggestion(id, 'work-item-plan-build-queued')
+      return convertAutopilotSuggestion(id, 'work-item')
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: AUTOPILOT_SUGGESTIONS_QUERY_KEY })
@@ -81,8 +142,9 @@ export function AutopilotSuggestionsScreen() {
     },
   })
 
-  const suggestions = suggestionsQuery.data ?? []
+  const rawSuggestions = suggestionsQuery.data ?? []
   const projects = projectsQuery.data ?? []
+  const suggestions = applyAutopilotSuggestionFilters(rawSuggestions, filters)
   const projectNameById = new Map(projects.map((project) => [project.id, project.name]))
 
   return (
@@ -104,15 +166,37 @@ export function AutopilotSuggestionsScreen() {
               Refresh
             </button>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {AUTOPILOT_SUGGESTIONS_FILTER_OPTIONS.map((option) => (
-              <span
-                key={option.value}
-                className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-1 text-[11px] text-[var(--theme-muted)]"
-              >
-                {option.label}
-              </span>
-            ))}
+          <div className="mt-4 grid gap-3 md:grid-cols-5">
+            <FilterSelect
+              label="Status"
+              value={filters.status ?? 'all'}
+              options={AUTOPILOT_SUGGESTIONS_FILTER_OPTIONS}
+              onChange={(value) => setFilters((current) => ({ ...current, status: value as AutopilotSuggestionStatus | 'all' }))}
+            />
+            <FilterSelect
+              label="Project"
+              value={filters.projectId ?? 'all'}
+              options={projects.map((project) => ({ value: project.id, label: project.name }))}
+              onChange={(value) => setFilters((current) => ({ ...current, projectId: value }))}
+            />
+            <FilterSelect
+              label="Source"
+              value={filters.source ?? 'all'}
+              options={AUTOPILOT_SUGGESTIONS_SOURCE_FILTER_OPTIONS}
+              onChange={(value) => setFilters((current) => ({ ...current, source: value as AutopilotSuggestionSource | 'all' }))}
+            />
+            <FilterSelect
+              label="Impact"
+              value={filters.impact ?? 'all'}
+              options={AUTOPILOT_SUGGESTIONS_IMPACT_FILTER_OPTIONS}
+              onChange={(value) => setFilters((current) => ({ ...current, impact: value as AutopilotSuggestionImpact | 'all' }))}
+            />
+            <FilterSelect
+              label="Risk"
+              value={filters.risk ?? 'all'}
+              options={AUTOPILOT_SUGGESTIONS_RISK_FILTER_OPTIONS}
+              onChange={(value) => setFilters((current) => ({ ...current, risk: value as AutopilotSuggestionRisk | 'all' }))}
+            />
           </div>
         </header>
 
@@ -120,9 +204,13 @@ export function AutopilotSuggestionsScreen() {
           <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 text-sm text-[var(--theme-muted)]">
             Loading suggestions…
           </div>
-        ) : suggestions.length === 0 ? (
+        ) : rawSuggestions.length === 0 ? (
           <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 text-sm text-[var(--theme-muted)]">
             {AUTOPILOT_SUGGESTIONS_EMPTY_COPY}
+          </div>
+        ) : suggestions.length === 0 ? (
+          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 text-sm text-[var(--theme-muted)]">
+            No suggestions match the selected filters.
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
@@ -140,6 +228,8 @@ export function AutopilotSuggestionsScreen() {
                   onReject={() => actionMutation.mutate({ id: suggestion.id, action: 'reject' })}
                   onArchive={() => actionMutation.mutate({ id: suggestion.id, action: 'archive' })}
                   onConvert={() => actionMutation.mutate({ id: suggestion.id, action: 'convert' })}
+                  onConvertPlan={() => actionMutation.mutate({ id: suggestion.id, action: 'convert-plan' })}
+                  onConvertPlanBuild={() => actionMutation.mutate({ id: suggestion.id, action: 'convert-plan-build' })}
                 />
               )
             })}
@@ -147,6 +237,37 @@ export function AutopilotSuggestionsScreen() {
         )}
       </div>
     </div>
+  )
+}
+
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: Array<{ value: string; label: string }>
+  onChange: (value: string | 'all') => void
+}) {
+  return (
+    <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-sm normal-case tracking-normal text-[var(--theme-text)]"
+      >
+        <option value="all">All</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 
@@ -158,6 +279,8 @@ function SuggestionCard({
   onReject,
   onArchive,
   onConvert,
+  onConvertPlan,
+  onConvertPlanBuild,
 }: {
   suggestion: AutopilotSuggestionRecord
   projectName: string
@@ -166,7 +289,13 @@ function SuggestionCard({
   onReject: () => void
   onArchive: () => void
   onConvert: () => void
+  onConvertPlan: () => void
+  onConvertPlanBuild: () => void
 }) {
+  const recommendation = recommendAutopilotDelegationAction(suggestion, {
+    buildAfterAcceptedPlan: true,
+  })
+
   return (
     <article className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -184,6 +313,17 @@ function SuggestionCard({
       <p className="mt-1 text-xs text-[var(--theme-muted)]">
         Source: {AUTOPILOT_SUGGESTION_SOURCE_LABELS[suggestion.source]}
       </p>
+      <div className="mt-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-xs text-[var(--theme-text)]">
+        <p>
+          Recommended: {formatRecommendedAction(recommendation.recommendedAction)} • Confidence:{' '}
+          {recommendation.confidence} • Evidence quality: {recommendation.evidenceQuality}
+        </p>
+        <p className="mt-1 text-[var(--theme-muted)]">{recommendation.operatorCopy}</p>
+        {recommendation.riskWarning ? (
+          <p className="mt-1 text-amber-600">{recommendation.riskWarning}</p>
+        ) : null}
+        <p className="mt-1 text-[var(--theme-muted)]">{AUTOPILOT_SUGGESTION_DELEGATION_SAFETY_COPY}</p>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
@@ -217,6 +357,22 @@ function SuggestionCard({
           className="rounded-full bg-[var(--theme-accent)] px-3 py-1 text-xs text-white"
         >
           {AUTOPILOT_SUGGESTION_CONVERT_BUTTON_LABEL}
+        </button>
+        <button
+          type="button"
+          disabled={actionPending}
+          onClick={onConvertPlan}
+          className="rounded-full bg-[var(--theme-accent)] px-3 py-1 text-xs text-white"
+        >
+          {AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUTTON_LABEL}
+        </button>
+        <button
+          type="button"
+          disabled={actionPending}
+          onClick={onConvertPlanBuild}
+          className="rounded-full border border-[var(--theme-accent)] px-3 py-1 text-xs text-[var(--theme-accent)]"
+        >
+          {AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUILD_BUTTON_LABEL}
         </button>
         <Link
           to="/projects/$projectId"

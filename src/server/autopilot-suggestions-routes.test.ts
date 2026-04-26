@@ -1,13 +1,22 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { launchConductorMission } = vi.hoisted(() => ({
+  launchConductorMission: vi.fn(),
+}))
+
+vi.mock('./conductor-launch', () => ({
+  launchConductorMission,
+}))
 
 import { createProject } from './projects-store'
 import {
   createAutopilotSuggestion,
   getAutopilotSuggestion,
 } from './autopilot-suggestions-store'
+import { getLatestPlanningDraftForWorkItem } from './planning-drafts-store'
 import { getWorkItem } from './work-items-store'
 import { Route as SuggestionsRoute } from '../routes/api/autopilot-suggestions'
 import { Route as ConvertSuggestionRoute } from '../routes/api/autopilot-suggestions.$suggestionId.convert'
@@ -23,6 +32,15 @@ describe('autopilot suggestions routes', () => {
     previousHermesPassword = process.env.HERMES_PASSWORD
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     delete process.env.HERMES_PASSWORD
+    launchConductorMission.mockReset()
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-autopilot-plan_pending',
+      sessionKeyPrefix: 'cron_job-autopilot-plan_',
+      jobId: 'job-autopilot-plan',
+      jobName: 'autopilot-planner',
+      runId: null,
+    })
   })
 
   afterEach(() => {
@@ -150,4 +168,107 @@ describe('autopilot suggestions routes', () => {
     expect(convertedSuggestion?.status).toBe('converted')
     expect(convertedSuggestion?.convertedWorkItemId).toBe(body.workItem.id)
   })
+
+  it('converts suggestion into work item and requested planning draft when mode asks for planning', async () => {
+    const project = createProject({
+      name: 'Mission control',
+      repoPath: '/repos/mission-control',
+    })
+
+    const suggestion = createAutopilotSuggestion({
+      projectId: project.id,
+      title: 'Plan flaky test quarantine lane',
+      rationale: 'Flakes need planner-scoped implementation before coding',
+      evidence: ['CI retry rate 18%'],
+      suggestedAcceptanceCriteria: ['Planner draft is requested before build starts'],
+      impact: 'medium',
+      risk: 'low',
+      effort: 'small',
+      labels: ['ci'],
+      source: 'failing-tests-scout',
+    })
+
+    const response = await ConvertSuggestionRoute.options.server.handlers.POST({
+      request: new Request(
+        `http://127.0.0.1:3456/api/autopilot-suggestions/${suggestion.id}/convert`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'work-item-and-plan' }),
+        },
+      ),
+      params: { suggestionId: suggestion.id },
+    })
+
+    expect(response.status).toBe(201)
+    const body = (await response.json()) as {
+      workItem: { id: string; status: string; phase?: string }
+      planningDraft: { id: string; status: string; workItemId: string; plannerJobId?: string }
+    }
+
+    expect(body.workItem.status).toBe('active')
+    expect(body.workItem.phase).toBe('research')
+    expect(body.planningDraft.status).toBe('running')
+    expect(body.planningDraft.workItemId).toBe(body.workItem.id)
+    expect(body.planningDraft.plannerJobId).toBe('job-autopilot-plan')
+
+    const latestDraft = getLatestPlanningDraftForWorkItem(body.workItem.id)
+    expect(latestDraft?.id).toBe(body.planningDraft.id)
+    expect(launchConductorMission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deliver: 'local',
+        phaseProfiles: expect.objectContaining({ research: expect.any(String) }),
+      }),
+    )
+    expect(getWorkItem(body.workItem.id)?.history.at(-1)?.note).toContain('Planner enrichment requested')
+  })
+
+  it('records policy-gated build intent without launching build when mode queues post-plan build', async () => {
+    const project = createProject({
+      name: 'Mission control',
+      repoPath: '/repos/mission-control',
+    })
+
+    const suggestion = createAutopilotSuggestion({
+      projectId: project.id,
+      title: 'Queue safe docs build after plan',
+      rationale: 'Low risk docs automation still needs accepted plan first',
+      evidence: ['Docs page drift detected'],
+      suggestedAcceptanceCriteria: ['Build waits for accepted planner draft'],
+      impact: 'low',
+      risk: 'low',
+      effort: 'small',
+      labels: ['docs'],
+      source: 'stale-docs-scout',
+    })
+
+    const response = await ConvertSuggestionRoute.options.server.handlers.POST({
+      request: new Request(
+        `http://127.0.0.1:3456/api/autopilot-suggestions/${suggestion.id}/convert`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'work-item-plan-build-queued' }),
+        },
+      ),
+      params: { suggestionId: suggestion.id },
+    })
+
+    expect(response.status).toBe(201)
+    const body = (await response.json()) as {
+      workItem: { id: string; autopilotBuildIntent?: string; missionId?: string; status: string; phase?: string }
+      planningDraft: { id: string; status: string; plannerJobId?: string }
+    }
+
+    expect(body.workItem.status).toBe('active')
+    expect(body.workItem.phase).toBe('research')
+    expect(body.workItem.autopilotBuildIntent).toBe('build-after-accepted-plan')
+    expect(body.workItem.missionId).toBeUndefined()
+    expect(body.planningDraft.status).toBe('running')
+    expect(body.planningDraft.plannerJobId).toBe('job-autopilot-plan')
+    expect(getWorkItem(body.workItem.id)?.notes).toContain(
+      'Autopilot build intent queued: launch build only after an operator accepts the planner draft.',
+    )
+  })
+
 })

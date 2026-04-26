@@ -2,6 +2,11 @@ export type AutopilotSuggestionStatus = 'new' | 'accepted' | 'rejected' | 'conve
 export type AutopilotSuggestionImpact = 'low' | 'medium' | 'high'
 export type AutopilotSuggestionRisk = 'low' | 'medium' | 'high'
 export type AutopilotSuggestionEffort = 'small' | 'medium' | 'large'
+export type AutopilotSuggestionConvertMode =
+  | 'work-item'
+  | 'work-item-and-plan'
+  | 'work-item-plan-build-queued'
+
 export type AutopilotSuggestionSource =
   | 'manual'
   | 'autopilot'
@@ -178,9 +183,12 @@ export async function archiveAutopilotSuggestion(
 
 export async function convertAutopilotSuggestion(
   suggestionId: string,
-): Promise<{ suggestion: AutopilotSuggestionRecord; workItem: { id: string } }> {
+  mode: AutopilotSuggestionConvertMode = 'work-item',
+): Promise<{ suggestion: AutopilotSuggestionRecord; workItem: { id: string }; planningDraft?: { id: string } }> {
   const response = await fetch(`/api/autopilot-suggestions/${encodeURIComponent(suggestionId)}/convert`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
   })
 
   if (!response.ok) {
