@@ -847,4 +847,27 @@ Grounded updates from this session:
   - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
   - Live smoke: `GET /api/attention-queue?refresh=true` → `200 {"items":[]}` on current live data
 
-If resuming later, start from `docs/handoff/current-slice-status.md`; the next task is Slice R/S PR 6 — Dashboard attention surface.
+### 2026-04-26 Slice R/S PR 6 completion snapshot
+
+Grounded updates from this session:
+
+- Added the Dashboard global attention surface:
+  - `src/screens/dashboard/dashboard-screen.tsx`
+  - fetches `GET /api/attention-queue?refresh=true` via `fetchAttentionQueue({ refresh: true })`
+  - renders a `Global attention` card with open count, calm empty state, refresh action, severity badges, critical-first ordering, and project/work-item navigation from persisted attention item `href`s
+- Added RED→GREEN helper coverage in `src/screens/dashboard/dashboard-screen.test.ts`:
+  - attention count/surface construction
+  - critical item renders first
+  - resolved items are excluded
+  - stable work-item/project href exposure
+  - calm empty state copy
+- Verified commands:
+  - RED: `pnpm vitest run src/screens/dashboard/dashboard-screen.test.ts` failed because `buildDashboardAttentionSurface` was missing
+  - GREEN: focused dashboard tests → `5/5`
+  - Adjacent: `pnpm vitest run src/server/attention-queue-store.test.ts src/server/attention-queue.test.ts src/server/attention-queue-routes.test.ts src/server/work-item-supervisor-routes.test.ts src/server/work-item-supervisor.test.ts src/server/execution-runs-routes.test.ts src/server/execution-runs-store.test.ts src/server/work-item-execution.test.ts` plus dashboard focused test → `49/49`
+  - Full: `pnpm vitest run` → `253/253`
+  - Build: `pnpm build` passed with existing Vite chunk/dynamic-import warnings
+  - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
+  - Live smoke: `GET /api/attention-queue?refresh=true` → `200 {"items":[]}` and `GET /dashboard` → `200`
+
+If resuming later, start from `docs/handoff/current-slice-status.md`; the next task is Slice R/S PR 7 — Role capacity store/evaluator.

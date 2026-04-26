@@ -9,6 +9,10 @@ import {
   type WorkItemRecord,
 } from '@/lib/projects-api'
 import {
+  fetchAttentionQueue,
+} from '@/lib/attention-queue-api'
+import type { AttentionKind, AttentionQueueItem } from '@/server/attention-queue-store'
+import {
   fetchApprovalInbox,
   type ApprovalInboxEntry,
 } from '@/lib/work-item-approvals-api'
@@ -51,6 +55,17 @@ type MissionControlQueueEntry = {
   href: string
 }
 
+type DashboardAttentionEntry = MissionControlQueueEntry & {
+  badge: string
+  severity: AttentionQueueItem['severity']
+}
+
+type DashboardAttentionSurface = {
+  count: number
+  items: Array<DashboardAttentionEntry>
+  emptyCopy: string
+}
+
 type MissionControlQueues = {
   approvals: Array<MissionControlQueueEntry>
   failed: Array<MissionControlQueueEntry>
@@ -72,6 +87,23 @@ export const DASHBOARD_MISSION_CONTROL_QUEUE_TITLES: Record<keyof MissionControl
   failed: 'Failed missions',
   blocked: 'Blocked work',
   running: 'Running missions',
+}
+
+const DASHBOARD_ATTENTION_EMPTY_COPY = 'No global attention items right now. Mission Control is calm.'
+
+const ATTENTION_KIND_LABELS: Record<AttentionKind, string> = {
+  approval_pending: 'Approval pending',
+  mission_failed: 'Mission failed',
+  review_failed: 'Review failed',
+  execution_stale: 'Execution stale',
+  blocked_work: 'Blocked work',
+  capacity_exceeded: 'Capacity advisory',
+}
+
+const ATTENTION_SEVERITY_ORDER: Record<AttentionQueueItem['severity'], number> = {
+  critical: 0,
+  warning: 1,
+  info: 2,
 }
 
 function timeAgo(ts: number): string {
@@ -113,6 +145,32 @@ export function buildDashboardMissionControlSummary(
     blockedWorkItems: workItems.filter((workItem) => workItem.status === 'blocked').length,
     failedMissions: workItems.filter((workItem) => workItem.missionState === 'failed').length,
     runningMissions: workItems.filter((workItem) => workItem.missionState === 'running').length,
+  }
+}
+
+export function buildDashboardAttentionSurface(
+  attentionItems: Array<AttentionQueueItem>,
+): DashboardAttentionSurface {
+  const openItems = attentionItems
+    .filter((item) => item.status === 'open')
+    .sort((left, right) => {
+      const severityDelta = ATTENTION_SEVERITY_ORDER[left.severity] - ATTENTION_SEVERITY_ORDER[right.severity]
+      if (severityDelta !== 0) return severityDelta
+      return Date.parse(right.lastSeenAt) - Date.parse(left.lastSeenAt)
+    })
+
+  return {
+    count: openItems.length,
+    emptyCopy: DASHBOARD_ATTENTION_EMPTY_COPY,
+    items: openItems.slice(0, 5).map((item) => ({
+      id: item.id,
+      title: item.title,
+      subtitle: ATTENTION_KIND_LABELS[item.kind],
+      detail: item.detail,
+      href: item.href,
+      badge: item.severity,
+      severity: item.severity,
+    })),
   }
 }
 
@@ -453,6 +511,76 @@ function MissionControlQueueCard({
             >
               <div className="text-sm font-semibold text-ink">{entry.title}</div>
               <div className="mt-1 text-xs font-medium text-[var(--theme-text)]">{entry.subtitle}</div>
+              <div className="mt-1 text-[11px] text-muted">{entry.detail}</div>
+            </button>
+          ))
+        )}
+      </div>
+    </GlassCard>
+  )
+}
+
+function MissionControlAttentionCard({
+  surface,
+  accentColor,
+  onOpenAll,
+  onOpenEntry,
+}: {
+  surface: DashboardAttentionSurface
+  accentColor: string
+  onOpenAll: () => void
+  onOpenEntry: (href: string) => void
+}) {
+  return (
+    <GlassCard
+      title="Global attention"
+      titleRight={
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+            {surface.count} open
+          </span>
+          <button
+            type="button"
+            className="text-[10px] text-muted hover:text-neutral-300 transition-colors"
+            onClick={onOpenAll}
+          >
+            Refresh →
+          </button>
+        </div>
+      }
+      accentColor={accentColor}
+      className="h-full"
+      noPadding
+    >
+      <div className="py-2">
+        {surface.items.length === 0 ? (
+          <div className="px-5 py-10 text-center text-xs text-muted">{surface.emptyCopy}</div>
+        ) : (
+          surface.items.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => onOpenEntry(entry.href)}
+              className="w-full px-5 py-3 text-left transition-colors hover:bg-[var(--theme-card2)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-ink">{entry.title}</div>
+                  <div className="mt-1 text-xs font-medium text-[var(--theme-text)]">{entry.subtitle}</div>
+                </div>
+                <span
+                  className={cn(
+                    'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                    entry.severity === 'critical'
+                      ? 'bg-red-500/15 text-red-300'
+                      : entry.severity === 'warning'
+                        ? 'bg-amber-500/15 text-amber-300'
+                        : 'bg-blue-500/15 text-blue-300',
+                  )}
+                >
+                  {entry.badge}
+                </span>
+              </div>
               <div className="mt-1 text-[11px] text-muted">{entry.detail}</div>
             </button>
           ))
@@ -932,10 +1060,17 @@ export function DashboardScreen() {
     staleTime: 15_000,
     refetchInterval: 30_000,
   })
+  const missionAttentionQuery = useQuery({
+    queryKey: [...DASHBOARD_MISSION_CONTROL_QUERY_KEY, 'attention-queue'],
+    queryFn: () => fetchAttentionQueue({ refresh: true }),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  })
 
   const missionProjects = missionProjectsQuery.data ?? []
   const missionWorkItems = missionWorkItemsQuery.data ?? []
   const missionApprovals = missionApprovalsQuery.data ?? []
+  const missionAttentionItems = missionAttentionQuery.data?.items ?? []
 
   const stats = useMemo(() => {
     let totalMessages = 0,
@@ -980,6 +1115,10 @@ export function DashboardScreen() {
   const missionControlQueues = useMemo(
     () => buildDashboardMissionControlQueues(missionProjects, missionWorkItems, missionApprovals),
     [missionApprovals, missionProjects, missionWorkItems],
+  )
+  const missionAttentionSurface = useMemo(
+    () => buildDashboardAttentionSurface(missionAttentionItems),
+    [missionAttentionItems],
   )
 
   const updateSettings = useSettingsStore((state) => state.updateSettings)
@@ -1135,6 +1274,34 @@ export function DashboardScreen() {
             />
           )
         })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <MissionControlAttentionCard
+          surface={missionAttentionSurface}
+          accentColor={
+            missionAttentionSurface.items.some((item) => item.severity === 'critical')
+              ? palette.danger
+              : palette.warning
+          }
+          onOpenAll={() => void missionAttentionQuery.refetch()}
+          onOpenEntry={(href) => {
+            const workItemMatch = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
+            if (workItemMatch) {
+              navigate({
+                to: '/projects/$projectId/work-items/$workItemId',
+                params: { projectId: workItemMatch[1], workItemId: workItemMatch[2] },
+              })
+              return
+            }
+            const projectMatch = href.match(/^\/projects\/([^/]+)$/)
+            if (projectMatch) {
+              navigate({ to: '/projects/$projectId', params: { projectId: projectMatch[1] } })
+              return
+            }
+            navigate({ to: '/projects' })
+          }}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">

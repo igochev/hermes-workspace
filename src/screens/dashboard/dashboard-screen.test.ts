@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ProjectSummary, WorkItemRecord } from '@/lib/projects-api'
+import type { AttentionQueueItem } from '@/server/attention-queue-store'
 import type { ApprovalInboxEntry } from '@/lib/work-item-approvals-api'
 import {
   DASHBOARD_MISSION_CONTROL_QUERY_KEY,
   DASHBOARD_MISSION_CONTROL_QUEUE_TITLES,
   DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS,
+  buildDashboardAttentionSurface,
   buildDashboardMissionControlQueues,
   buildDashboardMissionControlSummary,
 } from './dashboard-screen'
@@ -180,7 +182,81 @@ describe('dashboard mission control helpers', () => {
       title: 'Implement cockpit updates',
     })
   })
+
+  it('builds a calm dashboard attention surface with critical items first and stable hrefs', () => {
+    const surface = buildDashboardAttentionSurface([
+      makeAttentionItem({
+        id: 'warning-blocked',
+        dedupeKey: 'blocked:work-2',
+        kind: 'blocked_work',
+        severity: 'warning',
+        title: 'Blocked implementation',
+        detail: 'Needs operator follow-up.',
+        href: '/projects/project-1/work-items/work-2',
+        workItemId: 'work-2',
+        lastSeenAt: '2026-04-22T10:10:00.000Z',
+      }),
+      makeAttentionItem({
+        id: 'critical-review',
+        dedupeKey: 'review_failed:work-1',
+        kind: 'review_failed',
+        severity: 'critical',
+        title: 'Structured review failed',
+        detail: 'Planner requested changes.',
+        href: '/projects/project-1/work-items/work-1',
+        workItemId: 'work-1',
+        lastSeenAt: '2026-04-22T10:00:00.000Z',
+      }),
+      makeAttentionItem({
+        id: 'resolved-old',
+        dedupeKey: 'mission_failed:work-old',
+        kind: 'mission_failed',
+        severity: 'critical',
+        title: 'Resolved old failure',
+        detail: 'Already handled.',
+        status: 'resolved',
+        href: '/projects/project-1/work-items/work-old',
+        workItemId: 'work-old',
+        lastSeenAt: '2026-04-22T11:00:00.000Z',
+      }),
+    ])
+
+    expect(surface.count).toBe(2)
+    expect(surface.items.map((item) => item.id)).toEqual(['critical-review', 'warning-blocked'])
+    expect(surface.items[0]).toMatchObject({
+      badge: 'critical',
+      href: '/projects/project-1/work-items/work-1',
+      subtitle: 'Review failed',
+      title: 'Structured review failed',
+    })
+  })
+
+  it('builds a calm empty attention surface when no open items need operator action', () => {
+    expect(buildDashboardAttentionSurface([])).toEqual({
+      count: 0,
+      items: [],
+      emptyCopy: 'No global attention items right now. Mission Control is calm.',
+    })
+  })
 })
+
+function makeAttentionItem(overrides: Partial<AttentionQueueItem>): AttentionQueueItem {
+  return {
+    id: overrides.id ?? 'attention-1',
+    dedupeKey: overrides.dedupeKey ?? 'approval:work-item-1',
+    kind: overrides.kind ?? 'approval_pending',
+    severity: overrides.severity ?? 'warning',
+    projectId: overrides.projectId ?? 'project-1',
+    workItemId: overrides.workItemId,
+    title: overrides.title ?? 'Attention item',
+    detail: overrides.detail ?? 'Operator attention needed.',
+    href: overrides.href ?? '/projects/project-1/work-items/work-item-1',
+    source: overrides.source ?? 'derived',
+    status: overrides.status ?? 'open',
+    firstSeenAt: overrides.firstSeenAt ?? '2026-04-22T09:00:00.000Z',
+    lastSeenAt: overrides.lastSeenAt ?? '2026-04-22T10:00:00.000Z',
+  }
+}
 
 function makeProject(overrides: Partial<ProjectSummary>): ProjectSummary {
   return {
