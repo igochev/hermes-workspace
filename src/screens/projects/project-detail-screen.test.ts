@@ -152,9 +152,9 @@ describe('project detail screen board constants', () => {
   })
 
   it('surfaces project workflow policy copy and helper summaries for routing governance', () => {
-    expect(PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL).toBe('Workflow Policy')
-    expect(PROJECT_WORKFLOW_POLICY_PANEL_TITLE).toBe('Project Workflow Policy')
-    expect(PROJECT_WORKFLOW_POLICY_SAVE_LABEL).toBe('Save Workflow Policy')
+    expect(PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL).toBe('Profile & Workflow Policy')
+    expect(PROJECT_WORKFLOW_POLICY_PANEL_TITLE).toBe('Project Profile & Workflow Policy')
+    expect(PROJECT_WORKFLOW_POLICY_SAVE_LABEL).toBe('Save Profile & Workflow Policy')
     expect(PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING).toBe('Deploy governance')
     expect(PROJECT_WIP_WARNING_BADGE_LABEL).toBe('WIP high')
     expect(PROJECT_WIP_WARNING_LAUNCH_HINT).toBe('WIP is high; finish one active item first.')

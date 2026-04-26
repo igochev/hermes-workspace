@@ -32,6 +32,10 @@ export type ProjectAutopilotPolicy = {
   lastCreatedAt?: string
 }
 
+export type ProjectRuntimeProfiles = {
+  supervisorProfile?: string
+}
+
 export type ProjectRecord = {
   id: string
   name: string
@@ -41,6 +45,7 @@ export type ProjectRecord = {
   defaultBranch?: string
   description?: string
   phaseProfiles: ConductorPhaseProfiles
+  runtimeProfiles: ProjectRuntimeProfiles
   reviewAutoApproval: ReviewAutoApprovalPolicy
   autopilotPolicy: ProjectAutopilotPolicy
   createdAt: string
@@ -59,6 +64,7 @@ type CreateProjectInput = {
   defaultBranch?: string
   description?: string
   phaseProfiles?: unknown
+  runtimeProfiles?: unknown
   reviewAutoApproval?: unknown
   autopilotPolicy?: unknown
 }
@@ -172,6 +178,13 @@ function normalizeAutopilotPolicy(value: unknown): ProjectAutopilotPolicy {
   }
 }
 
+function normalizeRuntimeProfiles(value: unknown): ProjectRuntimeProfiles {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return {
+    supervisorProfile: asOptionalString(candidate.supervisorProfile),
+  }
+}
+
 function slugifyProjectName(name: string): string {
   const normalized = name
     .trim()
@@ -196,8 +209,9 @@ function uniqueSlug(baseSlug: string, projects: Array<ProjectRecord>, excludeId?
 }
 
 function normalizeProject(
-  project: (Omit<Partial<ProjectRecord>, 'phaseProfiles' | 'reviewAutoApproval' | 'autopilotPolicy'> & {
+  project: (Omit<Partial<ProjectRecord>, 'phaseProfiles' | 'runtimeProfiles' | 'reviewAutoApproval' | 'autopilotPolicy'> & {
     phaseProfiles?: unknown
+    runtimeProfiles?: unknown
     reviewAutoApproval?: unknown
     autopilotPolicy?: unknown
   }) &
@@ -212,6 +226,7 @@ function normalizeProject(
     defaultBranch: asOptionalString(project.defaultBranch),
     description: asOptionalString(project.description),
     phaseProfiles: normalizePhaseProfiles((project as Partial<ProjectRecord>).phaseProfiles),
+    runtimeProfiles: normalizeRuntimeProfiles((project as Partial<ProjectRecord>).runtimeProfiles),
     reviewAutoApproval: normalizeReviewAutoApprovalPolicy(
       (project as Partial<ProjectRecord>).reviewAutoApproval,
     ),
@@ -242,6 +257,7 @@ export function createProject(input: CreateProjectInput): ProjectRecord {
     defaultBranch: input.defaultBranch,
     description: input.description,
     phaseProfiles: input.phaseProfiles,
+    runtimeProfiles: input.runtimeProfiles,
     reviewAutoApproval: input.reviewAutoApproval,
     autopilotPolicy: input.autopilotPolicy,
     createdAt: now,
@@ -276,12 +292,16 @@ export function updateProject(projectId: string, updates: UpdateProjectInput): P
         : current.repoPath,
     phaseProfiles:
       updates.phaseProfiles !== undefined ? updates.phaseProfiles : current.phaseProfiles,
+    runtimeProfiles:
+      updates.runtimeProfiles !== undefined ? updates.runtimeProfiles : current.runtimeProfiles,
     reviewAutoApproval:
       updates.reviewAutoApproval !== undefined
         ? updates.reviewAutoApproval
         : current.reviewAutoApproval,
     autopilotPolicy:
-      updates.autopilotPolicy !== undefined ? updates.autopilotPolicy : current.autopilotPolicy,
+      updates.autopilotPolicy !== undefined
+        ? { ...current.autopilotPolicy, ...updates.autopilotPolicy }
+        : current.autopilotPolicy,
     createdAt: current.createdAt,
     updatedAt: new Date().toISOString(),
   })

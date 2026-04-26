@@ -16,6 +16,7 @@ export type ProfileReadinessSeverity = 'ready' | 'info' | 'warning' | 'unknown'
 
 export type ProfileReadinessSource =
   | 'project-phase-profile'
+  | 'project-runtime-profile'
   | 'work-item-assigned-profile'
   | 'project-autopilot-policy'
   | 'default'
@@ -79,7 +80,15 @@ function getPhaseMapping(
   }
 }
 
-function getSupervisorMapping(defaults: EvaluateProfileReadinessInput['defaults']): Mapping {
+function getSupervisorMapping(
+  project: ProjectRecord,
+  defaults: EvaluateProfileReadinessInput['defaults'],
+): Mapping {
+  const projectSupervisorProfile = normalizeProfileName(project.runtimeProfiles?.supervisorProfile)
+  if (projectSupervisorProfile) {
+    return { profile: projectSupervisorProfile, source: 'project-runtime-profile' }
+  }
+
   return {
     profile: normalizeProfileName(defaults?.supervisorProfile),
     source: normalizeProfileName(defaults?.supervisorProfile) ? 'default' : 'none',
@@ -178,7 +187,7 @@ export function evaluateProfileReadiness({
   )
   const roles: Array<ProfileReadinessRoleReport> = [
     ...phaseReports,
-    evaluateRole('supervisor', getSupervisorMapping(defaults), availableProfileSet),
+    evaluateRole('supervisor', getSupervisorMapping(project, defaults), availableProfileSet),
     evaluateRole('autopilot-scout', getAutopilotScoutMapping(project, defaults), availableProfileSet),
   ]
   const summary = summarizeStatus(roles)

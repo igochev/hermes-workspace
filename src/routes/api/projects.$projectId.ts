@@ -59,11 +59,23 @@ export const Route = createFileRoute('/api/projects/$projectId')({
                 : body.phaseProfiles && typeof body.phaseProfiles === 'object' && !Array.isArray(body.phaseProfiles)
                   ? body.phaseProfiles
                   : undefined,
+            runtimeProfiles:
+              body.runtimeProfiles === null
+                ? {}
+                : body.runtimeProfiles && typeof body.runtimeProfiles === 'object' && !Array.isArray(body.runtimeProfiles)
+                  ? body.runtimeProfiles
+                  : undefined,
             reviewAutoApproval:
               body.reviewAutoApproval === null
                 ? { enabled: false, maxPriority: 'low' }
                 : body.reviewAutoApproval && typeof body.reviewAutoApproval === 'object' && !Array.isArray(body.reviewAutoApproval)
                   ? body.reviewAutoApproval
+                  : undefined,
+            autopilotPolicy:
+              body.autopilotPolicy === null
+                ? {}
+                : body.autopilotPolicy && typeof body.autopilotPolicy === 'object' && !Array.isArray(body.autopilotPolicy)
+                  ? body.autopilotPolicy
                   : undefined,
           })
 

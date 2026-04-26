@@ -1,6 +1,6 @@
 'use client'
 
-import { type CSSProperties, useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -20,6 +20,8 @@ import {
   updateProject,
   type CreateWorkItemInput,
   type PhaseProfiles,
+  type ProjectAutopilotPolicy,
+  type ProjectRuntimeProfiles,
   type ReviewAutoApprovalPolicy,
   type WorkItemRiskLevel,
   WORK_ITEM_BLOCKED_REASON_LABELS,
@@ -81,12 +83,31 @@ const DEFAULT_REVIEW_AUTO_APPROVAL: ReviewAutoApprovalPolicy = {
   maxPriority: 'low',
 }
 
+const EMPTY_RUNTIME_PROFILES: ProjectRuntimeProfiles = {
+  supervisorProfile: '',
+}
+
+const DEFAULT_AUTOPILOT_POLICY: ProjectAutopilotPolicy = {
+  enabled: false,
+  schedulePreset: 'manual',
+  scoutProfile: '',
+  suggestionLimit: 5,
+  scoutSources: ['repo-health-scout', 'stale-docs-scout', 'architecture-debt-scout'],
+}
+
 type AvailableProfile = {
   name: string
 }
 
 type ProfilesListResponse = {
   profiles?: Array<AvailableProfile>
+}
+
+type ProjectProfileWorkflowPolicySavePayload = {
+  phaseProfiles: PhaseProfiles
+  runtimeProfiles: ProjectRuntimeProfiles
+  reviewAutoApproval: ReviewAutoApprovalPolicy
+  autopilotPolicy: ProjectAutopilotPolicy
 }
 
 export const PROJECT_BOARD_COLUMNS_CLASS = 'grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6'
@@ -104,9 +125,10 @@ export const PROJECT_FORM_NATIVE_SELECT_STYLE = {
 } satisfies CSSProperties
 export const PROJECT_ACCEPTANCE_CRITERIA_HELP_TEXT =
   'Optional for idea capture. Planning can draft or refine acceptance criteria later.'
-export const PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL = 'Workflow Policy'
-export const PROJECT_WORKFLOW_POLICY_PANEL_TITLE = 'Project Workflow Policy'
-export const PROJECT_WORKFLOW_POLICY_SAVE_LABEL = 'Save Workflow Policy'
+export const PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL = 'Profile & Workflow Policy'
+export const PROJECT_WORKFLOW_POLICY_PANEL_TITLE = 'Project Profile & Workflow Policy'
+export const PROJECT_WORKFLOW_POLICY_SAVE_LABEL = 'Save Profile & Workflow Policy'
+export const PROJECT_PROFILE_MAPPING_CONFIGURE_LABEL = 'Configure profile mappings'
 export const PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING = 'Deploy governance'
 export const PROJECT_WIP_WARNING_BADGE_LABEL = 'WIP high'
 export const PROJECT_WIP_WARNING_LAUNCH_HINT = 'WIP is high; finish one active item first.'
@@ -265,6 +287,10 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
   const [boardFilter, setBoardFilter] = useState<ProjectBoardFilter>('all')
   const [form, setForm] = useState(EMPTY_WORK_ITEM_FORM)
   const [projectRouting, setProjectRouting] = useState<PhaseProfiles>(EMPTY_PHASE_PROFILES)
+  const [runtimeProfiles, setRuntimeProfiles] = useState<ProjectRuntimeProfiles>(EMPTY_RUNTIME_PROFILES)
+  const [autopilotPolicy, setAutopilotPolicy] = useState<ProjectAutopilotPolicy>(
+    DEFAULT_AUTOPILOT_POLICY,
+  )
   const [reviewAutoApproval, setReviewAutoApproval] = useState<ReviewAutoApprovalPolicy>(
     DEFAULT_REVIEW_AUTO_APPROVAL,
   )
@@ -308,6 +334,8 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (!project) return
     setProjectRouting(project.phaseProfiles ?? EMPTY_PHASE_PROFILES)
+    setRuntimeProfiles(project.runtimeProfiles ?? EMPTY_RUNTIME_PROFILES)
+    setAutopilotPolicy(project.autopilotPolicy ?? DEFAULT_AUTOPILOT_POLICY)
     setReviewAutoApproval(project.reviewAutoApproval ?? DEFAULT_REVIEW_AUTO_APPROVAL)
   }, [project])
 
@@ -375,11 +403,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
   })
 
   const updateProjectMutation = useMutation({
-    mutationFn: () =>
-      updateProject(projectId, {
-        phaseProfiles: projectRouting,
-        reviewAutoApproval,
-      }),
+    mutationFn: (payload: ProjectProfileWorkflowPolicySavePayload) => updateProject(projectId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey })
       await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects'] })
@@ -579,154 +603,32 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
             roles={profileReadinessQuery.data?.report.roles ?? []}
             profileDiscoveryAvailable={profileReadinessQuery.data?.profileDiscoveryAvailable}
             profileDiscoveryError={profileReadinessQuery.data?.profileDiscoveryError}
+            onConfigureProfileMappings={() => setShowProjectRouting(true)}
           />
 
           {showProjectRouting ? (
-            <div className="mt-5 space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4">
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
-                <div className="space-y-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
-                  <div>
-                    <h2 className="text-sm font-semibold text-ink">{PROJECT_WORKFLOW_POLICY_PANEL_TITLE}</h2>
-                    <p className="mt-1 text-sm text-[var(--theme-muted)]">
-                      Make phase routing and review governance visible at the project level so operators can predict how planning, build, review, and deploy launches will route.
-                    </p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {workflowPolicyPhaseSummaries.map((summary, index) => {
-                      const phase = (Object.keys(WORK_ITEM_PHASE_LABELS) as Array<keyof PhaseProfiles>)[index]
-                      return (
-                        <div
-                          key={phase}
-                          className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3"
-                        >
-                          <div className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
-                            {WORK_ITEM_PHASE_LABELS[phase]} routing
-                          </div>
-                          <div className="mt-2 text-sm font-medium text-ink">{summary}</div>
-                          <div className="mt-1 text-xs text-[var(--theme-muted)]">
-                            {PROJECT_PHASE_ROUTING_POLICY_LABELS[phase]}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="space-y-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-ink">Routing precedence</h3>
-                    <p className="mt-1 text-sm text-[var(--theme-muted)]">
-                      Launch profile resolution follows the same operational order everywhere in Mission Control.
-                    </p>
-                  </div>
-                  <ol className="space-y-2 text-sm text-[var(--theme-text)]">
-                    {PROJECT_ROUTING_PRECEDENCE_LABELS.map((label) => (
-                      <li
-                        key={label}
-                        className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2"
-                      >
-                        {label}
-                      </li>
-                    ))}
-                  </ol>
-                  <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
-                      Review governance
-                    </div>
-                    <div className="mt-2 text-sm font-medium text-ink">{reviewAutoApprovalSummary}</div>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
-                      {PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING}
-                    </div>
-                    <div className="mt-2 text-sm font-medium text-ink">{deployGovernanceSummary}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">Research Profile</label>
-                  <Input value={projectRouting.research} onChange={(event) => updateProjectRoutingField('research', event.target.value)} placeholder="planner" nativeInput />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">Build Profile</label>
-                  <Input value={projectRouting.build} onChange={(event) => updateProjectRoutingField('build', event.target.value)} placeholder="builder" nativeInput />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">Review Profile</label>
-                  <Input value={projectRouting.review} onChange={(event) => updateProjectRoutingField('review', event.target.value)} placeholder="reviewer" nativeInput />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">Deploy Profile</label>
-                  <Input value={projectRouting.deploy} onChange={(event) => updateProjectRoutingField('deploy', event.target.value)} placeholder="deployer" nativeInput />
-                </div>
-              </div>
-              <div className="space-y-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-ink">Review Auto-Approval</h3>
-                    <p className="mt-1 text-sm text-[var(--theme-muted)]">
-                      Automatically approve review-phase work items up to the selected priority threshold.
-                    </p>
-                  </div>
-                  <label className="inline-flex items-center gap-2 text-sm font-medium text-[var(--theme-text)]">
-                    <input
-                      type="checkbox"
-                      checked={reviewAutoApproval.enabled}
-                      onChange={(event) =>
-                        setReviewAutoApproval((current) => ({
-                          ...current,
-                          enabled: event.target.checked,
-                        }))
-                      }
-                    />
-                    Enabled
-                  </label>
-                </div>
-                <div className="space-y-1 max-w-xs">
-                  <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
-                    Max Priority
-                  </label>
-                  <select
-                    value={reviewAutoApproval.maxPriority}
-                    onChange={(event) =>
-                      setReviewAutoApproval((current) => ({
-                        ...current,
-                        maxPriority: event.target.value as ReviewAutoApprovalPolicy['maxPriority'],
-                      }))
-                    }
-                    className={PROJECT_FORM_SELECT_CLASS}
-                    style={PROJECT_FORM_NATIVE_SELECT_STYLE}
-                  >
-                    <option value="low">Low only</option>
-                    <option value="medium">Low + Medium</option>
-                    <option value="high">All priorities</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProjectRouting(project.phaseProfiles ?? EMPTY_PHASE_PROFILES)
-                    setReviewAutoApproval(
-                      project.reviewAutoApproval ?? DEFAULT_REVIEW_AUTO_APPROVAL,
-                    )
-                    setShowProjectRouting(false)
-                  }}
-                  className="rounded-lg border border-[var(--theme-border)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateProjectMutation.mutate()}
-                  disabled={updateProjectMutation.isPending}
-                  className="rounded-lg bg-[var(--theme-accent)] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                >
-                  {updateProjectMutation.isPending ? 'Saving…' : PROJECT_WORKFLOW_POLICY_SAVE_LABEL}
-                </button>
-              </div>
-            </div>
+            <ProjectProfileWorkflowPolicyEditor
+              phaseProfiles={projectRouting}
+              runtimeProfiles={runtimeProfiles}
+              reviewAutoApproval={reviewAutoApproval}
+              autopilotPolicy={autopilotPolicy}
+              availableProfiles={availableProfiles}
+              isSaving={updateProjectMutation.isPending}
+              onCancel={() => {
+                setProjectRouting(project.phaseProfiles ?? EMPTY_PHASE_PROFILES)
+                setRuntimeProfiles(project.runtimeProfiles ?? EMPTY_RUNTIME_PROFILES)
+                setAutopilotPolicy(project.autopilotPolicy ?? DEFAULT_AUTOPILOT_POLICY)
+                setReviewAutoApproval(project.reviewAutoApproval ?? DEFAULT_REVIEW_AUTO_APPROVAL)
+                setShowProjectRouting(false)
+              }}
+              onSave={(payload) => {
+                setProjectRouting(payload.phaseProfiles)
+                setRuntimeProfiles(payload.runtimeProfiles)
+                setAutopilotPolicy(payload.autopilotPolicy)
+                setReviewAutoApproval(payload.reviewAutoApproval)
+                updateProjectMutation.mutate(payload)
+              }}
+            />
           ) : null}
 
           {showCreateWorkItem ? (
@@ -1240,19 +1142,196 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
   )
 }
 
-function ProjectProfileReadinessPanel({
+
+function buildProfileOptions(
+  availableProfiles: Array<string>,
+  currentValue?: string,
+): Array<[string, string]> {
+  const values = Array.from(
+    new Set(
+      [currentValue, ...availableProfiles].filter(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0,
+      ),
+    ),
+  )
+  return [["", PROJECT_ROUTING_POLICY_EMPTY_VALUE], ...values.map((value) => [value, value] as [string, string])]
+}
+
+export function ProjectProfileWorkflowPolicyEditor({
+  phaseProfiles,
+  runtimeProfiles,
+  reviewAutoApproval,
+  autopilotPolicy,
+  availableProfiles,
+  isSaving,
+  onCancel,
+  onSave,
+}: {
+  phaseProfiles: PhaseProfiles
+  runtimeProfiles: ProjectRuntimeProfiles
+  reviewAutoApproval: ReviewAutoApprovalPolicy
+  autopilotPolicy: ProjectAutopilotPolicy
+  availableProfiles: Array<string>
+  isSaving: boolean
+  onCancel: () => void
+  onSave: (payload: ProjectProfileWorkflowPolicySavePayload) => void
+}) {
+  const workflowPolicyPhaseSummaries = buildProjectWorkflowPolicyPhaseSummaries(phaseProfiles)
+  const reviewAutoApprovalSummary = buildProjectReviewAutoApprovalSummary(reviewAutoApproval)
+  const deployGovernanceSummary = buildProjectDeployGovernanceSummary(phaseProfiles)
+
+  function readString(formData: FormData, key: string): string {
+    const value = formData.get(key)
+    return typeof value === 'string' ? value : ''
+  }
+
+  function handleSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    onSave({
+      phaseProfiles: {
+        research: readString(formData, 'researchProfile'),
+        build: readString(formData, 'buildProfile'),
+        review: readString(formData, 'reviewProfile'),
+        deploy: readString(formData, 'deployProfile'),
+      },
+      runtimeProfiles: { supervisorProfile: readString(formData, 'supervisorProfile') },
+      reviewAutoApproval: {
+        enabled: formData.get('reviewAutoApprovalEnabled') === 'on',
+        maxPriority: readString(formData, 'reviewAutoApprovalMaxPriority') as ReviewAutoApprovalPolicy['maxPriority'],
+      },
+      autopilotPolicy: { ...autopilotPolicy, scoutProfile: readString(formData, 'autopilotScoutProfile') },
+    })
+  }
+
+  return (
+    <form onSubmit={handleSave} className="mt-5 space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
+        <div className="space-y-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">{PROJECT_WORKFLOW_POLICY_PANEL_TITLE}</h2>
+            <p className="mt-1 text-sm text-[var(--theme-muted)]">
+              Configure every profile role reported by Profile Readiness: phase routing, Supervisor, Autopilot Scout, and review governance.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {workflowPolicyPhaseSummaries.map((summary, index) => {
+              const phase = (Object.keys(WORK_ITEM_PHASE_LABELS) as Array<keyof PhaseProfiles>)[index]
+              return (
+                <div key={phase} className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
+                  <div className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
+                    {WORK_ITEM_PHASE_LABELS[phase]} routing
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-ink">{summary}</div>
+                  <div className="mt-1 text-xs text-[var(--theme-muted)]">
+                    {PROJECT_PHASE_ROUTING_POLICY_LABELS[phase]}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+        <div className="space-y-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">Routing precedence</h3>
+            <p className="mt-1 text-sm text-[var(--theme-muted)]">
+              Launch profile resolution follows the same operational order everywhere in Mission Control.
+            </p>
+          </div>
+          <ol className="space-y-2 text-sm text-[var(--theme-text)]">
+            {PROJECT_ROUTING_PRECEDENCE_LABELS.map((label) => (
+              <li key={label} className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+                {label}
+              </li>
+            ))}
+          </ol>
+          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">Review governance</div>
+            <div className="mt-2 text-sm font-medium text-ink">{reviewAutoApprovalSummary}</div>
+          </div>
+          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">{PROJECT_WORKFLOW_DEPLOY_GOVERNANCE_HEADING}</div>
+            <div className="mt-2 text-sm font-medium text-ink">{deployGovernanceSummary}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <SelectField label="Research Profile" name="researchProfile" value={phaseProfiles.research} options={buildProfileOptions(availableProfiles, phaseProfiles.research)} />
+        <SelectField label="Build Profile" name="buildProfile" value={phaseProfiles.build} options={buildProfileOptions(availableProfiles, phaseProfiles.build)} />
+        <SelectField label="Review Profile" name="reviewProfile" value={phaseProfiles.review} options={buildProfileOptions(availableProfiles, phaseProfiles.review)} />
+        <SelectField label="Deploy Profile" name="deployProfile" value={phaseProfiles.deploy} options={buildProfileOptions(availableProfiles, phaseProfiles.deploy)} />
+        <SelectField label="Supervisor Profile" name="supervisorProfile" value={runtimeProfiles.supervisorProfile ?? ''} options={buildProfileOptions(availableProfiles, runtimeProfiles.supervisorProfile)} />
+        <SelectField label="Autopilot Scout Profile" name="autopilotScoutProfile" value={autopilotPolicy.scoutProfile ?? ''} options={buildProfileOptions(availableProfiles, autopilotPolicy.scoutProfile)} />
+      </div>
+
+      <div className="space-y-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">Review Auto-Approval</h3>
+            <p className="mt-1 text-sm text-[var(--theme-muted)]">
+              Automatically approve review-phase work items up to the selected priority threshold.
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-[var(--theme-text)]">
+            <input
+              type="checkbox"
+              name="reviewAutoApprovalEnabled"
+              defaultChecked={reviewAutoApproval.enabled}
+            />
+            Enabled
+          </label>
+        </div>
+        <div className="space-y-1 max-w-xs">
+          <label className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">Max Priority</label>
+          <select
+            name="reviewAutoApprovalMaxPriority"
+            defaultValue={reviewAutoApproval.maxPriority}
+            className={PROJECT_FORM_SELECT_CLASS}
+            style={PROJECT_FORM_NATIVE_SELECT_STYLE}
+          >
+            <option value="low">Low only</option>
+            <option value="medium">Low + Medium</option>
+            <option value="high">All priorities</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--theme-border)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]">
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="rounded-lg bg-[var(--theme-accent)] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {isSaving ? 'Saving…' : PROJECT_WORKFLOW_POLICY_SAVE_LABEL}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+export function ProjectProfileReadinessPanel({
   isLoading,
   error,
   roles,
   profileDiscoveryAvailable,
   profileDiscoveryError,
+  onConfigureProfileMappings,
 }: {
   isLoading: boolean
   error: Error | null
   roles: Array<ProfileReadinessRoleReport>
   profileDiscoveryAvailable?: boolean
   profileDiscoveryError?: string
+  onConfigureProfileMappings?: () => void
 }) {
+  const needsProfileMapping = roles.some((role) =>
+    ['unmapped', 'missing', 'unknown'].includes(role.status),
+  )
+
   return (
     <div className="mt-5 space-y-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1262,11 +1341,22 @@ function ProjectProfileReadinessPanel({
             {PROJECT_PROFILE_READINESS_COPY}
           </p>
         </div>
-        {profileDiscoveryAvailable === false ? (
-          <span className="rounded-full border border-slate-500/35 bg-slate-500/10 px-2 py-0.5 text-[11px] font-medium text-slate-200">
-            Discovery unavailable
-          </span>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {needsProfileMapping && onConfigureProfileMappings ? (
+            <button
+              type="button"
+              onClick={onConfigureProfileMappings}
+              className="rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+            >
+              {PROJECT_PROFILE_MAPPING_CONFIGURE_LABEL}
+            </button>
+          ) : null}
+          {profileDiscoveryAvailable === false ? (
+            <span className="rounded-full border border-slate-500/35 bg-slate-500/10 px-2 py-0.5 text-[11px] font-medium text-slate-200">
+              Discovery unavailable
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {isLoading ? (
@@ -1349,14 +1439,16 @@ function MetricCard({
 function SelectField({
   label,
   hideLabel,
+  name,
   value,
   onChange,
   options,
 }: {
   label: string
   hideLabel?: boolean
+  name?: string
   value: string
-  onChange: (value: string) => void
+  onChange?: (value: string) => void
   options: Array<[string, string]>
 }) {
   return (
@@ -1367,8 +1459,10 @@ function SelectField({
         </label>
       )}
       <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
+        name={name}
+        value={onChange ? value : undefined}
+        defaultValue={onChange ? undefined : value}
+        onChange={(event) => onChange?.(event.target.value)}
         aria-label={label}
         className={PROJECT_FORM_SELECT_CLASS}
         style={PROJECT_FORM_NATIVE_SELECT_STYLE}

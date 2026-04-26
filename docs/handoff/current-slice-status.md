@@ -17,17 +17,21 @@
 - Cycle 2 complete: slices V/W, X/Y, Z/AA, AB/AC shipped and verified ✅
 - Main/Architect created the Production Readiness Dogfood plan after D3n13r reported non-actionable Profile Readiness / Workflow Policy UX ✅
 - Main/Architect updated the implementation index to point Builder at the new active plan ✅
+- Slice PR-1 — Profile Readiness actionability shipped: project runtime Supervisor mapping, partial-safe Autopilot Scout PATCH, readiness-panel configure CTA, Profile & Workflow Policy editor controls for every reported readiness role, and render/click coverage ✅
+- Slice PR-2 — Production dogfood harness shipped and passed against `family_command_center-ABACUS`; report: `dogfood-output/production-dogfood-2026-04-26T09-39-36-276Z.md`, screenshot: `dogfood-output/production-dogfood-project-detail.png` ✅
 
 ## Current State
 
 - Branch: `my-hermes-workspace-dev`; latest inspected commit `9cd429a`.
 - Test repo verified at `/home/d3ni3/.Hermes/workspace/projects/family_command_center-ABACUS`, branch `test-hermes-workspace`, latest inspected commit `62ff902`.
-- Confirmed product gap: Profile Readiness displays Supervisor / Autopilot Scout readiness, but the project detail Workflow Policy editor only updates phase profiles and review auto-approval. Current tests mostly check constants/helpers and do not click through the repair path.
-- Production readiness is NOT accepted until Builder adds UI click tests, fixes actionability, runs full regression/build, restarts the service, and runs a live real-project dogfood smoke.
+- PR-1 verification passed in Builder session: `pnpm test src/server/profile-readiness.test.ts src/server/profile-readiness-routes.test.ts src/server/projects-store.test.ts src/server/project-route.test.ts src/screens/projects/project-detail-screen.test.ts src/screens/projects/project-detail-screen.render.test.tsx -- --runInBand` → 28/28 tests; `pnpm vitest run` → 327/327 tests; `pnpm build` passes with existing Vite chunk/dynamic-import warnings. `pnpm lint` remains blocked by pre-existing broad lint debt (parserOptions project errors for `public/sw.js`, `scripts/generate-pwa-icons.js`, `server-entry.js`, plus many legacy import/order/no-unnecessary-condition issues outside this slice).
+- PR-2 live verification passed after `systemctl --user restart hermes-workspace.service` and API readiness smoke: `node scripts/mission-control-production-dogfood.mjs` → PASS. The script created/reused project `production-dogfood-family-command-center-abacus`, clicked Refresh, Profile Readiness → Configure profile mappings, Supervisor/Autopilot Scout selects, Save Profile & Workflow Policy, Capture rough idea validation/create, opened the created work item, opened Project Autopilot, and verified no tested-route browser/network errors.
+- Profile Readiness now exposes a Configure profile mappings action when reported roles need attention; the editor saves Research/Build/Review/Deploy/Supervisor/Autopilot Scout mappings and preserves existing Autopilot policy fields during partial PATCH.
+- Production readiness is NOT accepted until Builder completes PR-3 clickability audit and re-runs full verification/dogfood after any PR-3 fixes.
 
 ## Next Steps
 
-**Next:** Builder must read the active plan, then start Slice PR-1 Task 1: add RED tests proving Profile Readiness cannot currently configure every role it reports. After PR-1, update this handoff before proceeding to PR-2 dogfood harness.
+**Next:** Start Slice PR-3 clickability audit of Mission Control surfaces. Extend `scripts/mission-control-production-dogfood.mjs` where practical to cover Dashboard attention/recovery cards, Projects list, Project detail metrics/Profile Readiness/Policy editor, Project Autopilot, Autopilot Suggestions, Work item detail launch/preflight/recovery panels, Approvals inbox, and chat/session sidebar stale indicators. Fix any button-like non-clickable UI or restyle as static, then re-run focused tests, full regression/build, service restart, and dogfood harness.
 
 ## Required Verification Before Shipping This Plan
 

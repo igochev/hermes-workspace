@@ -115,6 +115,22 @@ describe('evaluateProfileReadiness', () => {
     })
   })
 
+  it('uses the project supervisor mapping before falling back to process defaults', () => {
+    const report = evaluateProfileReadiness({
+      project: makeProject({
+        runtimeProfiles: { supervisorProfile: 'project-supervisor' },
+      } as Partial<ProjectRecord>),
+      availableProfiles: ['researcher', 'builder', 'planner', 'deployer', 'project-supervisor'],
+      defaults: { supervisorProfile: 'global-supervisor' },
+    })
+
+    expect(report.roles.find((role) => role.role === 'supervisor')).toMatchObject({
+      mappedProfile: 'project-supervisor',
+      source: 'project-runtime-profile',
+      status: 'ready',
+    })
+  })
+
   it('defaults the Autopilot scout role from project policy', () => {
     const report = evaluateProfileReadiness({
       project: makeProject({

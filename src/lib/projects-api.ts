@@ -35,6 +35,10 @@ export type ProjectAutopilotPolicy = {
   lastCreatedAt?: string
 }
 
+export type ProjectRuntimeProfiles = {
+  supervisorProfile?: string
+}
+
 export type ProjectRecord = {
   id: string
   name: string
@@ -44,6 +48,7 @@ export type ProjectRecord = {
   defaultBranch?: string
   description?: string
   phaseProfiles: PhaseProfiles
+  runtimeProfiles: ProjectRuntimeProfiles
   reviewAutoApproval: ReviewAutoApprovalPolicy
   autopilotPolicy: ProjectAutopilotPolicy
   createdAt: string
@@ -199,6 +204,7 @@ export type CreateProjectInput = {
   defaultBranch?: string
   description?: string
   phaseProfiles?: Partial<PhaseProfiles>
+  runtimeProfiles?: Partial<ProjectRuntimeProfiles>
   reviewAutoApproval?: Partial<ReviewAutoApprovalPolicy>
   autopilotPolicy?: Partial<ProjectAutopilotPolicy>
 }
