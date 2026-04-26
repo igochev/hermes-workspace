@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  PROJECT_AUTOPILOT_CLICKABILITY_AUDIT,
   PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY,
   PROJECT_AUTOPILOT_SAFETY_COPY,
+  PROJECT_AUTOPILOT_SAVE_BUTTON_LABEL,
   PROJECT_AUTOPILOT_SCHEDULE_OPTIONS,
   PROJECT_AUTOPILOT_SCOUT_SOURCES,
-  PROJECT_AUTOPILOT_SAVE_BUTTON_LABEL,
 } from './project-autopilot-screen'
 
 describe('project autopilot screen constants', () => {
@@ -33,5 +34,15 @@ describe('project autopilot screen constants', () => {
     expect(PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY).toContain('Convert + Plan')
     expect(PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY).toContain('accepted planner draft')
     expect(PROJECT_AUTOPILOT_DELEGATION_POLICY_COPY).toContain('No code is launched')
+  })
+
+  it('documents project autopilot clickability and marks suggestion previews static', () => {
+    expect(PROJECT_AUTOPILOT_CLICKABILITY_AUDIT).toEqual([
+      { surface: 'back-to-project', label: 'Back to Project', kind: 'link', target: '/projects/:projectId' },
+      { surface: 'save-schedule', label: 'Save Autopilot Schedule', kind: 'button', target: 'saveProjectAutopilotSchedule' },
+      { surface: 'disable-schedule', label: 'Disable schedule', kind: 'button', target: 'disableProjectAutopilotSchedule' },
+      { surface: 'project-suggestion-preview', label: 'Suggestion preview', kind: 'static', target: null },
+      { surface: 'global-suggestions-copy', label: 'Convert + Plan is available from the global suggestions inbox.', kind: 'static', target: null },
+    ])
   })
 })

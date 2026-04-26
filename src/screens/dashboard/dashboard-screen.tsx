@@ -92,6 +92,13 @@ type DashboardSessionTelemetryCard = {
   detail: string
 }
 
+type ClickabilityAuditEntry = {
+  surface: string
+  label: string
+  kind: 'button' | 'link' | 'static'
+  target: string | null
+}
+
 export const DASHBOARD_SESSION_TELEMETRY_QUERY_KEY = ['dashboard', 'session-telemetry'] as const
 export const DASHBOARD_SESSION_TELEMETRY_LABELS = {
   totalTokens: 'Session tokens',
@@ -115,6 +122,18 @@ export const DASHBOARD_MISSION_CONTROL_QUEUE_TITLES: Record<keyof MissionControl
   blocked: 'Blocked work',
   running: 'Running missions',
 }
+export const DASHBOARD_CLICKABILITY_AUDIT: Array<ClickabilityAuditEntry> = [
+  { surface: 'summary-projects', label: 'Projects', kind: 'link', target: '/projects' },
+  { surface: 'summary-work-items', label: 'Work items', kind: 'link', target: '/projects' },
+  { surface: 'summary-approvals', label: 'Pending approvals', kind: 'link', target: '/projects/approvals' },
+  { surface: 'summary-blocked', label: 'Blocked work', kind: 'link', target: '/projects' },
+  { surface: 'summary-failed', label: 'Failed missions', kind: 'link', target: '/projects' },
+  { surface: 'summary-running', label: 'Running missions', kind: 'link', target: '/projects' },
+  { surface: 'attention-card', label: 'Open detail for all recovery actions', kind: 'link', target: 'attention.href' },
+  { surface: 'attention-first-action', label: 'Recommended action preview', kind: 'static', target: null },
+  { surface: 'mission-queue-card', label: 'Open work item/project detail', kind: 'link', target: 'queue.href' },
+  { surface: 'session-telemetry-card', label: 'Session telemetry summary', kind: 'static', target: null },
+]
 
 const DASHBOARD_ATTENTION_EMPTY_COPY = 'No global attention items right now. Mission Control is calm.'
 

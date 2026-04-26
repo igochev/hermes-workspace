@@ -5,6 +5,7 @@ import type { AttentionQueueItem } from '@/server/attention-queue-store'
 import type { ApprovalInboxEntry } from '@/lib/work-item-approvals-api'
 import type { SessionTelemetrySummary } from '@/server/session-telemetry'
 import {
+  DASHBOARD_CLICKABILITY_AUDIT,
   DASHBOARD_MISSION_CONTROL_QUERY_KEY,
   DASHBOARD_MISSION_CONTROL_QUEUE_TITLES,
   DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS,
@@ -280,6 +281,21 @@ describe('dashboard mission control helpers', () => {
       items: [],
       emptyCopy: 'No global attention items right now. Mission Control is calm.',
     })
+  })
+
+  it('documents dashboard attention/recovery clickability so no card-like CTA is a no-op', () => {
+    expect(DASHBOARD_CLICKABILITY_AUDIT).toEqual([
+      { surface: 'summary-projects', label: 'Projects', kind: 'link', target: '/projects' },
+      { surface: 'summary-work-items', label: 'Work items', kind: 'link', target: '/projects' },
+      { surface: 'summary-approvals', label: 'Pending approvals', kind: 'link', target: '/projects/approvals' },
+      { surface: 'summary-blocked', label: 'Blocked work', kind: 'link', target: '/projects' },
+      { surface: 'summary-failed', label: 'Failed missions', kind: 'link', target: '/projects' },
+      { surface: 'summary-running', label: 'Running missions', kind: 'link', target: '/projects' },
+      { surface: 'attention-card', label: 'Open detail for all recovery actions', kind: 'link', target: 'attention.href' },
+      { surface: 'attention-first-action', label: 'Recommended action preview', kind: 'static', target: null },
+      { surface: 'mission-queue-card', label: 'Open work item/project detail', kind: 'link', target: 'queue.href' },
+      { surface: 'session-telemetry-card', label: 'Session telemetry summary', kind: 'static', target: null },
+    ])
   })
 
   it('uses stable labels for session telemetry truth cards', () => {

@@ -15,6 +15,14 @@ export const APPROVALS_INBOX_QUERY_KEY = ['mission-control', 'approvals'] as con
 export const APPROVALS_INBOX_PANEL_CLASS =
   'rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-sm backdrop-blur-xl'
 export const APPROVALS_INBOX_EMPTY_COPY = 'No pending approvals. Recent approval decisions stay visible below for audit.'
+export const APPROVALS_INBOX_CLICKABILITY_AUDIT = [
+  { surface: 'back-to-projects', label: 'Back to Projects', kind: 'link', target: '/projects' },
+  { surface: 'refresh', label: 'Refresh', kind: 'button', target: 'approvalsQuery.refetch' },
+  { surface: 'pending-open-work-item', label: 'Open Work Item', kind: 'link', target: '/projects/:projectId/work-items/:workItemId' },
+  { surface: 'approve', label: 'Approve', kind: 'button', target: 'resolveWorkItemApproval:approved' },
+  { surface: 'request-changes', label: 'Request Changes', kind: 'button', target: 'resolveWorkItemApproval:changes_requested' },
+  { surface: 'recent-decision-card', label: 'Recent approval decision', kind: 'static', target: null },
+] as const
 
 function formatTimestamp(value?: string): string {
   if (!value) return '—'

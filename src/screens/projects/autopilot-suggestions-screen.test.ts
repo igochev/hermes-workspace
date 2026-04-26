@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  AUTOPILOT_SUGGESTIONS_CLICKABILITY_AUDIT,
+  AUTOPILOT_SUGGESTIONS_EMPTY_COPY,
+  AUTOPILOT_SUGGESTIONS_FILTER_OPTIONS,
+  AUTOPILOT_SUGGESTIONS_QUERY_KEY,
   AUTOPILOT_SUGGESTION_ACTION_LABELS,
   AUTOPILOT_SUGGESTION_CONVERT_BUTTON_LABEL,
-  AUTOPILOT_SUGGESTIONS_EMPTY_COPY,
   AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUILD_BUTTON_LABEL,
   AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUTTON_LABEL,
   AUTOPILOT_SUGGESTION_DELEGATION_SAFETY_COPY,
-  AUTOPILOT_SUGGESTIONS_FILTER_OPTIONS,
-  AUTOPILOT_SUGGESTIONS_QUERY_KEY,
   applyAutopilotSuggestionFilters,
 } from './autopilot-suggestions-screen'
 import {
@@ -101,5 +102,19 @@ describe('autopilot suggestions screen constants', () => {
     expect(AUTOPILOT_SUGGESTION_DELEGATION_SAFETY_COPY).toContain(
       'No code is launched until policy/operator conditions are met.',
     )
+  })
+
+  it('documents suggestion inbox clickability across filters and card actions', () => {
+    expect(AUTOPILOT_SUGGESTIONS_CLICKABILITY_AUDIT).toEqual([
+      { surface: 'refresh', label: 'Refresh', kind: 'button', target: 'invalidate-autopilot-suggestions' },
+      { surface: 'filters', label: 'Status/Project/Source/Impact/Risk filters', kind: 'button', target: 'setFilters' },
+      { surface: 'accept', label: 'Accept', kind: 'button', target: 'acceptAutopilotSuggestion' },
+      { surface: 'reject', label: 'Reject', kind: 'button', target: 'rejectAutopilotSuggestion' },
+      { surface: 'archive', label: 'Archive', kind: 'button', target: 'archiveAutopilotSuggestion' },
+      { surface: 'convert', label: 'Convert to Work Item', kind: 'button', target: 'convertAutopilotSuggestion:work-item' },
+      { surface: 'convert-plan', label: 'Convert + Plan', kind: 'button', target: 'convertAutopilotSuggestion:work-item-and-plan' },
+      { surface: 'convert-plan-build', label: 'Convert + Plan + Build Queued', kind: 'button', target: 'convertAutopilotSuggestion:work-item-plan-build-queued' },
+      { surface: 'open-project', label: 'Open Project', kind: 'link', target: '/projects/:projectId' },
+    ])
   })
 })

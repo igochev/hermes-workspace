@@ -33,6 +33,13 @@ export const PROJECT_AUTOPILOT_SCOUT_SOURCES = [
   'dependency-api-scout',
   'architecture-debt-scout',
 ] as const
+export const PROJECT_AUTOPILOT_CLICKABILITY_AUDIT = [
+  { surface: 'back-to-project', label: 'Back to Project', kind: 'link', target: '/projects/:projectId' },
+  { surface: 'save-schedule', label: PROJECT_AUTOPILOT_SAVE_BUTTON_LABEL, kind: 'button', target: 'saveProjectAutopilotSchedule' },
+  { surface: 'disable-schedule', label: 'Disable schedule', kind: 'button', target: 'disableProjectAutopilotSchedule' },
+  { surface: 'project-suggestion-preview', label: 'Suggestion preview', kind: 'static', target: null },
+  { surface: 'global-suggestions-copy', label: 'Convert + Plan is available from the global suggestions inbox.', kind: 'static', target: null },
+] as const
 
 export function ProjectAutopilotScreen({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient()

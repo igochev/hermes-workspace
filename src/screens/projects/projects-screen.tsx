@@ -36,6 +36,15 @@ export const PROJECTS_CARD_CLASS =
 export const PROJECTS_STAT_PILL_CLASS =
   'inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)]'
 
+export const PROJECTS_CLICKABILITY_AUDIT = [
+  { surface: 'refresh', label: 'Refresh', kind: 'button', target: 'projectsQuery.refetch' },
+  { surface: 'approvals-inbox', label: 'Approvals Inbox', kind: 'link', target: '/projects/approvals' },
+  { surface: 'autopilot-inbox', label: 'Autopilot Inbox', kind: 'link', target: '/projects/autopilot' },
+  { surface: 'new-project', label: 'New Project', kind: 'button', target: 'toggle-create-project-form' },
+  { surface: 'project-card', label: 'Open Project', kind: 'link', target: '/projects/:projectId' },
+  { surface: 'status-pill', label: 'Project status counts', kind: 'static', target: null },
+] as const
+
 const EMPTY_PROJECT_FORM: CreateProjectInput = {
   name: '',
   repoPath: '',

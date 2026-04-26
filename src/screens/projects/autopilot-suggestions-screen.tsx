@@ -37,6 +37,17 @@ export const AUTOPILOT_SUGGESTION_ACTION_LABELS = {
   reject: 'Reject',
   archive: 'Archive',
 } as const
+export const AUTOPILOT_SUGGESTIONS_CLICKABILITY_AUDIT = [
+  { surface: 'refresh', label: 'Refresh', kind: 'button', target: 'invalidate-autopilot-suggestions' },
+  { surface: 'filters', label: 'Status/Project/Source/Impact/Risk filters', kind: 'button', target: 'setFilters' },
+  { surface: 'accept', label: AUTOPILOT_SUGGESTION_ACTION_LABELS.accept, kind: 'button', target: 'acceptAutopilotSuggestion' },
+  { surface: 'reject', label: AUTOPILOT_SUGGESTION_ACTION_LABELS.reject, kind: 'button', target: 'rejectAutopilotSuggestion' },
+  { surface: 'archive', label: AUTOPILOT_SUGGESTION_ACTION_LABELS.archive, kind: 'button', target: 'archiveAutopilotSuggestion' },
+  { surface: 'convert', label: AUTOPILOT_SUGGESTION_CONVERT_BUTTON_LABEL, kind: 'button', target: 'convertAutopilotSuggestion:work-item' },
+  { surface: 'convert-plan', label: AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUTTON_LABEL, kind: 'button', target: 'convertAutopilotSuggestion:work-item-and-plan' },
+  { surface: 'convert-plan-build', label: AUTOPILOT_SUGGESTION_CONVERT_PLAN_BUILD_BUTTON_LABEL, kind: 'button', target: 'convertAutopilotSuggestion:work-item-plan-build-queued' },
+  { surface: 'open-project', label: 'Open Project', kind: 'link', target: '/projects/:projectId' },
+] as const
 export const AUTOPILOT_SUGGESTIONS_FILTER_OPTIONS: Array<{
   value: AutopilotSuggestionStatus
   label: string
