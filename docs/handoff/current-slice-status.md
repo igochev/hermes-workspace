@@ -5,8 +5,8 @@
 ## Active Plan
 
 - **Project:** Hermes Workspace — Dream Mission Control
-- **Slice:** AB/AC — Recovery Actions + Supervisor Controls
-- **Plan file:** `docs/plans/2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md`
+- **Slice:** Cycle 2 complete — V/W, X/Y, Z/AA, AB/AC shipped
+- **Plan file:** none active; last shipped `docs/plans/2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md`
 - **Plan index:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
 
 ## Completed Tasks
@@ -30,11 +30,15 @@
 - Slice AB/AC Task 1 — Pure work-item recovery recommendation helper/tests (`src/server/work-item-recovery-actions.ts`, `src/server/work-item-recovery-actions.test.ts`) ✅
 - Slice AB/AC Task 2 — Attention queue items now normalize/persist recommended recovery actions and builder attaches actions to derived/supervisor/capacity items (`src/server/attention-queue-store.ts`, `src/server/attention-queue.ts`, related tests) ✅
 - Slice AB/AC Task 3 — Recovery action execution route for relaunch, return to build, request review, mark/dismiss, and cancel with audit history/attention resolution (`src/routes/api/work-items.$workItemId.recovery-actions.ts`, `src/server/work-item-recovery-actions-routes.test.ts`, `src/routeTree.gen.ts`) ✅
+- Slice AB/AC Task 4 — Dashboard global attention cards now surface first recommended recovery action and deep-link to full work-item action list (`src/screens/dashboard/dashboard-screen.tsx`, `src/screens/dashboard/dashboard-screen.test.ts`) ✅
+- Slice AB/AC Task 5 — Work-item detail recovery panel with explicit action buttons/client helper and recovery invalidation (`src/screens/projects/work-item-detail-screen.tsx`, `src/lib/work-item-recovery-actions-api.ts`, `src/screens/projects/work-item-detail-screen.test.ts`) ✅
+- Slice AB/AC Task 6 — Full verification, service restart, API smoke, and browser UI smoke completed ✅
+- Cycle 2 complete: slices V/W, X/Y, Z/AA, AB/AC shipped and verified ✅
 
 ## Current State
 
 - Branch: `my-hermes-workspace-dev`; Cycle 2 baseline commit was `ac52b9b`.
-- Cycle 2 plan order: V/W telemetry+realtime ✅, X/Y profile readiness ✅, Z/AA Autopilot delegation ✅, AB/AC recovery actions active.
+- Cycle 2 plan order: V/W telemetry+realtime ✅, X/Y profile readiness ✅, Z/AA Autopilot delegation ✅, AB/AC recovery actions ✅. Cycle 2 is complete.
 - Slice V/W verification: full `pnpm vitest run` passed (289/289); `pnpm build` passed with existing Vite warnings; service/live smokes passed.
 - Slice X/Y implemented:
   - Task 1 — Pure profile readiness evaluator/tests (`src/server/profile-readiness.ts`, `src/server/profile-readiness.test.ts`) ✅
@@ -58,13 +62,17 @@
 - Slice AB/AC Tasks 1-3 RED/GREEN notes: Task 1 RED confirmed missing `work-item-recovery-actions` module; Task 2 RED confirmed attention items lacked `recommendedActions`; Task 3 RED confirmed missing `/api/work-items/$workItemId/recovery-actions` route.
 - Slice AB/AC Tasks 1-3 implementation notes: recovery recommendations are pure/deterministic; attention item normalization is migration-safe and upsert replaces actions on dedupe updates; recovery route keeps actions explicit/audited, resolves linked attention items, and relaunches only through existing `launchWorkItemIntoConductor` with an explicit phase.
 - Slice AB/AC Tasks 1-3 verification: focused `pnpm test src/server/work-item-recovery-actions-routes.test.ts src/server/work-item-recovery-actions.test.ts src/server/attention-queue-store.test.ts src/server/attention-queue.test.ts` passes (18/18); full `pnpm vitest run` passes (321/321); `pnpm build` passes with existing Vite sourcemap/dynamic-import/chunk-size warnings.
+- Slice AB/AC Tasks 4-5 RED confirmed with missing dashboard first-action metadata and missing work-item recovery panel helper; GREEN focused `pnpm test src/screens/dashboard/dashboard-screen.test.ts src/screens/projects/work-item-detail-screen.test.ts -- --runInBand` passes (24/24).
+- Slice AB/AC Tasks 4-5 implementation notes: dashboard global attention cards show the first recommended recovery action and deep-link copy; work-item detail fetches attention queue, filters open items for the work item, renders all recommended actions with explicit safe/destructive button styling, and posts through `src/lib/work-item-recovery-actions-api.ts` to the existing server recovery route.
+- Slice AB/AC full verification: focused AB/AC suite `pnpm test src/server/work-item-recovery-actions-routes.test.ts src/server/work-item-recovery-actions.test.ts src/server/attention-queue-store.test.ts src/server/attention-queue.test.ts src/screens/dashboard/dashboard-screen.test.ts src/screens/projects/work-item-detail-screen.test.ts -- --runInBand` passes (42/42); full `pnpm vitest run` passes (323/323); `pnpm build` passes with existing Vite sourcemap/dynamic-import/chunk-size warnings; `hermes-workspace.service` restarted active.
+- Slice AB/AC live smoke: `GET /api/projects` returned 200; synthetic work item `live-smoke-abac-2026-04-26T08-35-37-458Z` + attention `d33ab5bb-9b70-491a-b840-ce3c33b2dcb3` exposed recovery actions `[relaunch_phase, return_to_build, cancel_work_item, dismiss_attention]`; `POST /api/work-items/:id/recovery-actions` with `dismiss_attention` returned 200, resolved the attention item, and appended history note `Recovery action: attention dismissed...`; browser DOM confirmed dashboard deep-link copy and work-item detail `Recovery Actions` panel with `Relaunch build` and no-automatic-retry safety copy using second smoke item `live-smoke-abac-2026-04-26T08-36-51-166Z`.
 
 ## Next Steps
 
-**Next:** Continue Slice AB/AC with Task 4 — dashboard attention action UI (`src/screens/dashboard/dashboard-screen.tsx`, `src/screens/dashboard/dashboard-screen.test.ts`), then Task 5 work-item detail recovery panel and Task 6 live verification.
+**Next:** Cycle 2 is complete. Ask Main/Architect for the next Hermes Workspace slice/roadmap before Builder implements more product scope.
 
 ## Notes
 
 - Keep using TDD and update this handoff after every completed task.
-- Preserve PATCH partial-update safety: do not include undefined fields that wipe arrays.
-- AB/AC still needs operator-facing UI surfaces: dashboard first-action/deep link, then work-item detail full recovery panel.
+- Preserve PATCH partial-update safety: do not include undefined fields that wipe arrays such as `acceptanceCriteria`.
+- Do not invent Cycle 3 scope in Builder. Main/Architect should create/update the next plan and point this handoff at it.

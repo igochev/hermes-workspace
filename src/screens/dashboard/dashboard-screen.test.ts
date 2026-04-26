@@ -234,6 +234,46 @@ describe('dashboard mission control helpers', () => {
     })
   })
 
+  it('surfaces the first recommended recovery action and keeps a detail deep link', () => {
+    const surface = buildDashboardAttentionSurface([
+      makeAttentionItem({
+        id: 'failed-build',
+        dedupeKey: 'mission_failed:work-1',
+        kind: 'mission_failed',
+        severity: 'critical',
+        title: 'Build mission failed',
+        detail: 'Builder run exited non-zero.',
+        href: '/projects/project-1/work-items/work-1',
+        workItemId: 'work-1',
+        recommendedActions: [
+          {
+            type: 'relaunch_phase',
+            label: 'Relaunch build',
+            description: 'Relaunch the failed build through the existing launch path.',
+            phase: 'build',
+            destructive: false,
+            auditNote: 'Operator relaunched build from recovery actions.',
+          },
+          {
+            type: 'cancel_work_item',
+            label: 'Cancel work item',
+            description: 'Cancel the work item with an operator-supplied reason.',
+            destructive: true,
+            auditNote: 'Operator cancelled work item from recovery actions.',
+          },
+        ],
+      }),
+    ])
+
+    expect(surface.items[0]).toMatchObject({
+      firstActionLabel: 'Relaunch build',
+      firstActionDescription: 'Relaunch the failed build through the existing launch path.',
+      firstActionType: 'relaunch_phase',
+      detailHref: '/projects/project-1/work-items/work-1',
+      detailCta: 'Open detail for all recovery actions',
+    })
+  })
+
   it('builds a calm empty attention surface when no open items need operator action', () => {
     expect(buildDashboardAttentionSurface([])).toEqual({
       count: 0,
@@ -308,6 +348,7 @@ function makeAttentionItem(overrides: Partial<AttentionQueueItem>): AttentionQue
     status: overrides.status ?? 'open',
     firstSeenAt: overrides.firstSeenAt ?? '2026-04-22T09:00:00.000Z',
     lastSeenAt: overrides.lastSeenAt ?? '2026-04-22T10:00:00.000Z',
+    recommendedActions: overrides.recommendedActions ?? [],
   }
 }
 

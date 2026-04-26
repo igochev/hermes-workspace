@@ -19,6 +19,8 @@ import {
   getWorkItemPrimaryLaunchLabel,
   getWorkItemProfileReadinessAdvisory,
   getWorkItemProfileReadinessDecision,
+  getWorkItemRecoveryActionButtonLabel,
+  getWorkItemRecoveryPanelItems,
   parseWorkItemDetailListDraft,
   reviewDecisionLabel,
   reviewQualityGateLabel,
@@ -221,6 +223,63 @@ describe('work item detail screen theme classes', () => {
         fixHint: 'Hermes profile planner is available for review.',
       }),
     ).toBe('Selected phase profile: planner (project phase mapping). Ready for launch.')
+  })
+
+  it('builds the work-item recovery panel item list from open attention actions', () => {
+    const panelItems = getWorkItemRecoveryPanelItems([
+      {
+        id: 'resolved-attention',
+        status: 'resolved',
+        title: 'Old attention',
+        detail: 'Already handled.',
+        recommendedActions: [
+          {
+            type: 'dismiss_attention',
+            label: 'Dismiss attention',
+            description: 'Dismiss this old attention item.',
+            destructive: false,
+            auditNote: 'Dismissed.',
+          },
+        ],
+      },
+      {
+        id: 'failed-attention',
+        status: 'open',
+        title: 'Build mission failed',
+        detail: 'Builder exited non-zero.',
+        recommendedActions: [
+          {
+            type: 'relaunch_phase',
+            label: 'Relaunch build',
+            description: 'Relaunch the failed build through the existing launch path.',
+            phase: 'build',
+            destructive: false,
+            auditNote: 'Relaunched.',
+          },
+          {
+            type: 'cancel_work_item',
+            label: 'Cancel work item',
+            description: 'Cancel the work item with an operator-supplied reason.',
+            destructive: true,
+            auditNote: 'Cancelled.',
+          },
+        ],
+      },
+    ])
+
+    expect(panelItems).toEqual([
+      {
+        attentionItemId: 'failed-attention',
+        title: 'Build mission failed',
+        detail: 'Builder exited non-zero.',
+        actions: [
+          expect.objectContaining({ type: 'relaunch_phase', phase: 'build', label: 'Relaunch build' }),
+          expect.objectContaining({ type: 'cancel_work_item', label: 'Cancel work item' }),
+        ],
+      },
+    ])
+    expect(getWorkItemRecoveryActionButtonLabel(panelItems[0].actions[0])).toBe('Relaunch build')
+    expect(getWorkItemRecoveryActionButtonLabel(panelItems[0].actions[1])).toBe('Cancel work item')
   })
 
   it('formats non-fatal execution sync warnings for operator-visible banner copy', () => {

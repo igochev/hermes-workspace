@@ -12,6 +12,7 @@ import {
   fetchAttentionQueue,
 } from '@/lib/attention-queue-api'
 import type { AttentionKind, AttentionQueueItem } from '@/server/attention-queue-store'
+import type { WorkItemRecoveryActionType } from '@/server/work-item-recovery-actions'
 import {
   fetchApprovalInbox,
   type ApprovalInboxEntry,
@@ -64,6 +65,11 @@ type MissionControlQueueEntry = {
 type DashboardAttentionEntry = MissionControlQueueEntry & {
   badge: string
   severity: AttentionQueueItem['severity']
+  firstActionLabel?: string
+  firstActionDescription?: string
+  firstActionType?: WorkItemRecoveryActionType
+  detailHref: string
+  detailCta: string
 }
 
 type DashboardAttentionSurface = {
@@ -237,15 +243,23 @@ export function buildDashboardAttentionSurface(
   return {
     count: openItems.length,
     emptyCopy: DASHBOARD_ATTENTION_EMPTY_COPY,
-    items: openItems.slice(0, 5).map((item) => ({
-      id: item.id,
-      title: item.title,
-      subtitle: ATTENTION_KIND_LABELS[item.kind],
-      detail: item.detail,
-      href: item.href,
-      badge: item.severity,
-      severity: item.severity,
-    })),
+    items: openItems.slice(0, 5).map((item) => {
+      const firstAction = item.recommendedActions[0]
+      return {
+        id: item.id,
+        title: item.title,
+        subtitle: ATTENTION_KIND_LABELS[item.kind],
+        detail: item.detail,
+        href: item.href,
+        badge: item.severity,
+        severity: item.severity,
+        firstActionLabel: firstAction?.label,
+        firstActionDescription: firstAction?.description,
+        firstActionType: firstAction?.type,
+        detailHref: item.href,
+        detailCta: 'Open detail for all recovery actions',
+      }
+    }),
   }
 }
 
@@ -657,6 +671,18 @@ function MissionControlAttentionCard({
                 </span>
               </div>
               <div className="mt-1 text-[11px] text-muted">{entry.detail}</div>
+              {entry.firstActionLabel ? (
+                <div className="mt-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    Recommended recovery
+                  </div>
+                  <div className="mt-1 text-xs font-semibold text-ink">{entry.firstActionLabel}</div>
+                  <div className="mt-1 text-[11px] text-muted">{entry.firstActionDescription}</div>
+                </div>
+              ) : null}
+              <div className="mt-2 text-[11px] font-medium text-[var(--theme-accent)]">
+                {entry.detailCta} →
+              </div>
             </button>
           ))
         )}

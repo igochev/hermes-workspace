@@ -44,6 +44,15 @@ import type {
   ProfileReadinessStatus,
 } from '@/server/profile-readiness'
 import {
+  fetchAttentionQueue,
+} from '@/lib/attention-queue-api'
+import {
+  executeWorkItemRecoveryAction,
+  toRecoveryActionInput,
+} from '@/lib/work-item-recovery-actions-api'
+import type { AttentionQueueItem } from '@/server/attention-queue-store'
+import type { WorkItemRecoveryAction } from '@/server/work-item-recovery-actions'
+import {
   applyWorkItemLifecycleAction,
   syncWorkItemExecution,
   type WorkItemExecutionPayload,
@@ -64,6 +73,48 @@ export const WORK_ITEM_BLOCKED_REASON_HELP_TEXT =
 export const WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL = 'Open Conductor'
 export const WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE = 'Execution sync warning'
 export const WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE = 'Profile Preflight'
+export const WORK_ITEM_RECOVERY_PANEL_TITLE = 'Recovery Actions'
+
+type WorkItemRecoveryPanelSourceItem = Pick<
+  AttentionQueueItem,
+  'id' | 'status' | 'title' | 'detail' | 'recommendedActions'
+>
+
+export type WorkItemRecoveryPanelItem = {
+  attentionItemId: string
+  title: string
+  detail: string
+  actions: Array<WorkItemRecoveryAction>
+}
+
+export function getWorkItemRecoveryPanelItems(
+  attentionItems: Array<WorkItemRecoveryPanelSourceItem>,
+): Array<WorkItemRecoveryPanelItem> {
+  return attentionItems
+    .filter((item) => item.status === 'open' && item.recommendedActions.length > 0)
+    .map((item) => ({
+      attentionItemId: item.id,
+      title: item.title,
+      detail: item.detail,
+      actions: item.recommendedActions,
+    }))
+}
+
+export function getWorkItemRecoveryActionButtonLabel(action: WorkItemRecoveryAction): string {
+  if (action.type === 'relaunch_phase' && action.phase) {
+    return `Relaunch ${WORK_ITEM_PHASE_LABELS[action.phase].toLowerCase()}`
+  }
+  return action.label
+}
+
+const WORK_ITEM_RECOVERY_DEFAULT_NOTES: Record<WorkItemRecoveryAction['type'], string> = {
+  relaunch_phase: 'Operator relaunched phase from recovery panel.',
+  return_to_build: 'Operator returned work item to build from recovery panel.',
+  request_review: 'Operator requested review from recovery panel.',
+  mark_resolved: 'Operator marked attention externally resolved from recovery panel.',
+  cancel_work_item: 'Operator cancelled work item from recovery panel.',
+  dismiss_attention: 'Operator dismissed attention from recovery panel.',
+}
 
 const WORK_ITEM_PROFILE_READINESS_SOURCE_LABELS: Record<ProfileReadinessSource, string> = {
   'work-item-assigned-profile': 'work-item override',
@@ -480,6 +531,12 @@ export function WorkItemDetailScreen({
     queryFn: () => fetchProjectProfileReadiness(projectId, workItemId),
     refetchInterval: 60_000,
   })
+  const attentionQueryKey = ['mission-control', 'attention-queue', workItemId] as const
+  const attentionQuery = useQuery({
+    queryKey: attentionQueryKey,
+    queryFn: () => fetchAttentionQueue({ refresh: true }),
+    refetchInterval: 30_000,
+  })
 
   const launchMutation = useMutation({
     mutationFn: () =>
@@ -569,6 +626,32 @@ export function WorkItemDetailScreen({
     },
     onError: (error) => {
       toast(error instanceof Error ? error.message : 'Failed to apply lifecycle action', {
+        type: 'error',
+      })
+    },
+  })
+
+  const recoveryMutation = useMutation({
+    mutationFn: ({
+      action,
+      attentionItemId,
+    }: {
+      action: WorkItemRecoveryAction
+      attentionItemId: string
+    }) =>
+      executeWorkItemRecoveryAction(
+        workItemId,
+        toRecoveryActionInput(action, attentionItemId, WORK_ITEM_RECOVERY_DEFAULT_NOTES[action.type]),
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey })
+      await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      await queryClient.invalidateQueries({ queryKey: attentionQueryKey })
+      await queryClient.invalidateQueries({ queryKey: ['dashboard', 'mission-control', 'attention-queue'] })
+      toast('Recovery action applied')
+    },
+    onError: (error) => {
+      toast(error instanceof Error ? error.message : 'Failed to apply recovery action', {
         type: 'error',
       })
     },
@@ -776,6 +859,9 @@ export function WorkItemDetailScreen({
     latestRunStatus: execution?.latestRun?.status ?? null,
   })
   const approvalSummary = getWorkItemApprovalSummary(workItem?.approvals ?? [])
+  const recoveryPanelItems = getWorkItemRecoveryPanelItems(
+    (attentionQuery.data?.items ?? []).filter((item) => item.workItemId === workItemId),
+  )
   const latestPlanningDraft: PlanningDraftRecord | null = workItem?.latestPlanningDraft ?? null
   const planningDraftStatusLabel = getPlanningDraftStatusLabel(latestPlanningDraft?.status)
   const planningDraftGuidance = getPlanningDraftGuidance(latestPlanningDraft?.status)
@@ -1013,6 +1099,51 @@ export function WorkItemDetailScreen({
                 </div>
                 <div className="mt-2 text-sm text-[var(--theme-text)]">{approvalSummary}</div>
               </div>
+
+              {recoveryPanelItems.length > 0 ? (
+                <Panel title={WORK_ITEM_RECOVERY_PANEL_TITLE}>
+                  <div className="space-y-3">
+                    {recoveryPanelItems.map((item) => (
+                      <div
+                        key={item.attentionItemId}
+                        className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-3 text-sm text-[var(--theme-text)]"
+                      >
+                        <div className="font-semibold text-ink">{item.title}</div>
+                        <div className="mt-1 text-xs text-[var(--theme-muted)]">{item.detail}</div>
+                        <div className="mt-3 space-y-2">
+                          {item.actions.map((action) => (
+                            <div key={`${item.attentionItemId}-${action.type}-${action.phase ?? 'none'}`} className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="max-w-[20rem]">
+                                  <div className="text-xs font-semibold text-ink">
+                                    {getWorkItemRecoveryActionButtonLabel(action)}
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-[var(--theme-muted)]">{action.description}</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => recoveryMutation.mutate({ action, attentionItemId: item.attentionItemId })}
+                                  disabled={recoveryMutation.isPending}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+                                    action.destructive
+                                      ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                                      : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card)]/80'
+                                  }`}
+                                >
+                                  {recoveryMutation.isPending ? 'Applying…' : getWorkItemRecoveryActionButtonLabel(action)}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-xs text-[var(--theme-muted)]">
+                      Recovery actions are explicit operator controls. No automatic retry runs until you click an action.
+                    </div>
+                  </div>
+                </Panel>
+              ) : null}
 
               <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
