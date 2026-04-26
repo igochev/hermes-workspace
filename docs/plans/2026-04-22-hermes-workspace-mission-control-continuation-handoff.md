@@ -870,4 +870,41 @@ Grounded updates from this session:
   - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
   - Live smoke: `GET /api/attention-queue?refresh=true` → `200 {"items":[]}` and `GET /dashboard` → `200`
 
-If resuming later, start from `docs/handoff/current-slice-status.md`; the next task is Slice R/S PR 7 — Role capacity store/evaluator.
+### 2026-04-26 Slice R/S PR 7 completion snapshot
+
+Grounded updates from this session:
+
+- Added advisory role capacity policy persistence/evaluation:
+  - `src/server/role-capacity-policy-store.ts`
+  - `src/server/role-capacity-policy.ts`
+  - `src/routes/api/role-capacity-policy.ts`
+  - `src/lib/role-capacity-policy-api.ts`
+  - `src/routeTree.gen.ts`
+- Role capacity defaults are file-backed under `HERMES_HOME/role-capacity-policy.json`:
+  - `research=1`
+  - `build=2`
+  - `review=1`
+  - `deploy=1`
+  - `supervisor=1`
+- Evaluator behavior is advisory-only:
+  - counts active work items for the requested execution role/phase;
+  - optionally scopes count to matching assigned profile;
+  - returns `{ role, profile, activeCount, maxActive, allowed, advisoryOnly: true, message? }`;
+  - over-capacity returns `allowed=false` with operator-awareness message but does not block launch.
+- Added RED→GREEN coverage in `src/server/role-capacity-policy.test.ts`:
+  - default policy;
+  - invalid `maxActive` normalization;
+  - active build counting;
+  - under-capacity allowed;
+  - over-capacity advisory;
+  - API returns policy.
+- Verified commands:
+  - RED: `pnpm vitest run src/server/role-capacity-policy.test.ts` failed on missing role capacity module/route
+  - GREEN: focused role capacity tests → `6/6`
+  - Adjacent: `pnpm vitest run src/server/role-capacity-policy.test.ts src/server/attention-queue.test.ts src/server/attention-queue-store.test.ts src/server/work-item-supervisor.test.ts src/server/execution-runs-store.test.ts` → `31/31`
+  - Full: `pnpm vitest run` → `259/259`
+  - Build: `pnpm build` passed with existing Vite chunk/dynamic-import warnings
+  - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
+  - Live smoke: `GET /api/role-capacity-policy` → `200` with default roles `research, build, review, deploy, supervisor`
+
+If resuming later, start from `docs/handoff/current-slice-status.md`; the next task is Slice R/S PR 8 — Launch advisory integration.

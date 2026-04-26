@@ -49,6 +49,7 @@ import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiRoleCapacityPolicyRouteImport } from './routes/api/role-capacity-policy'
 import { Route as ApiProjectsRouteImport } from './routes/api/projects'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
@@ -326,6 +327,11 @@ const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
 const ApiSendRoute = ApiSendRouteImport.update({
   id: '/api/send',
   path: '/api/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRoleCapacityPolicyRoute = ApiRoleCapacityPolicyRouteImport.update({
+  id: '/api/role-capacity-policy',
+  path: '/api/role-capacity-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProjectsRoute = ApiProjectsRouteImport.update({
@@ -773,6 +779,7 @@ export interface FileRoutesByFullPath {
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/projects': typeof ApiProjectsRouteWithChildren
+  '/api/role-capacity-policy': typeof ApiRoleCapacityPolicyRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -890,6 +897,7 @@ export interface FileRoutesByTo {
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/projects': typeof ApiProjectsRouteWithChildren
+  '/api/role-capacity-policy': typeof ApiRoleCapacityPolicyRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1009,6 +1017,7 @@ export interface FileRoutesById {
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/projects': typeof ApiProjectsRouteWithChildren
+  '/api/role-capacity-policy': typeof ApiRoleCapacityPolicyRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1130,6 +1139,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/preview-file'
     | '/api/projects'
+    | '/api/role-capacity-policy'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1247,6 +1257,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/preview-file'
     | '/api/projects'
+    | '/api/role-capacity-policy'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1365,6 +1376,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/preview-file'
     | '/api/projects'
+    | '/api/role-capacity-policy'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -1485,6 +1497,7 @@ export interface RootRouteChildren {
   ApiPingRoute: typeof ApiPingRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
   ApiProjectsRoute: typeof ApiProjectsRouteWithChildren
+  ApiRoleCapacityPolicyRoute: typeof ApiRoleCapacityPolicyRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
@@ -1806,6 +1819,13 @@ declare module '@tanstack/react-router' {
       path: '/api/send'
       fullPath: '/api/send'
       preLoaderRoute: typeof ApiSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/role-capacity-policy': {
+      id: '/api/role-capacity-policy'
+      path: '/api/role-capacity-policy'
+      fullPath: '/api/role-capacity-policy'
+      preLoaderRoute: typeof ApiRoleCapacityPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/projects': {
@@ -2640,6 +2660,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPingRoute: ApiPingRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
   ApiProjectsRoute: ApiProjectsRouteWithChildren,
+  ApiRoleCapacityPolicyRoute: ApiRoleCapacityPolicyRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,

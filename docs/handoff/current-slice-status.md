@@ -22,9 +22,10 @@
 - Slice R/S PR 4 — Supervisor reconcile route/client (`src/routes/api/work-items.supervisor.reconcile.ts`, `src/lib/work-item-supervisor-api.ts`, `src/server/work-item-supervisor-routes.test.ts`) ✅
 - Slice R/S PR 5 — Attention queue store/builder/route (`src/server/attention-queue-store.ts`, `src/server/attention-queue.ts`, `src/routes/api/attention-queue.ts`, `src/lib/attention-queue-api.ts`) ✅
 - Slice R/S PR 6 — Dashboard attention surface (`src/screens/dashboard/dashboard-screen.tsx`, `src/screens/dashboard/dashboard-screen.test.ts`) ✅
+- Slice R/S PR 7 — Role capacity store/evaluator (`src/server/role-capacity-policy-store.ts`, `src/server/role-capacity-policy.ts`, `src/routes/api/role-capacity-policy.ts`, `src/lib/role-capacity-policy-api.ts`) ✅
 
 ## Current State
-- Slice R/S PR 1–6 implementation complete.
+- Slice R/S PR 1–7 implementation complete.
 - Durable execution-run store writes `work-item-execution-runs.json` under `HERMES_HOME`, supports create/upsert, dedupe by `workItemId + role + jobId + runId` (or without runId), filters, deletion by work item/project, and invalid JSON safe fallback.
 - Work-item launch now records scheduled mission execution runs; execution sync records mission run state/evidence/session details; structured review sync records review run details.
 - New API route/client helper: `GET /api/work-items/:workItemId/execution-runs` → `{ workItemId, runs }`.
@@ -33,13 +34,14 @@
 - New attention queue store writes `attention-queue.json` under `HERMES_HOME`, upserts by `dedupeKey`, reopens resolved items when seen again, and sorts open critical items before warnings/resolved items.
 - New attention queue builder derives pending approvals, failed missions/reviews, blocked work, supervisor stale findings, and capacity advisory items; `GET /api/attention-queue?refresh=true` refreshes/persists open queue items and `src/lib/attention-queue-api.ts` exposes the client helper.
 - Dashboard now fetches the persisted/refreshed global attention queue, renders an operator-facing Global attention card with open count, calm empty state, severity badges, critical-first ordering, refresh action, and project/work-item navigation.
-- Tests passing: PR 6 dashboard attention focused tests (`dashboard-screen`) → **5/5**; adjacent PR 1–6 targeted verification (`attention-queue*`, `work-item-supervisor*`, `execution-runs*`, `work-item-execution`, `dashboard-screen`) → **49/49**; full `pnpm vitest run` → **253/253**.
+- New role capacity policy store/evaluator writes `role-capacity-policy.json` under `HERMES_HOME`, exposes default advisory capacities (`research=1`, `build=2`, `review=1`, `deploy=1`, `supervisor=1`), normalizes invalid `maxActive`, counts active phase-matching work items, and exposes `GET /api/role-capacity-policy` plus `fetchRoleCapacityPolicy()`.
+- Tests passing: PR 7 role capacity focused tests (`role-capacity-policy`) → **6/6**; adjacent PR 1–7 targeted verification (`attention-queue*`, `work-item-supervisor*`, `execution-runs*`, `role-capacity-policy`) → **31/31**; full `pnpm vitest run` → **259/259**.
 - Build passing: `pnpm build` with existing Vite chunk/dynamic-import warnings.
-- Service status: restarted after PR 6 dashboard addition; `hermes-workspace.service` is active.
-- Live API/page smoke: `GET /api/attention-queue?refresh=true` returned `200 {"items":[]}` on current live data; `GET /dashboard` returned `200`.
+- Service status: restarted after PR 7 route addition; `hermes-workspace.service` is active.
+- Live API smoke: `GET /api/role-capacity-policy` returned `200` with roles `research, build, review, deploy, supervisor`.
 
 ## Next Steps
-**Next:** Slice R/S PR 7 — Role capacity store/evaluator (`src/server/role-capacity-policy-store.ts`, `src/server/role-capacity-policy.ts`, `src/routes/api/role-capacity-policy.ts`, `src/lib/role-capacity-policy-api.ts`).
+**Next:** Slice R/S PR 8 — Launch advisory integration (`src/server/work-item-launch.ts`, `src/server/work-item-launch.test.ts`, `src/lib/work-item-launch-api.ts`).
 
 ## Notes
 - Build still emits existing Vite chunk-size/dynamic-import warnings; build exits successfully.
