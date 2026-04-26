@@ -36,6 +36,13 @@ import {
 } from '@/lib/planning-drafts-api'
 import { resolveWorkItemApproval } from '@/lib/work-item-approvals-api'
 import { launchWorkItem } from '@/lib/work-item-launch-api'
+import { fetchProjectProfileReadiness } from '@/lib/profile-readiness-api'
+import type {
+  ProfileReadinessReport,
+  ProfileReadinessRoleReport,
+  ProfileReadinessSource,
+  ProfileReadinessStatus,
+} from '@/server/profile-readiness'
 import {
   applyWorkItemLifecycleAction,
   syncWorkItemExecution,
@@ -56,6 +63,42 @@ export const WORK_ITEM_BLOCKED_REASON_HELP_TEXT =
   'Classify why this work item is blocked so board triage and recovery guidance stay actionable.'
 export const WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL = 'Open Conductor'
 export const WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE = 'Execution sync warning'
+export const WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE = 'Profile Preflight'
+
+const WORK_ITEM_PROFILE_READINESS_SOURCE_LABELS: Record<ProfileReadinessSource, string> = {
+  'work-item-assigned-profile': 'work-item override',
+  'project-phase-profile': 'project phase mapping',
+  'project-autopilot-policy': 'project Autopilot policy',
+  default: 'default mapping',
+  none: 'no mapping',
+}
+
+const WORK_ITEM_PROFILE_READINESS_STATUS_LABELS: Record<ProfileReadinessStatus, string> = {
+  ready: 'Ready for launch.',
+  unmapped: 'No mapped Hermes profile; launch may use fallback routing.',
+  missing: 'Warning: missing Hermes profile.',
+  unknown: 'Warning: profile availability could not be checked.',
+}
+
+export function getWorkItemProfileReadinessDecision(
+  report: ProfileReadinessReport | null | undefined,
+  phase: 'research' | 'build' | 'review' | 'deploy' | undefined,
+): ProfileReadinessRoleReport | undefined {
+  if (!report || !phase) return undefined
+  return report.roles.find((role) => role.role === phase)
+}
+
+export function getWorkItemProfileReadinessAdvisory(
+  decision: ProfileReadinessRoleReport | undefined,
+): string {
+  if (!decision) return 'Profile readiness is loading for this work item launch path.'
+
+  const profile = decision.mappedProfile ?? 'Unmapped'
+  const source = WORK_ITEM_PROFILE_READINESS_SOURCE_LABELS[decision.source]
+  const status = WORK_ITEM_PROFILE_READINESS_STATUS_LABELS[decision.status]
+  const fixHint = decision.status === 'ready' ? '' : ` ${decision.fixHint}`
+  return `Selected phase profile: ${profile} (${source}). ${status}${fixHint}`
+}
 
 export function getWorkItemExecutionSyncWarningMessage(warning?: string): string | null {
   if (!warning || warning.trim().length === 0) return null
@@ -431,6 +474,12 @@ export function WorkItemDetailScreen({
     queryFn: () => syncWorkItemExecution(workItemId),
     refetchInterval: 30_000,
   })
+  const profileReadinessQueryKey = ['mission-control', 'projects', projectId, 'profile-readiness', workItemId] as const
+  const profileReadinessQuery = useQuery({
+    queryKey: profileReadinessQueryKey,
+    queryFn: () => fetchProjectProfileReadiness(projectId, workItemId),
+    refetchInterval: 60_000,
+  })
 
   const launchMutation = useMutation({
     mutationFn: () =>
@@ -440,6 +489,7 @@ export function WorkItemDetailScreen({
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey })
       await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
+      await queryClient.invalidateQueries({ queryKey: profileReadinessQueryKey })
       const isTwoPhase = !!result.workItem.planFilePath
       toast(
         isTwoPhase
@@ -737,6 +787,13 @@ export function WorkItemDetailScreen({
     : true
   const isBuildLaunchAction =
     primaryLaunchLabel === 'Launch Build' || primaryLaunchLabel === 'Relaunch Build'
+  const profileReadinessDecision = getWorkItemProfileReadinessDecision(
+    profileReadinessQuery.data?.report,
+    workItem?.phase,
+  )
+  const profileReadinessAdvisory = getWorkItemProfileReadinessAdvisory(profileReadinessDecision)
+  const profileReadinessIsWarning =
+    profileReadinessDecision?.status === 'missing' || profileReadinessDecision?.status === 'unknown'
 
   useEffect(() => {
     if (!executionSyncWarning) return
@@ -894,10 +951,25 @@ export function WorkItemDetailScreen({
                   {WORK_ITEM_DETAIL_ACTION_GROUP_TITLES.execution}
                 </div>
                 <div className="mt-2 text-sm text-[var(--theme-text)]">{executionSummary}</div>
+                <div
+                  className={`mt-3 rounded-xl border px-3 py-2 text-xs ${
+                    profileReadinessIsWarning
+                      ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                      : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)]'
+                  }`}
+                >
+                  <div className="font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                    {WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE}
+                  </div>
+                  <div className="mt-1 text-[var(--theme-text)]">{profileReadinessAdvisory}</div>
+                </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => void workItemQuery.refetch()}
+                    onClick={() => {
+                      void workItemQuery.refetch()
+                      void profileReadinessQuery.refetch()
+                    }}
                     className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]/80"
                   >
                     <HugeiconsIcon icon={RefreshIcon} size={14} />

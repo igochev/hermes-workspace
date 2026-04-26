@@ -1,5 +1,6 @@
 import type { ProjectRecord, WorkItemPhase, WorkItemRecord } from './projects-api'
 import type { LaunchCapacityDecision } from '../server/role-capacity-policy'
+import type { ProfileReadinessReport, ProfileReadinessRoleReport } from '../server/profile-readiness'
 
 const WORK_ITEMS_BASE = '/api/work-items'
 
@@ -17,6 +18,8 @@ export type WorkItemLaunchResponse = {
   workItem: WorkItemRecord
   project: ProjectRecord
   capacityDecision: LaunchCapacityDecision
+  profileReadinessReport: ProfileReadinessReport
+  profileReadinessDecision: ProfileReadinessRoleReport
   launch: {
     ok: true
     sessionKey: string

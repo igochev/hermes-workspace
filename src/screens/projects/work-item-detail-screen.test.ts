@@ -17,6 +17,8 @@ import {
   getWorkItemLifecycleActionLabel,
   getWorkItemOperatorGuidance,
   getWorkItemPrimaryLaunchLabel,
+  getWorkItemProfileReadinessAdvisory,
+  getWorkItemProfileReadinessDecision,
   parseWorkItemDetailListDraft,
   reviewDecisionLabel,
   reviewQualityGateLabel,
@@ -33,6 +35,7 @@ import {
   WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL,
   WORK_ITEM_DETAIL_PANEL_CLASS,
   WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE,
+  WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE,
 } from './work-item-detail-screen'
 
 describe('work item detail screen theme classes', () => {
@@ -173,6 +176,51 @@ describe('work item detail screen theme classes', () => {
       ]),
     ).toBe('2 approvals need attention — pending review approval and changes requested.')
     expect(getWorkItemApprovalSummary([])).toBe('No approvals are currently blocking this work item.')
+  })
+
+  it('formats profile readiness preflight advisories for launch controls', () => {
+    const report = {
+      overallStatus: 'missing' as const,
+      severity: 'warning' as const,
+      roles: [
+        {
+          role: 'build' as const,
+          mappedProfile: 'missing-specialist',
+          source: 'work-item-assigned-profile' as const,
+          status: 'missing' as const,
+          severity: 'warning' as const,
+          fixHint: 'Create missing-specialist or choose an available build profile.',
+        },
+      ],
+    }
+
+    const decision = getWorkItemProfileReadinessDecision(report, 'build')
+
+    expect(WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE).toBe('Profile Preflight')
+    expect(decision).toMatchObject({
+      mappedProfile: 'missing-specialist',
+      source: 'work-item-assigned-profile',
+      status: 'missing',
+    })
+    expect(getWorkItemProfileReadinessAdvisory(decision)).toBe(
+      'Selected phase profile: missing-specialist (work-item override). Warning: missing Hermes profile. Create missing-specialist or choose an available build profile.',
+    )
+    expect(getWorkItemProfileReadinessAdvisory(undefined)).toBe(
+      'Profile readiness is loading for this work item launch path.',
+    )
+  })
+
+  it('formats ready project-mapped profile readiness preflight copy', () => {
+    expect(
+      getWorkItemProfileReadinessAdvisory({
+        role: 'review',
+        mappedProfile: 'planner',
+        source: 'project-phase-profile',
+        status: 'ready',
+        severity: 'ready',
+        fixHint: 'Hermes profile planner is available for review.',
+      }),
+    ).toBe('Selected phase profile: planner (project phase mapping). Ready for launch.')
   })
 
   it('formats non-fatal execution sync warnings for operator-visible banner copy', () => {

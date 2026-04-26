@@ -21,6 +21,12 @@ import {
 import { upsertExecutionRun } from './execution-runs-store'
 import { evaluateLaunchCapacity, type LaunchCapacityDecision } from './role-capacity-policy'
 import { refreshAttentionQueue } from './attention-queue'
+import {
+  evaluateProfileReadiness,
+  type ProfileReadinessReport,
+  type ProfileReadinessRoleReport,
+} from './profile-readiness'
+import { listProfiles } from './profiles-browser'
 
 export type WorkItemLaunchRequest = {
   phase?: unknown
@@ -36,6 +42,8 @@ export type WorkItemLaunchResponse = {
   workItem: WorkItemRecord
   project: ProjectRecord
   capacityDecision: LaunchCapacityDecision
+  profileReadinessReport: ProfileReadinessReport
+  profileReadinessDecision: ProfileReadinessRoleReport
   launch: ConductorLaunchResult & {
     phase: WorkItemPhase
     profile: string | null
@@ -84,6 +92,55 @@ function buildLaunchPhaseProfiles(params: {
   }
 
   return merged
+}
+
+function discoverAvailableProfilesForReadiness(): Array<string> | null {
+  try {
+    return listProfiles().map((profile) => profile.name)
+  } catch {
+    return null
+  }
+}
+
+function evaluateLaunchProfileReadiness(params: {
+  project: ProjectRecord
+  workItem: WorkItemRecord
+  phase: WorkItemPhase
+  resolvedProfile: string | null
+}): {
+  profileReadinessReport: ProfileReadinessReport
+  profileReadinessDecision: ProfileReadinessRoleReport
+} {
+  const readinessWorkItem = {
+    ...params.workItem,
+    phase: params.phase,
+    assignedProfile: params.resolvedProfile ?? undefined,
+  }
+  const profileReadinessReport = evaluateProfileReadiness({
+    project: params.project,
+    workItem: readinessWorkItem,
+    availableProfiles: discoverAvailableProfilesForReadiness(),
+  })
+  const profileReadinessDecision = profileReadinessReport.roles.find((role) => role.role === params.phase)
+
+  if (!profileReadinessDecision) {
+    throw new Error(`Profile readiness decision missing for launch phase ${params.phase}`)
+  }
+
+  return { profileReadinessReport, profileReadinessDecision }
+}
+
+function buildProfileReadinessAdvisory(role: ProfileReadinessRoleReport): string | null {
+  if (role.status !== 'missing' && role.status !== 'unknown') return null
+  const profile = role.mappedProfile ? `profile ${role.mappedProfile}` : 'no mapped profile'
+  return `Profile readiness advisory: ${role.role} uses ${profile} (${role.status}). ${role.fixHint}`
+}
+
+function joinLaunchAdvisories(baseNote: string, advisories: Array<string | null>): string {
+  return advisories.filter((advisory): advisory is string => Boolean(advisory)).reduce(
+    (note, advisory) => `${note} ${advisory}`,
+    baseNote,
+  )
 }
 
 function buildAcceptanceCriteriaBlock(workItem: WorkItemRecord): string[] {
@@ -398,6 +455,13 @@ export async function launchWorkItemIntoConductor(
     })
   }
 
+  const { profileReadinessReport, profileReadinessDecision } = evaluateLaunchProfileReadiness({
+    project,
+    workItem,
+    phase,
+    resolvedProfile,
+  })
+
   const capacityDecision = evaluateLaunchCapacity({
     role: phase,
     profile: resolvedProfile ?? undefined,
@@ -468,9 +532,12 @@ export async function launchWorkItemIntoConductor(
       : resolvedProfile
         ? `Launched ${phase} via Conductor using profile ${resolvedProfile}.`
         : `Launched ${phase} via Conductor.`
-  const note = !capacityDecision.allowed && capacityDecision.message
-    ? `${baseNote} Capacity advisory: ${capacityDecision.message}`
-    : baseNote
+  const note = joinLaunchAdvisories(baseNote, [
+    !capacityDecision.allowed && capacityDecision.message
+      ? `Capacity advisory: ${capacityDecision.message}`
+      : null,
+    buildProfileReadinessAdvisory(profileReadinessDecision),
+  ])
 
   const updatedWithHistory = appendWorkItemHistoryEntry(workItem.id, {
     action: 'launch',
@@ -505,6 +572,8 @@ export async function launchWorkItemIntoConductor(
     workItem: updatedWithHistory,
     project,
     capacityDecision,
+    profileReadinessReport,
+    profileReadinessDecision,
     launch: {
       ...launch,
       phase,

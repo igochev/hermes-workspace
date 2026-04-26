@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { launchConductorMission, buildMissionLink } = vi.hoisted(() => ({
+const { launchConductorMission, buildMissionLink, listProfiles } = vi.hoisted(() => ({
   launchConductorMission: vi.fn(),
   buildMissionLink: (jobId: string) => `/jobs?jobId=${encodeURIComponent(jobId)}`,
+  listProfiles: vi.fn(),
 }))
 
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
   buildMissionLink,
+}))
+
+vi.mock('./profiles-browser', () => ({
+  listProfiles,
 }))
 
 import { createProject } from './projects-store'
@@ -36,6 +41,17 @@ describe('work-item-launch', () => {
     previousHermesHome = process.env.HERMES_HOME
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     launchConductorMission.mockReset()
+    listProfiles.mockReset()
+    listProfiles.mockReturnValue([
+      { name: 'researcher' },
+      { name: 'planner' },
+      { name: 'builder' },
+      { name: 'reviewer' },
+      { name: 'deployer' },
+      { name: 'project-builder' },
+      { name: 'project-reviewer' },
+      { name: 'global-builder' },
+    ])
   })
 
   afterEach(async () => {
@@ -534,6 +550,120 @@ describe('work-item-launch', () => {
       advisoryOnly: true,
       message: 'build capacity is at 1/1 active work items; launch may proceed with operator awareness.',
     })
+    expect(result.workItem.status).toBe('active')
+  })
+
+  it('includes profile readiness advisory without changing launch resolution order', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+      phaseProfiles: {
+        build: 'project-builder',
+      },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Assigned profile overrides project readiness mapping',
+      status: 'ready',
+      phase: 'build',
+      priority: 'high',
+      assignedProfile: 'missing-specialist',
+      repoPathSnapshot: project.repoPath,
+      planFilePath: 'docs/plans/assigned-profile.md',
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-903_pending',
+      sessionKeyPrefix: 'cron_job-903_',
+      jobId: 'job-903',
+      jobName: 'work-item-build-readiness',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'build',
+      phaseProfiles: { build: 'global-builder' },
+    })
+
+    expect(result.launch.profile).toBe('missing-specialist')
+    expect(result.profileReadinessDecision).toMatchObject({
+      role: 'build',
+      mappedProfile: 'missing-specialist',
+      source: 'work-item-assigned-profile',
+      status: 'missing',
+      severity: 'warning',
+    })
+    expect(result.profileReadinessReport.roles.find((role) => role.role === 'build')).toMatchObject({
+      mappedProfile: 'missing-specialist',
+      status: 'missing',
+    })
+    expect(result.workItem.history.at(-1)?.note).toContain('Profile readiness advisory:')
+    expect(result.workItem.history.at(-1)?.note).toContain('missing-specialist')
+    expect(launchConductorMission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phaseProfiles: expect.objectContaining({ build: 'missing-specialist' }),
+      }),
+    )
+  })
+
+  it('keeps capacity advisory behavior while adding unknown readiness when profile discovery fails', async () => {
+    listProfiles.mockImplementation(() => {
+      throw new Error('profile browser unavailable')
+    })
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+      phaseProfiles: { build: 'builder' },
+    })
+    upsertRoleCapacityRule({ role: 'build', profile: 'builder', maxActive: 1, enabled: true })
+    createWorkItem({
+      projectId: project.id,
+      title: 'Already active build',
+      status: 'active',
+      phase: 'build',
+      priority: 'medium',
+      assignedProfile: 'builder',
+      repoPathSnapshot: project.repoPath,
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Launch with capacity and readiness advisories',
+      status: 'ready',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      planFilePath: 'docs/plans/capacity-and-readiness.md',
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-904_pending',
+      sessionKeyPrefix: 'cron_job-904_',
+      jobId: 'job-904',
+      jobName: 'work-item-build-capacity-readiness',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'build',
+      phaseProfiles: { build: 'builder' },
+    })
+
+    expect(result.launch.jobId).toBe('job-904')
+    expect(result.capacityDecision.allowed).toBe(false)
+    expect(result.capacityDecision.message).toContain('build capacity is at 1/1')
+    expect(result.profileReadinessDecision).toMatchObject({
+      role: 'build',
+      mappedProfile: 'builder',
+      status: 'unknown',
+      severity: 'unknown',
+    })
+    expect(result.profileReadinessReport.overallStatus).toBe('unknown')
+    expect(result.workItem.history.at(-1)?.note).toContain('Capacity advisory: build capacity is at 1/1')
+    expect(result.workItem.history.at(-1)?.note).toContain('Profile readiness advisory:')
     expect(result.workItem.status).toBe('active')
   })
 

@@ -27,13 +27,14 @@
 - Acceptance criteria should be drafted/refined by Planner, not forced at initial capture time.
 - New north-star roadmap for the next era: `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`.
 - Implementer-ready plan index for cheaper models: `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`.
-- Recommended next slice: **Slice N/O — Idea Intake + Planner Enrichment + Structured Planner Output**.
+- Current compact execution handoff is authoritative for Builder: `docs/handoff/current-slice-status.md`.
+- Current next slice after 2026-04-26 Slice X/Y completion: **Slice Z/AA — Autopilot Delegation Policies**.
 
 ### 1.2 Live-verified runtime facts
 - Runtime repo in use: `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
 - Local systemd service in use: `hermes-workspace.service`
 - Serving locally on port `3456`
-- Branch state on 2026-04-24: `my-hermes-workspace-dev...origin/my-hermes-workspace-dev` with a clean working tree
+- Branch state on 2026-04-26: `my-hermes-workspace-dev` with Slice V/W and Slice X/Y shipped in Cycle 2; see `docs/handoff/current-slice-status.md` for the exact active next slice.
 - Known verification project: `46b401f9-9243-472f-b5b7-04bf34596906`
 - Browser may show onboarding/mobile overlay first; use **Skip setup** if needed.
 - `jq` is unavailable in this environment; use Python for JSON/HTTP inspection.
@@ -64,6 +65,8 @@
   - `missionSessionKeyPrefix`
   - `missionLink`
   - `missionState`
+- Work-item launch responses now include profile readiness advisories (`profileReadinessReport` and selected-phase `profileReadinessDecision`) beside capacity advisories; launch history records missing/unknown profile readiness without hard-blocking.
+- Project detail and work-item detail now expose profile readiness/preflight UI so operators see mapped profile, mapping source, status, and fix hints before launch.
 - Launch routing precedence is implemented and test-verified as:
   1. explicit work-item profile override
   2. project phase routing
