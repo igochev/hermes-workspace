@@ -88,6 +88,9 @@ describe('attention queue builder', () => {
         kind: 'mission_failed',
         severity: 'critical',
         detail: expect.stringContaining('Tests failed'),
+        recommendedActions: expect.arrayContaining([
+          expect.objectContaining({ type: 'relaunch_phase', phase: 'build' }),
+        ]),
       }),
     )
   })

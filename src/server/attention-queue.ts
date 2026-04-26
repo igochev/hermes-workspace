@@ -9,6 +9,7 @@ import {
   type AttentionQueueSource,
   type AttentionSeverity,
 } from './attention-queue-store'
+import { recommendWorkItemRecoveryActions, type WorkItemRecoveryAction } from './work-item-recovery-actions'
 
 export type BuildAttentionQueueOptions = {
   supervisorFindings?: Array<SupervisorFinding>
@@ -42,6 +43,7 @@ function buildTransientItem(input: {
   detail: string
   href: string
   source: AttentionQueueSource
+  recommendedActions?: Array<WorkItemRecoveryAction>
 }): AttentionQueueItem {
   const now = new Date().toISOString()
   return {
@@ -58,6 +60,17 @@ function buildTransientItem(input: {
     status: 'open',
     firstSeenAt: now,
     lastSeenAt: now,
+    recommendedActions: input.recommendedActions ?? [],
+  }
+}
+
+function withRecommendedActions(
+  item: AttentionQueueItem,
+  workItem: WorkItemRecord | undefined,
+): AttentionQueueItem {
+  return {
+    ...item,
+    recommendedActions: recommendWorkItemRecoveryActions({ attentionItem: item, workItem }),
   }
 }
 
@@ -97,102 +110,97 @@ export function buildAttentionQueue(options: BuildAttentionQueueOptions = {}): A
     if (approval.status !== 'pending') continue
     const workItem = workItemById.get(approval.workItemId)
     if (!workItem) continue
-    items.push(
-      buildTransientItem({
-        dedupeKey: `approval:${approval.workItemId}:${approval.phase}`,
-        kind: 'approval_pending',
-        severity: 'warning',
-        projectId: approval.projectId,
-        workItemId: approval.workItemId,
-        title: `${approval.phase === 'deploy' ? 'Deploy' : 'Review'} approval pending`,
-        detail: `${workItem.title} is waiting for ${approval.phase} approval.`,
-        href: workItemHref(workItem),
-        source: 'derived',
-      }),
-    )
+    const item = buildTransientItem({
+      dedupeKey: `approval:${approval.workItemId}:${approval.phase}`,
+      kind: 'approval_pending',
+      severity: 'warning',
+      projectId: approval.projectId,
+      workItemId: approval.workItemId,
+      title: `${approval.phase === 'deploy' ? 'Deploy' : 'Review'} approval pending`,
+      detail: `${workItem.title} is waiting for ${approval.phase} approval.`,
+      href: workItemHref(workItem),
+      source: 'derived',
+    })
+    items.push(withRecommendedActions(item, workItem))
   }
 
   for (const workItem of workItems) {
     if (workItem.status === 'blocked') {
-      items.push(
-        buildTransientItem({
-          dedupeKey: `blocked:${workItem.id}`,
-          kind: 'blocked_work',
-          severity: 'warning',
-          projectId: workItem.projectId,
-          workItemId: workItem.id,
-          title: 'Blocked work item',
-          detail: `${workItem.title} is blocked${workItem.blockedReason ? ` (${workItem.blockedReason})` : ''}.`,
-          href: workItemHref(workItem),
-          source: 'derived',
-        }),
-      )
+      const item = buildTransientItem({
+        dedupeKey: `blocked:${workItem.id}`,
+        kind: 'blocked_work',
+        severity: 'warning',
+        projectId: workItem.projectId,
+        workItemId: workItem.id,
+        title: 'Blocked work item',
+        detail: `${workItem.title} is blocked${workItem.blockedReason ? ` (${workItem.blockedReason})` : ''}.`,
+        href: workItemHref(workItem),
+        source: 'derived',
+      })
+      items.push(withRecommendedActions(item, workItem))
     }
 
     if (workItem.missionState === 'failed') {
-      items.push(
-        buildTransientItem({
-          dedupeKey: `mission_failed:${workItem.id}`,
-          kind: 'mission_failed',
-          severity: 'critical',
-          projectId: workItem.projectId,
-          workItemId: workItem.id,
-          title: 'Mission failed',
-          detail: failureDetail(`${workItem.title} mission failed`, workItem),
-          href: workItemHref(workItem),
-          source: 'derived',
-        }),
-      )
+      const item = buildTransientItem({
+        dedupeKey: `mission_failed:${workItem.id}`,
+        kind: 'mission_failed',
+        severity: 'critical',
+        projectId: workItem.projectId,
+        workItemId: workItem.id,
+        title: 'Mission failed',
+        detail: failureDetail(`${workItem.title} mission failed`, workItem),
+        href: workItemHref(workItem),
+        source: 'derived',
+      })
+      items.push(withRecommendedActions(item, workItem))
     }
 
     if (workItem.reviewState === 'failed' || workItem.reviewDecision === 'changes_requested') {
-      items.push(
-        buildTransientItem({
-          dedupeKey: `review_failed:${workItem.id}`,
-          kind: 'review_failed',
-          severity: 'critical',
-          projectId: workItem.projectId,
-          workItemId: workItem.id,
-          title: 'Review needs attention',
-          detail: `${workItem.title} review failed or requested changes.`,
-          href: workItemHref(workItem),
-          source: 'derived',
-        }),
-      )
+      const item = buildTransientItem({
+        dedupeKey: `review_failed:${workItem.id}`,
+        kind: 'review_failed',
+        severity: 'critical',
+        projectId: workItem.projectId,
+        workItemId: workItem.id,
+        title: 'Review needs attention',
+        detail: `${workItem.title} review failed or requested changes.`,
+        href: workItemHref(workItem),
+        source: 'derived',
+      })
+      items.push(withRecommendedActions(item, workItem))
     }
   }
 
   for (const finding of options.supervisorFindings ?? []) {
     const workItem = workItemById.get(finding.workItemId)
-    items.push(
-      buildTransientItem({
-        dedupeKey: supervisorDedupeKey(finding),
-        kind: supervisorAttentionKind(finding),
-        severity: finding.severity === 'critical' ? 'critical' : 'warning',
-        projectId: finding.projectId,
-        workItemId: finding.workItemId,
-        title: finding.kind === 'sync_error' ? 'Execution sync failed' : 'Execution needs attention',
-        detail: finding.message,
-        href: workItem ? workItemHref(workItem) : `/projects/${finding.projectId}`,
-        source: 'supervisor',
-      }),
-    )
+    const item = buildTransientItem({
+      dedupeKey: supervisorDedupeKey(finding),
+      kind: supervisorAttentionKind(finding),
+      severity: finding.severity === 'critical' ? 'critical' : 'warning',
+      projectId: finding.projectId,
+      workItemId: finding.workItemId,
+      title: finding.kind === 'sync_error' ? 'Execution sync failed' : 'Execution needs attention',
+      detail: finding.message,
+      href: workItem ? workItemHref(workItem) : `/projects/${finding.projectId}`,
+      source: 'supervisor',
+    })
+    items.push(withRecommendedActions(item, workItem))
   }
 
   for (const capacity of options.capacityItems ?? []) {
-    items.push(
-      buildTransientItem({
-        dedupeKey: `capacity:${capacity.dedupeKey}`,
-        kind: 'capacity_exceeded',
-        severity: capacity.severity ?? 'warning',
-        projectId: capacity.projectId,
-        workItemId: capacity.workItemId,
-        title: capacity.title,
-        detail: capacity.detail,
-        href: capacity.href,
-        source: 'capacity',
-      }),
-    )
+    const workItem = capacity.workItemId ? workItemById.get(capacity.workItemId) : undefined
+    const item = buildTransientItem({
+      dedupeKey: `capacity:${capacity.dedupeKey}`,
+      kind: 'capacity_exceeded',
+      severity: capacity.severity ?? 'warning',
+      projectId: capacity.projectId,
+      workItemId: capacity.workItemId,
+      title: capacity.title,
+      detail: capacity.detail,
+      href: capacity.href,
+      source: 'capacity',
+    })
+    items.push(withRecommendedActions(item, workItem))
   }
 
   return sortAttentionItems(items)

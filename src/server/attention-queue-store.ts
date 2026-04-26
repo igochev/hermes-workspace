@@ -3,6 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
+import type { WorkItemRecoveryAction } from './work-item-recovery-actions'
+
 export type AttentionKind =
   | 'approval_pending'
   | 'mission_failed'
@@ -28,6 +30,7 @@ export type AttentionQueueItem = {
   status: AttentionQueueStatus
   firstSeenAt: string
   lastSeenAt: string
+  recommendedActions: Array<WorkItemRecoveryAction>
 }
 
 type AttentionQueueFile = {
@@ -44,6 +47,7 @@ type UpsertAttentionQueueItemInput = {
   detail: string
   href: string
   source: AttentionQueueSource
+  recommendedActions?: Array<WorkItemRecoveryAction>
 }
 
 const VALID_KINDS: Array<AttentionKind> = [
@@ -115,6 +119,34 @@ function normalizeStatus(value: unknown): AttentionQueueStatus {
   return value === 'resolved' ? 'resolved' : 'open'
 }
 
+const VALID_ACTION_TYPES: Array<WorkItemRecoveryAction['type']> = [
+  'relaunch_phase',
+  'return_to_build',
+  'request_review',
+  'mark_resolved',
+  'cancel_work_item',
+  'dismiss_attention',
+]
+
+function normalizeRecommendedActions(value: unknown): Array<WorkItemRecoveryAction> {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is Partial<WorkItemRecoveryAction> => Boolean(item) && typeof item === 'object')
+    .map((item) => ({
+      type: VALID_ACTION_TYPES.includes(item.type as WorkItemRecoveryAction['type'])
+        ? (item.type as WorkItemRecoveryAction['type'])
+        : 'dismiss_attention',
+      label: asString(item.label, 'Dismiss attention'),
+      description: asString(item.description, 'Dismiss this attention item.'),
+      phase:
+        item.phase === 'research' || item.phase === 'build' || item.phase === 'review' || item.phase === 'deploy'
+          ? item.phase
+          : undefined,
+      destructive: item.destructive === true,
+      auditNote: asString(item.auditNote, 'Operator used a recovery action.'),
+    }))
+}
+
 function normalizeAttentionQueueItem(
   item: Partial<AttentionQueueItem> &
     Pick<AttentionQueueItem, 'id' | 'dedupeKey' | 'projectId' | 'title' | 'detail' | 'href' | 'firstSeenAt' | 'lastSeenAt'>,
@@ -133,6 +165,7 @@ function normalizeAttentionQueueItem(
     status: normalizeStatus(item.status),
     firstSeenAt: item.firstSeenAt,
     lastSeenAt: item.lastSeenAt,
+    recommendedActions: normalizeRecommendedActions((item as Partial<AttentionQueueItem>).recommendedActions),
   }
 }
 
@@ -186,6 +219,7 @@ export function upsertAttentionQueueItem(input: UpsertAttentionQueueItemInput): 
     status: 'open',
     firstSeenAt: existing?.firstSeenAt ?? now,
     lastSeenAt: now,
+    recommendedActions: input.recommendedActions,
   })
 
   if (existingIndex === -1) items.push(next)

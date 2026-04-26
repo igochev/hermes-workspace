@@ -115,6 +115,7 @@ import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs
 import { Route as ApiAutopilotSuggestionsSuggestionIdRouteImport } from './routes/api/autopilot-suggestions.$suggestionId'
 import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
 import { Route as ApiWorkItemsSupervisorReconcileRouteImport } from './routes/api/work-items.supervisor.reconcile'
+import { Route as ApiWorkItemsWorkItemIdRecoveryActionsRouteImport } from './routes/api/work-items.$workItemId.recovery-actions'
 import { Route as ApiWorkItemsWorkItemIdPrepareRouteImport } from './routes/api/work-items.$workItemId.prepare'
 import { Route as ApiWorkItemsWorkItemIdPlanningDraftsRouteImport } from './routes/api/work-items.$workItemId.planning-drafts'
 import { Route as ApiWorkItemsWorkItemIdLifecycleRouteImport } from './routes/api/work-items.$workItemId.lifecycle'
@@ -667,6 +668,12 @@ const ApiWorkItemsSupervisorReconcileRoute =
     path: '/supervisor/reconcile',
     getParentRoute: () => ApiWorkItemsRoute,
   } as any)
+const ApiWorkItemsWorkItemIdRecoveryActionsRoute =
+  ApiWorkItemsWorkItemIdRecoveryActionsRouteImport.update({
+    id: '/recovery-actions',
+    path: '/recovery-actions',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
 const ApiWorkItemsWorkItemIdPrepareRoute =
   ApiWorkItemsWorkItemIdPrepareRouteImport.update({
     id: '/prepare',
@@ -871,6 +878,7 @@ export interface FileRoutesByFullPath {
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
   '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
+  '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
   '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -990,6 +998,7 @@ export interface FileRoutesByTo {
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
   '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
+  '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
   '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -1113,6 +1122,7 @@ export interface FileRoutesById {
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
   '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
+  '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
   '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -1237,6 +1247,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId/lifecycle'
     | '/api/work-items/$workItemId/planning-drafts'
     | '/api/work-items/$workItemId/prepare'
+    | '/api/work-items/$workItemId/recovery-actions'
     | '/api/work-items/supervisor/reconcile'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesByTo: FileRoutesByTo
@@ -1356,6 +1367,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId/lifecycle'
     | '/api/work-items/$workItemId/planning-drafts'
     | '/api/work-items/$workItemId/prepare'
+    | '/api/work-items/$workItemId/recovery-actions'
     | '/api/work-items/supervisor/reconcile'
     | '/projects/$projectId/work-items/$workItemId'
   id:
@@ -1478,6 +1490,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId/lifecycle'
     | '/api/work-items/$workItemId/planning-drafts'
     | '/api/work-items/$workItemId/prepare'
+    | '/api/work-items/$workItemId/recovery-actions'
     | '/api/work-items/supervisor/reconcile'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesById: FileRoutesById
@@ -2309,6 +2322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkItemsSupervisorReconcileRouteImport
       parentRoute: typeof ApiWorkItemsRoute
     }
+    '/api/work-items/$workItemId/recovery-actions': {
+      id: '/api/work-items/$workItemId/recovery-actions'
+      path: '/recovery-actions'
+      fullPath: '/api/work-items/$workItemId/recovery-actions'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdRecoveryActionsRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
     '/api/work-items/$workItemId/prepare': {
       id: '/api/work-items/$workItemId/prepare'
       path: '/prepare'
@@ -2614,6 +2634,7 @@ interface ApiWorkItemsWorkItemIdRouteChildren {
   ApiWorkItemsWorkItemIdLifecycleRoute: typeof ApiWorkItemsWorkItemIdLifecycleRoute
   ApiWorkItemsWorkItemIdPlanningDraftsRoute: typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
   ApiWorkItemsWorkItemIdPrepareRoute: typeof ApiWorkItemsWorkItemIdPrepareRoute
+  ApiWorkItemsWorkItemIdRecoveryActionsRoute: typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
 }
 
 const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
@@ -2626,6 +2647,8 @@ const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
     ApiWorkItemsWorkItemIdPlanningDraftsRoute:
       ApiWorkItemsWorkItemIdPlanningDraftsRoute,
     ApiWorkItemsWorkItemIdPrepareRoute: ApiWorkItemsWorkItemIdPrepareRoute,
+    ApiWorkItemsWorkItemIdRecoveryActionsRoute:
+      ApiWorkItemsWorkItemIdRecoveryActionsRoute,
   }
 
 const ApiWorkItemsWorkItemIdRouteWithChildren =

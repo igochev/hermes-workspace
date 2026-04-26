@@ -31,7 +31,7 @@ describe('attention-queue-store', () => {
     expect(listAttentionQueueItems()).toEqual([])
   })
 
-  it('upserts by dedupe key while preserving firstSeenAt and updating details', () => {
+  it('upserts by dedupe key while preserving firstSeenAt and updating details/actions', () => {
     const first = upsertAttentionQueueItem({
       dedupeKey: 'work-1:mission_failed',
       kind: 'mission_failed',
@@ -42,6 +42,16 @@ describe('attention-queue-store', () => {
       detail: 'Original failure',
       href: '/projects/project-1/work-items/work-1',
       source: 'derived',
+      recommendedActions: [
+        {
+          type: 'relaunch_phase',
+          label: 'Relaunch build',
+          description: 'Relaunch the build phase',
+          phase: 'build',
+          destructive: false,
+          auditNote: 'Operator requested build relaunch from recovery actions.',
+        },
+      ],
     })
 
     const second = upsertAttentionQueueItem({
@@ -54,6 +64,15 @@ describe('attention-queue-store', () => {
       detail: 'Updated failure',
       href: '/projects/project-1/work-items/work-1',
       source: 'supervisor',
+      recommendedActions: [
+        {
+          type: 'return_to_build',
+          label: 'Return to build',
+          description: 'Move back to build',
+          destructive: false,
+          auditNote: 'Operator returned work item to build from recovery actions.',
+        },
+      ],
     })
 
     expect(second.id).toBe(first.id)
@@ -61,6 +80,7 @@ describe('attention-queue-store', () => {
     expect(second.title).toBe('Mission still failed')
     expect(second.detail).toBe('Updated failure')
     expect(second.source).toBe('supervisor')
+    expect(second.recommendedActions).toEqual([expect.objectContaining({ type: 'return_to_build' })])
     expect(listAttentionQueueItems()).toHaveLength(1)
   })
 
