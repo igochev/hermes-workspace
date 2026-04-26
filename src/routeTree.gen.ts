@@ -44,6 +44,7 @@ import { Route as ApiStartHermesRouteImport } from './routes/api/start-hermes'
 import { Route as ApiStartAgentRouteImport } from './routes/api/start-agent'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
+import { Route as ApiSessionTelemetryRouteImport } from './routes/api/session-telemetry'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
 import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
@@ -302,6 +303,11 @@ const ApiSkillsRoute = ApiSkillsRouteImport.update({
 const ApiSessionsRoute = ApiSessionsRouteImport.update({
   id: '/api/sessions',
   path: '/api/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionTelemetryRoute = ApiSessionTelemetryRouteImport.update({
+  id: '/api/session-telemetry',
+  path: '/api/session-telemetry',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionStatusRoute = ApiSessionStatusRouteImport.update({
@@ -785,6 +791,7 @@ export interface FileRoutesByFullPath {
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
+  '/api/session-telemetry': typeof ApiSessionTelemetryRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
@@ -903,6 +910,7 @@ export interface FileRoutesByTo {
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
+  '/api/session-telemetry': typeof ApiSessionTelemetryRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
@@ -1023,6 +1031,7 @@ export interface FileRoutesById {
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
+  '/api/session-telemetry': typeof ApiSessionTelemetryRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
@@ -1145,6 +1154,7 @@ export interface FileRouteTypes {
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
+    | '/api/session-telemetry'
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
@@ -1263,6 +1273,7 @@ export interface FileRouteTypes {
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
+    | '/api/session-telemetry'
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
@@ -1382,6 +1393,7 @@ export interface FileRouteTypes {
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
+    | '/api/session-telemetry'
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
@@ -1503,6 +1515,7 @@ export interface RootRouteChildren {
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
   ApiSessionSendRoute: typeof ApiSessionSendRoute
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
+  ApiSessionTelemetryRoute: typeof ApiSessionTelemetryRoute
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRouteWithChildren
   ApiStartAgentRoute: typeof ApiStartAgentRoute
@@ -1784,6 +1797,13 @@ declare module '@tanstack/react-router' {
       path: '/api/sessions'
       fullPath: '/api/sessions'
       preLoaderRoute: typeof ApiSessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/session-telemetry': {
+      id: '/api/session-telemetry'
+      path: '/api/session-telemetry'
+      fullPath: '/api/session-telemetry'
+      preLoaderRoute: typeof ApiSessionTelemetryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/session-status': {
@@ -2666,6 +2686,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,
   ApiSessionSendRoute: ApiSessionSendRoute,
   ApiSessionStatusRoute: ApiSessionStatusRoute,
+  ApiSessionTelemetryRoute: ApiSessionTelemetryRoute,
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRouteWithChildren,
   ApiStartAgentRoute: ApiStartAgentRoute,

@@ -1,8 +1,8 @@
-# Hermes Workspace — Dream Mission Control Implementation Plan Index (2026-04-25)
+# Hermes Workspace — Dream Mission Control Implementation Plan Index (Updated 2026-04-26)
 
-> **For Hermes:** This is the implementation entrypoint for the new Dream Mission Control roadmap. Cheaper implementer models should start here, then open only the specific slice plan they are assigned.
+> **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **CEO/Architect source roadmap:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`
+> **Current CEO/Architect gap analysis:** `docs/plans/2026-04-26-hermes-workspace-next-cycle-gap-analysis.md`
 >
 > **Repo:** `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
 
@@ -10,27 +10,31 @@
 
 ## 1. Why this index exists
 
-The previous roadmap documents contain valuable history, but they are now too long and too mixed between completed slice logs, old assumptions, and new strategy. This index separates the new roadmap into executable work packages that a less expensive model can follow without re-reading every historical document.
+This index keeps Builder sessions cheap and reliable. Historical roadmaps and shipped slice plans remain valuable, but Builder should implement only the active detailed plan referenced by `docs/handoff/current-slice-status.md`.
 
-**Rule for implementers:** do not implement from the high-level roadmap directly. Implement from the detailed slice plans below.
+**Rule for implementers:** do not implement from high-level analysis directly. Implement from the detailed slice plan in the handoff.
 
 ---
 
 ## 2. Canonical implementation order
 
+### Cycle 1 — shipped
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| 1 | `2026-04-25-hermes-workspace-slice-n-o-idea-planner-enrichment-plan.md` | Rough idea → Planner-prepared draft → ready work item | Shipped |
+| 2 | `2026-04-25-hermes-workspace-slice-p-q-autopilot-suggestions-plan.md` | Project-aware Autopilot suggestion inbox and scout schedules | Shipped |
+| 3 | `2026-04-25-hermes-workspace-slice-t-u-structured-review-quality-gates-plan.md` | Parse Planner review output and enforce quality gates | Shipped |
+| 4 | `2026-04-25-hermes-workspace-slice-r-s-execution-runs-supervisor-plan.md` | Durable run records, stale supervisor, global attention, capacity policy | Shipped |
+
+### Cycle 2 — active next work
+
 | Order | Plan | Purpose | Why here |
 |---:|---|---|---|
-| 1 | `2026-04-25-hermes-workspace-slice-n-o-idea-planner-enrichment-plan.md` | Rough idea → Planner-prepared draft → ready work item | Highest user-value; enables easy delegation |
-| 2 | `2026-04-25-hermes-workspace-slice-p-q-autopilot-suggestions-plan.md` | Project-aware Autopilot suggestion inbox and scout schedules | Adds Multica-like proactive ideation safely |
-| 3 | `2026-04-25-hermes-workspace-slice-t-u-structured-review-quality-gates-plan.md` | Parse Planner review output and enforce quality gates | Prevents false approvals before scaling automation |
-| 4 | `2026-04-25-hermes-workspace-slice-r-s-execution-runs-supervisor-plan.md` | Durable run records, stale supervisor, global attention, capacity policy | Reduces babysitting and improves operational reliability |
-
-This order is intentional:
-
-1. make manual delegation easy;
-2. add safe proactive suggestions;
-3. harden quality gates;
-4. harden runtime supervision and cockpit experience.
+| 1 | `2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md` | Dashboard token/session telemetry and realtime session updates | Directly addresses reported dashboard stats + stale chat sessions |
+| 2 | `2026-04-26-hermes-workspace-slice-x-y-profile-role-preflight-plan.md` | Profile/role readiness preflight for phase mappings and launches | Proves Hermes multi-profile roles are real before scaling autonomy |
+| 3 | `2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` | Developer-grade Autopilot delegation policies and Convert+Plan actions | Turns safe suggestions into useful semi-autonomous delegation |
+| 4 | `2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md` | Recovery actions and supervisor controls for failed/stale runs | Converts attention signals into less-babysitting recovery workflow |
 
 ---
 
@@ -39,13 +43,13 @@ This order is intentional:
 Current inspected baseline:
 
 - Branch: `my-hermes-workspace-dev`
-- Recent commit inspected: `a07667f GPT 5.5 New Roadmap vision of Hermes Workspace`
+- Commit inspected for this update: `ac52b9b`
 - Test command: `pnpm vitest run` or `pnpm test`
 - Build command: `pnpm build`
 - Service: `hermes-workspace.service`
 - Local app: `http://localhost:3456`
 
-Core existing seams:
+Core seams:
 
 | Area | Existing files |
 |---|---|
@@ -53,12 +57,13 @@ Core existing seams:
 | Work items | `src/server/work-items-store.ts`, `src/routes/api/work-items.ts`, `src/routes/api/work-items.$workItemId.ts` |
 | Lifecycle | `src/server/work-item-lifecycle.ts`, `src/routes/api/work-items.$workItemId.lifecycle.ts` |
 | Launch/execution | `src/server/work-item-launch.ts`, `src/server/work-item-execution.ts`, `src/server/conductor-launch.ts` |
-| Approvals | `src/server/work-item-approvals.ts`, `src/routes/api/work-item-approvals*.ts` |
-| Project board | `src/screens/projects/project-detail-screen.tsx`, `src/lib/projects-view-model.ts` |
-| Work-item cockpit | `src/screens/projects/work-item-detail-screen.tsx` |
+| Phase profiles | `src/lib/conductor-phase-profiles.ts`, `src/server/work-item-launch.ts` |
+| Approvals/review gates | `src/server/work-item-approvals.ts`, `src/server/work-item-review-decision.ts`, `src/routes/api/work-item-approvals*.ts` |
+| Execution runs/supervisor | `src/server/execution-runs-store.ts`, `src/server/work-item-supervisor.ts`, `src/routes/api/work-items.supervisor.reconcile.ts` |
+| Attention queue | `src/server/attention-queue.ts`, `src/server/attention-queue-store.ts`, `src/routes/api/attention-queue.ts` |
+| Autopilot | `src/server/autopilot-suggestions-store.ts`, `src/routes/api/autopilot-suggestions*`, `src/screens/projects/*autopilot*` |
 | Dashboard | `src/screens/dashboard/dashboard-screen.tsx` |
-| Generic jobs | `src/server/hermes-jobs.ts`, `src/routes/api/hermes-jobs*.ts`, `src/screens/jobs/jobs-screen.tsx` |
-| Client API types | `src/lib/projects-api.ts`, `src/lib/work-item-launch-api.ts`, `src/lib/work-item-execution-api.ts` |
+| Chat sessions/events | `src/components/workspace-shell.tsx`, `src/screens/chat/chat-queries.ts`, `src/routes/api/sessions.ts`, `src/routes/api/chat-events.ts` |
 
 ---
 
@@ -66,60 +71,48 @@ Core existing seams:
 
 1. **Work Item is the source of truth.** Hermes jobs and Conductor runs are execution engines only.
 2. **Structured output before mutation.** Planner/Reviewer output must be parsed and validated before mutating work-item fields or approvals.
-3. **Suggestions before autonomous code.** Autopilot creates suggestions, not direct work items or code changes, until approved by policy/operator.
-4. **File-backed first, DB later.** Keep these slices merge-safe using current JSON-store conventions.
-5. **No automatic retries in first supervisor slice.** Observe and escalate first; recover later.
+3. **Suggestions before autonomous code.** Autopilot creates suggestions and policy-gated plans, not silent direct code changes.
+4. **File-backed first, DB later.** Keep new stores merge-safe using current JSON-store conventions.
+5. **Observe before auto-retry.** Recovery actions can be recommended and clicked; fully automatic retry loops need an explicit future policy.
 6. **No random UI-triggered automation.** Use server routes/helpers so rules are testable.
 7. **TDD is mandatory.** Add failing tests first where practical, then minimal implementation.
 8. **Every slice updates docs/handoff after verification.** Keep continuation accurate.
+9. **Preserve PATCH partial-update safety.** Do not include undefined fields that wipe arrays such as `acceptanceCriteria`.
+10. **Role routing must be visible.** If a work item launches through a profile, the operator should see which profile and why.
 
 ---
 
-## 5. Execution protocol for cheaper implementer models
+## 5. Execution protocol for Builder
 
-### Starting a fresh session
+When the user sends a minimal prompt like `proceed on Hermes Workspace`:
 
-When the user sends a minimal prompt like "proceed on Hermes Workspace":
+1. Navigate to the repo: `~/.Hermes/workspace/projects/hermes-workspace`.
+2. Read first: `docs/handoff/current-slice-status.md`.
+3. Read this index for architecture rules if needed.
+4. Read only the active detailed slice plan from the handoff.
+5. Implement the next uncompleted task.
+6. Update `docs/handoff/current-slice-status.md` after each task or before stopping.
+7. Report tests/build/live verification status.
 
-1. Navigate to the project repo: `~/.Hermes/workspace/projects/hermes-workspace`
-2. **Read first:** `docs/handoff/current-slice-status.md` — this tells you which plan is active, what's done, what's next
-3. If new to this project, read this index (sections 4 + 8) for architecture rules
-4. Read the active slice plan (from the handoff) for implementation details
-5. Implement the next uncompleted task
-6. **Update `docs/handoff/current-slice-status.md`** with completed task, next step, and current test/build state
-7. Report results
+For every task:
 
-For each assigned plan (when implementing):
+1. inspect exact files named in the plan;
+2. write failing tests where practical;
+3. run focused test and confirm RED;
+4. implement minimal code;
+5. run focused test and adjacent tests;
+6. update handoff.
 
-1. Read this index (first time in this project).
-2. Read the handoff to find position.
-3. Read only the assigned detailed plan.
-4. Inspect the exact files named in that plan.
-5. Create a todo list from the plan tasks.
-6. Implement one task at a time.
-7. For each task:
-   - write failing test;
-   - run focused test and confirm RED;
-   - implement minimal code;
-   - run focused test and confirm GREEN;
-   - run adjacent regression tests;
-   - update handoff with completed task.
-8. After all tasks in the plan:
-   - run all targeted tests named in the plan;
-   - run `pnpm vitest run` or `pnpm test`;
-   - run `pnpm build`;
-   - restart service if runtime behavior changed;
-   - live verify when UI/API changed;
-   - update roadmap/handoff with shipped status.
+For every shipped slice:
 
-Recommended controller workflow:
+```bash
+pnpm vitest run
+pnpm build
+systemctl --user restart hermes-workspace.service
+systemctl --user is-active hermes-workspace.service
+```
 
-- Use `subagent-driven-development`.
-- Dispatch one implementer per task.
-- After each task, run two reviews:
-  1. spec compliance;
-  2. code quality.
-- Do not let implementers broaden scope to later slices.
+Then live verify UI/API changes.
 
 ---
 
@@ -127,43 +120,34 @@ Recommended controller workflow:
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-25-hermes-workspace-dream-mission-control-roadmap.md` | Canonical north-star | Strategy only; do not implement directly |
-| This index | Canonical implementation entrypoint | Start here after context reset |
-| `slice-n-o-idea-planner-enrichment-plan.md` | Detailed plan | Implement first |
-| `slice-p-q-autopilot-suggestions-plan.md` | Detailed plan | Implement after Slice N/O |
-| `slice-t-u-structured-review-quality-gates-plan.md` | Detailed plan | Implement before scaling automation further |
-| `slice-r-s-execution-runs-supervisor-plan.md` | Detailed plan | Implement after quality gates, or earlier if stale jobs become painful |
-| `2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md` | Historical shipped slices A-M | Use for context only |
-| `2026-04-25-hermes-workspace-workflow-quality-analysis.md` | Historical gap analysis | Mostly superseded; useful for decisions behind A-M |
+| `2026-04-26-hermes-workspace-next-cycle-gap-analysis.md` | Current analysis | Strategy/context only; do not implement directly |
+| This index | Current implementation entrypoint | Builder reads after handoff |
+| `2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md` | Active detailed plan | Implement first in Cycle 2 |
+| `2026-04-26-hermes-workspace-slice-x-y-profile-role-preflight-plan.md` | Detailed plan | Implement second |
+| `2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` | Detailed plan | Implement third |
+| `2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md` | Detailed plan | Implement fourth |
+| Cycle 1 slice plans N/O, P/Q, T/U, R/S | Shipped historical implementation plans | Use only for context/regression expectations |
 | `2026-04-25-hermes-workspace-profiles-workflow-rearchitecture.md` | Profile/pipeline architecture record | Use for profile assumptions |
-| `2026-04-22-hermes-workspace-mission-control-continuation-handoff.md` | Continuation handoff | Must point here after this doc update |
-| `2026-04-21-hermes-workspace-mission-control-roadmap.md` | Long historical roadmap | Keep; append snapshots only |
+| `2026-04-25-hermes-workspace-workflow-quality-analysis.md` | Historical gap analysis | Mostly superseded by 2026-04-26 analysis |
+| `2026-04-21-hermes-workspace-mission-control-roadmap.md` | Long historical roadmap | Keep; append snapshots only if needed |
 
 ---
 
-## 7. Slice dependencies
+## 7. Cycle 2 dependency graph
 
 ```text
-Slice N/O: PlanningDraft + structured Planner output
-  └─ enables safer Builder launch and better acceptance criteria
+Slice V/W: Telemetry + realtime session truth
+  └─ makes the cockpit trustworthy before more automation
 
-Slice P/Q: Autopilot suggestions + schedules
-  └─ can convert suggestions into rough work items that use Slice N/O
+Slice X/Y: Profile/role readiness preflight
+  └─ proves role mappings are usable before Autopilot launches more work
 
-Slice T/U: Structured review + quality gates
-  └─ depends on existing Planner-as-Reviewer and benefits from Slice N/O plan evidence
+Slice Z/AA: Autopilot delegation policies
+  └─ depends on profile confidence; uses Planner enrichment from Cycle 1
 
-Slice R/S/V/X: Runs + supervisor + attention + capacity
-  └─ can be built incrementally; execution runs improve review/evidence and attention queue
+Slice AB/AC: Recovery actions + supervisor controls
+  └─ depends on execution runs/attention from Cycle 1; benefits from profile readiness
 ```
-
-Recommended hard dependency:
-
-- Build **Slice N/O before Slice P/Q**, because accepted Autopilot suggestions should flow into the same Planner enrichment path.
-
-Recommended soft dependency:
-
-- Build **Slice T/U before fully trusting Autopilot-generated work**, because review must be structured and safe.
 
 ---
 
@@ -175,10 +159,10 @@ A plan is not shipped until:
 - relevant existing tests pass;
 - full regression passes;
 - `pnpm build` passes;
-- route tree / generated route artifacts are updated if necessary;
+- route tree/generated route artifacts are updated if necessary;
 - service restarts if runtime changed;
 - UI/API live verification is completed;
-- continuation handoff and relevant roadmap docs are updated.
+- continuation handoff and relevant docs are updated.
 
 ---
 
@@ -186,26 +170,10 @@ A plan is not shipped until:
 
 Start with:
 
-`docs/plans/2026-04-25-hermes-workspace-slice-n-o-idea-planner-enrichment-plan.md`
+`docs/plans/2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md`
 
-The first implementation sub-slice should be **PlanningDraft store + parser tests**, not UI.
+The first implementation task should be **session telemetry aggregate helpers/tests**, not UI.
 
-## 10. After all current slices ship
+## 10. After Cycle 2 ships
 
-When all 4 slices (N/O → P/Q → T/U → R/S) are implemented and verified:
-
-1. The handoff at `docs/handoff/current-slice-status.md` will be updated by Builder to reflect "all planned slices complete"
-2. D3n13r or Main can request new features for the next cycle
-3. **Main's job** (me, Hermes Main profile): analyze the request, create new slice plans, update this index with new entries in the doc map, update the handoff to point to the first new slice
-4. **Builder's job**: implements from whatever the handoff points to — no knowledge of cycles needed
-5. **D3n13r's job**: says "proceed on Hermes Workspace" — same as always
-
-### What this means in practice
-
-When you finish this cycle and want something new:
-- You tell **me** (Main) what you want next
-- I create new slice plans + update the index + update the handoff
-- You tell Builder "proceed on Hermes Workspace" 
-- Builder reads the updated handoff and continues seamlessly
-
-**No new protocol needed.** The same self-navigation system handles new feature cycles transparently.
+When V/W, X/Y, Z/AA, and AB/AC are complete, Builder should update the handoff to say all Cycle 2 slices are shipped and ask Main/Architect for the next cycle.
