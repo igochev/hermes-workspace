@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Suspense, lazy } from 'react'
 import type { SessionMeta } from '@/screens/chat/types'
 import type { AuthStatus } from '@/lib/hermes-auth'
@@ -22,6 +22,7 @@ import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
+import { useSessionEventsRefresh } from '@/screens/chat/hooks/use-session-events-refresh'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
@@ -48,6 +49,9 @@ const TerminalWorkspace = lazy(() =>
 type SessionsListResponse = Array<SessionMeta>
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
   'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+export const LIVE_SESSION_STALE_TIME_MS = 1_000
+export const POLLING_SESSION_STALE_TIME_MS = 10_000
+export const SESSION_POLL_INTERVAL_MS = 15_000
 
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
@@ -154,12 +158,22 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const showDesktopSidebarBackdrop =
     !isMobile && !isOnChatRoute && !sidebarCollapsed
 
+  const queryClient = useQueryClient()
+  const sessionEventsRefresh = useSessionEventsRefresh({
+    queryClient,
+    queryKey: chatQueryKeys.sessions,
+  })
+
   // Sessions query — shared across sidebar and chat
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
     queryFn: fetchSessions,
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+    refetchInterval:
+      sessionEventsRefresh.status === 'live' ? false : SESSION_POLL_INTERVAL_MS,
+    staleTime:
+      sessionEventsRefresh.status === 'live'
+        ? LIVE_SESSION_STALE_TIME_MS
+        : POLLING_SESSION_STALE_TIME_MS,
   })
 
   const sessions = sessionsQuery.data ?? []

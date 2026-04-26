@@ -3,19 +3,23 @@
 > Canonical continuation handoff for Builder sessions.
 
 ## Active Plan
+
 - **Project:** Hermes Workspace — Dream Mission Control
 - **Slice:** V/W — Telemetry + Realtime Session Truth
 - **Plan file:** `docs/plans/2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md`
 - **Plan index:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
 
 ## Completed Tasks
+
 - Cycle 1 complete: slices N/O, P/Q, T/U, R/S shipped and verified ✅
 - Main/Architect created Cycle 2 gap analysis and slice plans ✅
 - Slice V/W Task 1 — Session telemetry aggregate helpers/tests (`src/server/session-telemetry.ts`, `src/server/session-telemetry.test.ts`) ✅
 - Slice V/W Task 2 — `/api/session-telemetry` route + route tests (`src/routes/api/session-telemetry.ts`, `src/server/session-telemetry-routes.test.ts`, `src/routeTree.gen.ts`) ✅
 - Slice V/W Task 3 — Client telemetry API + dashboard telemetry cards/table (`src/lib/session-telemetry-api.ts`, `src/screens/dashboard/dashboard-screen.tsx`, `src/screens/dashboard/dashboard-screen.test.ts`) ✅
+- Slice V/W Task 4 — Realtime chat-events session refresh hook + WorkspaceShell wiring (`src/screens/chat/hooks/use-session-events-refresh.ts`, `src/screens/chat/hooks/use-session-events-refresh.test.ts`, `src/components/workspace-shell.tsx`) ✅
 
 ## Current State
+
 - Baseline branch: `my-hermes-workspace-dev`; inspected commit: `ac52b9b`.
 - Cycle 1 final handoff reported full `pnpm vitest run` passing **261/261**, `pnpm build` passing, service active, and role-capacity/attention live smoke OK.
 - User-reported priorities for Cycle 2: dashboard token/statistics truth, realtime chat/session list freshness, stronger Autopilot features, and verification that Hermes profiles/roles work flawlessly with project Kanban.
@@ -23,11 +27,14 @@
 - Task 1 verification: `pnpm test src/server/session-telemetry.test.ts` passes (6/6); Prettier check passes; subagent spec review PASS and final quality review APPROVED.
 - Task 2 verification: `pnpm test src/server/session-telemetry.test.ts src/server/session-telemetry-routes.test.ts` passes (10/10); `pnpm build` passes with existing Vite chunk/dynamic-import warnings; subagent spec review PASS and quality review APPROVED after adding auth/error fallback coverage.
 - Task 3 verification: RED confirmed in `src/screens/dashboard/dashboard-screen.test.ts` for missing telemetry labels/helper; `pnpm test src/server/session-telemetry.test.ts src/server/session-telemetry-routes.test.ts src/screens/dashboard/dashboard-screen.test.ts` passes (17/17); `pnpm build` passes with existing Vite sourcemap/chunk/dynamic-import warnings. Prettier check on dashboard files still reports existing style issues, so broad formatting was intentionally avoided to keep the diff merge-safe.
+- Task 4 verification: RED confirmed in `src/screens/chat/hooks/use-session-events-refresh.test.ts` for missing hook module; `pnpm test src/screens/chat/hooks/use-session-events-refresh.test.ts src/screens/chat/chat-screen-utils.test.ts src/screens/chat/components/message-item.test.ts src/screens/chat/components/chat-composer-model-switch.test.ts src/components/workspace-shell.test.ts` passes (20/20); `pnpm build` passes with existing Vite sourcemap/chunk/dynamic-import warnings.
 
 ## Next Steps
-**Next:** Builder should implement Slice V/W Task 4 from `docs/plans/2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md`: add realtime `/api/chat-events` session-refresh hook and wire it into `WorkspaceShell`.
+
+**Next:** Builder should implement Slice V/W Task 5 from `docs/plans/2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md`: add visible session freshness state (`Live`, `Reconnecting`, `Polling`) near the sidebar header without noisy toasts.
 
 ## Notes
+
 - Keep using TDD and update this handoff after every completed task.
 - Preserve PATCH partial-update safety: do not include undefined fields that wipe arrays.
 - Do not start Slice X/Y until V/W is tested, built, live-verified, and this handoff points to X/Y.
