@@ -15,6 +15,7 @@
 - Main/Architect created Cycle 2 gap analysis and slice plans ✅
 - Slice V/W complete: telemetry + realtime session truth shipped and verified ✅
 - Slice X/Y Task 1 — Pure profile readiness evaluator/tests (`src/server/profile-readiness.ts`, `src/server/profile-readiness.test.ts`) ✅
+- Slice X/Y Task 2 — `/api/projects/$projectId/profile-readiness` route, client helper, and route tests (`src/routes/api/projects.$projectId.profile-readiness.ts`, `src/lib/profile-readiness-api.ts`, `src/server/profile-readiness-routes.test.ts`, `src/routeTree.gen.ts`) ✅
 
 ## Current State
 
@@ -29,12 +30,14 @@
 - Slice V/W verification: RED confirmed for Task 5 badge export/render test; focused `pnpm test src/screens/chat/components/chat-sidebar-session-freshness.test.tsx src/components/workspace-shell.test.ts src/screens/chat/hooks/use-session-events-refresh.test.ts` passes (17/17); full `pnpm vitest run` passes (289/289); `pnpm build` passes with existing Vite sourcemap/chunk/dynamic-import warnings; subagent spec review PASS; subagent quality review found and Builder fixed the memo comparator freshness-status regression; `hermes-workspace.service` restarted active; live smoke `GET /dashboard`, `/api/session-telemetry`, and `/api/sessions` returned 200.
 - Slice X/Y implemented:
   - Task 1 — Pure profile readiness evaluator/tests (`src/server/profile-readiness.ts`, `src/server/profile-readiness.test.ts`) ✅
+  - Task 2 — `/api/projects/$projectId/profile-readiness` route, client helper, and route tests (`src/routes/api/projects.$projectId.profile-readiness.ts`, `src/lib/profile-readiness-api.ts`, `src/server/profile-readiness-routes.test.ts`, `src/routeTree.gen.ts`) ✅
 - Slice X/Y Task 1 verification: RED confirmed with missing `./profile-readiness` module; `pnpm test src/server/profile-readiness.test.ts` passes (5/5); `pnpm build` passes with existing Vite sourcemap/chunk/dynamic-import warnings.
+- Slice X/Y Task 2 verification: RED confirmed with missing route module; `pnpm test src/server/profile-readiness.test.ts src/server/profile-readiness-routes.test.ts` passes (10/10); full `pnpm vitest run` passes (299/299); `pnpm build` passes with existing Vite sourcemap/chunk/dynamic-import/chunk-size warnings; `hermes-workspace.service` restarted active; live smoke `GET /api/projects` and `GET /api/projects/:id/profile-readiness` returned 200 with 6 role reports.
 - Prettier note: `pnpm exec prettier --check` still reports existing style issues in large legacy `src/screens/chat/components/chat-sidebar.tsx`; broad formatting was intentionally avoided to keep the diff merge-safe.
 
 ## Next Steps
 
-**Next:** Builder should implement Slice X/Y Task 2 from `docs/plans/2026-04-26-hermes-workspace-slice-x-y-profile-role-preflight-plan.md`: add `/api/projects/$projectId/profile-readiness`, client helper, and route tests using the Task 1 evaluator.
+**Next:** Builder should implement Slice X/Y Task 3 from `docs/plans/2026-04-26-hermes-workspace-slice-x-y-profile-role-preflight-plan.md`: add the Project Profile Readiness panel to project detail using `fetchProjectProfileReadiness(projectId)`, with compact role table and UI tests.
 
 ## Notes
 

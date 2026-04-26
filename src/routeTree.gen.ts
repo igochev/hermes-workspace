@@ -123,6 +123,7 @@ import { Route as ApiWorkItemsWorkItemIdExecutionRunsRouteImport } from './route
 import { Route as ApiWorkItemsWorkItemIdApprovalsRouteImport } from './routes/api/work-items.$workItemId.approvals'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
+import { Route as ApiProjectsProjectIdProfileReadinessRouteImport } from './routes/api/projects.$projectId.profile-readiness'
 import { Route as ApiProjectsProjectIdLabelAnalyticsRouteImport } from './routes/api/projects.$projectId.label-analytics'
 import { Route as ApiProjectsProjectIdAutopilotScheduleRouteImport } from './routes/api/projects.$projectId.autopilot-schedule'
 import { Route as ApiPlanningDraftsDraftIdOutputRouteImport } from './routes/api/planning-drafts.$draftId.output'
@@ -714,6 +715,12 @@ const ApiSessionsSessionKeyActiveRunRoute =
     path: '/$sessionKey/active-run',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
+const ApiProjectsProjectIdProfileReadinessRoute =
+  ApiProjectsProjectIdProfileReadinessRouteImport.update({
+    id: '/profile-readiness',
+    path: '/profile-readiness',
+    getParentRoute: () => ApiProjectsProjectIdRoute,
+  } as any)
 const ApiProjectsProjectIdLabelAnalyticsRoute =
   ApiProjectsProjectIdLabelAnalyticsRouteImport.update({
     id: '/label-analytics',
@@ -855,6 +862,7 @@ export interface FileRoutesByFullPath {
   '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
   '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
   '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
+  '/api/projects/$projectId/profile-readiness': typeof ApiProjectsProjectIdProfileReadinessRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
@@ -973,6 +981,7 @@ export interface FileRoutesByTo {
   '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
   '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
   '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
+  '/api/projects/$projectId/profile-readiness': typeof ApiProjectsProjectIdProfileReadinessRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
@@ -1095,6 +1104,7 @@ export interface FileRoutesById {
   '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
   '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
   '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
+  '/api/projects/$projectId/profile-readiness': typeof ApiProjectsProjectIdProfileReadinessRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
@@ -1218,6 +1228,7 @@ export interface FileRouteTypes {
     | '/api/planning-drafts/$draftId/output'
     | '/api/projects/$projectId/autopilot-schedule'
     | '/api/projects/$projectId/label-analytics'
+    | '/api/projects/$projectId/profile-readiness'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
@@ -1336,6 +1347,7 @@ export interface FileRouteTypes {
     | '/api/planning-drafts/$draftId/output'
     | '/api/projects/$projectId/autopilot-schedule'
     | '/api/projects/$projectId/label-analytics'
+    | '/api/projects/$projectId/profile-readiness'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
@@ -1457,6 +1469,7 @@ export interface FileRouteTypes {
     | '/api/planning-drafts/$draftId/output'
     | '/api/projects/$projectId/autopilot-schedule'
     | '/api/projects/$projectId/label-analytics'
+    | '/api/projects/$projectId/profile-readiness'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
@@ -2352,6 +2365,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/projects/$projectId/profile-readiness': {
+      id: '/api/projects/$projectId/profile-readiness'
+      path: '/profile-readiness'
+      fullPath: '/api/projects/$projectId/profile-readiness'
+      preLoaderRoute: typeof ApiProjectsProjectIdProfileReadinessRouteImport
+      parentRoute: typeof ApiProjectsProjectIdRoute
+    }
     '/api/projects/$projectId/label-analytics': {
       id: '/api/projects/$projectId/label-analytics'
       path: '/label-analytics'
@@ -2515,6 +2535,7 @@ const ApiMemoryRouteWithChildren = ApiMemoryRoute._addFileChildren(
 interface ApiProjectsProjectIdRouteChildren {
   ApiProjectsProjectIdAutopilotScheduleRoute: typeof ApiProjectsProjectIdAutopilotScheduleRoute
   ApiProjectsProjectIdLabelAnalyticsRoute: typeof ApiProjectsProjectIdLabelAnalyticsRoute
+  ApiProjectsProjectIdProfileReadinessRoute: typeof ApiProjectsProjectIdProfileReadinessRoute
 }
 
 const ApiProjectsProjectIdRouteChildren: ApiProjectsProjectIdRouteChildren = {
@@ -2522,6 +2543,8 @@ const ApiProjectsProjectIdRouteChildren: ApiProjectsProjectIdRouteChildren = {
     ApiProjectsProjectIdAutopilotScheduleRoute,
   ApiProjectsProjectIdLabelAnalyticsRoute:
     ApiProjectsProjectIdLabelAnalyticsRoute,
+  ApiProjectsProjectIdProfileReadinessRoute:
+    ApiProjectsProjectIdProfileReadinessRoute,
 }
 
 const ApiProjectsProjectIdRouteWithChildren =
