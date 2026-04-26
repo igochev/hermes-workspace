@@ -140,6 +140,12 @@ describe('autopilot suggestions routes', () => {
     expect(workItem?.riskLevel).toBe('low')
     expect(workItem?.labels).toEqual(expect.arrayContaining(['autopilot', 'ci', 'tests']))
     expect(workItem?.acceptanceCriteria).toEqual(['Flaky test label + quarantine workflow'])
+    expect(workItem?.sourceSuggestionId).toBe(suggestion.id)
+    expect(workItem?.sourceSuggestionTitle).toBe('Add flaky test quarantine lane')
+    expect(workItem?.sourceSuggestionEvidence).toEqual([
+      'Vitest retries increasing',
+      'CI rerun rate 18%',
+    ])
 
     expect(convertedSuggestion?.status).toBe('converted')
     expect(convertedSuggestion?.convertedWorkItemId).toBe(body.workItem.id)

@@ -21,6 +21,8 @@
 - Slice X/Y Task 4 — Launch response readiness advisory + launch history note preserving capacity behavior/resolution order (`src/server/work-item-launch.ts`, `src/lib/work-item-launch-api.ts`, `src/server/work-item-launch.test.ts`) ✅
 - Slice X/Y Task 5 — Work-item detail Profile Preflight warning above launch controls (`src/screens/projects/work-item-detail-screen.tsx`, `src/screens/projects/work-item-detail-screen.test.ts`) ✅
 - Slice X/Y Task 6 — Full slice verification and live smoke ✅
+- Slice Z/AA Task 1 — Pure Autopilot delegation recommendation helper/tests (`src/server/autopilot-delegation-policy.ts`, `src/server/autopilot-delegation-policy.test.ts`) ✅
+- Slice Z/AA Task 2 — Work-item source suggestion provenance persisted through conversion/create/update (`src/server/work-items-store.ts`, `src/server/work-items-store.test.ts`, `src/lib/projects-api.ts`, `src/routes/api/autopilot-suggestions.$suggestionId.convert.ts`, `src/server/autopilot-suggestions-routes.test.ts`) ✅
 
 ## Current State
 
@@ -40,10 +42,12 @@
 - Slice X/Y full verification: `pnpm vitest run` passes (304/304); `pnpm build` passes with existing Vite sourcemap/dynamic-import/chunk-size warnings; `hermes-workspace.service` restarted active.
 - Slice X/Y live smoke: `GET /api/projects` returned 200; `GET /api/projects/:id/profile-readiness` returned 200 with 6 role reports; safe smoke work item `401f1bbd-c433-4e7c-8d0d-6a20c05d84ae` launched research with missing assigned profile and launch response/history included `profileReadinessDecision` + `Profile readiness advisory`; browser DOM confirmed `PROFILE PREFLIGHT` warning above launch controls with work-item override copy.
 - Prettier note: `pnpm exec prettier --check` still reports existing style issues in large legacy `src/screens/chat/components/chat-sidebar.tsx`; broad formatting was intentionally avoided to keep the diff merge-safe.
+- Slice Z/AA Task 1 RED confirmed with missing `autopilot-delegation-policy` module; Task 2 RED confirmed with missing source suggestion provenance on work items/conversion.
+- Slice Z/AA Tasks 1-2 verification: `pnpm test src/server/autopilot-delegation-policy.test.ts src/server/work-items-store.test.ts src/server/autopilot-suggestions-routes.test.ts` passes (14/14); `pnpm build` passes with existing Vite sourcemap/dynamic-import/chunk-size warnings.
 
 ## Next Steps
 
-**Next:** Builder should implement Slice Z/AA Task 1 from `docs/plans/2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md`.
+**Next:** Builder should implement Slice Z/AA Task 3 from `docs/plans/2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` (Convert + Plan route/action).
 
 ## Notes
 

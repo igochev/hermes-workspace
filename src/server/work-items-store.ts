@@ -53,6 +53,9 @@ export type WorkItemRecord = {
   labels: Array<string>
   repoPathSnapshot: string
   planFilePath?: string
+  sourceSuggestionId?: string
+  sourceSuggestionTitle?: string
+  sourceSuggestionEvidence: Array<string>
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -101,6 +104,9 @@ type CreateWorkItemInput = {
   labels?: Array<string>
   repoPathSnapshot: string
   planFilePath?: string
+  sourceSuggestionId?: string
+  sourceSuggestionTitle?: string
+  sourceSuggestionEvidence?: Array<string>
   reviewJobId?: string
   reviewState?: WorkItemReviewState
   reviewDecision?: WorkItemReviewDecision
@@ -316,6 +322,13 @@ function normalizeWorkItem(
     labels: asStringArray(workItem.labels),
     repoPathSnapshot: workItem.repoPathSnapshot.trim(),
     planFilePath: asOptionalString((workItem as Partial<WorkItemRecord>).planFilePath),
+    sourceSuggestionId: asOptionalString((workItem as Partial<WorkItemRecord>).sourceSuggestionId),
+    sourceSuggestionTitle: asOptionalString(
+      (workItem as Partial<WorkItemRecord>).sourceSuggestionTitle,
+    ),
+    sourceSuggestionEvidence: asStringArray(
+      (workItem as Partial<WorkItemRecord>).sourceSuggestionEvidence,
+    ),
     reviewJobId: asOptionalString((workItem as Partial<WorkItemRecord>).reviewJobId),
     reviewState:
       (workItem as Partial<WorkItemRecord>).reviewState === 'scheduled' ||
@@ -414,6 +427,9 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     labels: input.labels,
     repoPathSnapshot: input.repoPathSnapshot,
     planFilePath: input.planFilePath,
+    sourceSuggestionId: input.sourceSuggestionId,
+    sourceSuggestionTitle: input.sourceSuggestionTitle,
+    sourceSuggestionEvidence: input.sourceSuggestionEvidence,
     reviewJobId: input.reviewJobId,
     reviewState: input.reviewState,
     reviewDecision: input.reviewDecision,

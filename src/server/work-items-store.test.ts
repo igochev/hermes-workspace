@@ -195,6 +195,33 @@ describe('work-items-store', () => {
     expect(reset?.reviewQualityGateStatus).toBe('manual_review')
   })
 
+  it('preserves source suggestion provenance across create, read, and partial update', () => {
+    const workItem = createWorkItem({
+      projectId: 'project-1',
+      title: 'Add flaky test quarantine lane',
+      description: 'Flakes delay release confidence',
+      repoPathSnapshot: '/repos/mission-control',
+      sourceSuggestionId: 'suggestion-1',
+      sourceSuggestionTitle: 'Add flaky test quarantine lane',
+      sourceSuggestionEvidence: ['Vitest retries increasing', 'CI rerun rate 18%'],
+    })
+
+    expect(getWorkItem(workItem.id)).toMatchObject({
+      sourceSuggestionId: 'suggestion-1',
+      sourceSuggestionTitle: 'Add flaky test quarantine lane',
+      sourceSuggestionEvidence: ['Vitest retries increasing', 'CI rerun rate 18%'],
+    })
+
+    const updated = updateWorkItem(workItem.id, { status: 'ready' })
+
+    expect(updated).toMatchObject({
+      status: 'ready',
+      sourceSuggestionId: 'suggestion-1',
+      sourceSuggestionTitle: 'Add flaky test quarantine lane',
+      sourceSuggestionEvidence: ['Vitest retries increasing', 'CI rerun rate 18%'],
+    })
+  })
+
   it('updates work items and can remove all work items for a deleted project', () => {
     const keep = createWorkItem({
       projectId: 'project-keep',

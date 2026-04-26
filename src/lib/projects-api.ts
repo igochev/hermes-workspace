@@ -130,6 +130,9 @@ export type WorkItemRecord = {
   labels: Array<string>
   repoPathSnapshot: string
   planFilePath?: string
+  sourceSuggestionId?: string
+  sourceSuggestionTitle?: string
+  sourceSuggestionEvidence: Array<string>
   missionId?: string
   missionJobId?: string
   missionJobName?: string
@@ -212,6 +215,9 @@ export type CreateWorkItemInput = {
   assignedProfile?: string
   labels?: Array<string>
   repoPathSnapshot?: string
+  sourceSuggestionId?: string
+  sourceSuggestionTitle?: string
+  sourceSuggestionEvidence?: Array<string>
   missionId?: string
   missionLink?: string
   sessionKeys?: Array<string>

@@ -50,6 +50,9 @@ export const Route = createFileRoute('/api/autopilot-suggestions/$suggestionId/c
           riskLevel: suggestion.risk,
           labels: uniqueLabels,
           acceptanceCriteria: suggestion.suggestedAcceptanceCriteria,
+          sourceSuggestionId: suggestion.id,
+          sourceSuggestionTitle: suggestion.title,
+          sourceSuggestionEvidence: suggestion.evidence,
           notes: [
             `Autopilot suggestion rationale: ${suggestion.rationale}`,
             `Evidence: ${evidenceText}`,
