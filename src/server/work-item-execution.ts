@@ -198,6 +198,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
   const state = deriveExecutionState(job)
   const missionFields = applyMissionFields(workItem, job, state)
   let updated = updateWorkItem(workItem.id, missionFields)
+  console.log('[AFTER_MISSION_UPDATE] reviewJobId=', updated?.reviewJobId, 'reviewDecision=', updated?.reviewDecision, 'id=', updated?.id)
   if (!updated) throw new Error('Failed to persist mission sync state')
 
   const resolvedJobId = readOptionalString((missionFields as { missionJobId?: string }).missionJobId)
@@ -215,6 +216,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       sessionKeys: Array.from(new Set([...updated.sessionKeys, latestSessionKey])),
       ...missionFields,
     })
+    console.log('[AFTER_SESSIONKEYS_UPDATE] reviewJobId=', updated?.reviewJobId)
     if (!updated) throw new Error('Failed to persist latest execution session key')
   }
 
@@ -232,6 +234,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
           : updated.artifactPaths,
       ...missionFields,
     })
+    console.log('[AFTER_EVIDENCE_UPDATE] reviewJobId=', updated?.reviewJobId)
     if (!updated) throw new Error('Failed to persist Hermes execution evidence')
   }
 

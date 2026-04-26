@@ -32,7 +32,6 @@ describe('work-item-execution', () => {
     listHermesJobs.mockReset()
     getHermesJobRuns.mockReset()
   })
-
   afterEach(async () => {
     const fs = await import('node:fs')
     if (previousHermesHome === undefined) delete process.env.HERMES_HOME
@@ -308,5 +307,404 @@ describe('work-item-execution', () => {
     expect(result.execution.job?.id).toBe('job-direct-fail')
     expect(result.workItem.missionState).toBe('running')
     expect(listHermesJobs).toHaveBeenCalledTimes(1)
+  })
+
+  describe('structured review decision auto-resolution', () => {
+    it('resolves approved decision with passing quality gates and advances to deploy', async () => {
+      const project = createProject({
+        name: 'Mission Control Demo',
+        repoPath: '/repos/mission-control-demo',
+        defaultBranch: 'main',
+        reviewAutoApproval: { enabled: true, maxPriority: 'medium' },
+      })
+      // Create work item in review phase with reviewJobId
+      let workItem = createWorkItem({
+        projectId: project.id,
+        title: 'Approved gate passes',
+        status: 'active',
+        phase: 'review',
+        priority: 'medium',
+        riskLevel: 'medium',
+        repoPathSnapshot: project.repoPath,
+        reviewJobId: 'review-job-1',
+      })
+
+      getHermesJobById.mockImplementation((id: string) => {
+        if (id === workItem.reviewJobId) {
+          return Promise.resolve({
+            id: 'review-job-1',
+            name: 'planner-review-1',
+            state: 'scheduled',
+            last_status: 'ok',
+            last_run_at: '2026-04-26T01:00:00Z',
+            last_error: null,
+            next_run_at: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+      listHermesJobs.mockResolvedValue([])
+      // No mission runs — the review output from job runs
+      getHermesJobRuns.mockImplementation((id: string) => {
+        if (id === 'review-job-1') {
+          return Promise.resolve([
+            {
+              id: 'review-run-1',
+              status: 'success',
+              startedAt: '2026-04-26T01:00:00Z',
+              finishedAt: '2026-04-26T01:05:00Z',
+              chatSessionKey: 'cron_review-job-1_run',
+              output: {
+                reviewOutput: `REVIEW_DECISION_JSON: ${JSON.stringify({
+                  decision: 'approved',
+                  confidence: 'high',
+                  summary: 'All criteria met with evidence.',
+                  criteria: [{ text: 'Feature A', met: true, evidence: 'Detected in codebase' }],
+                  evidence: {
+                    testCommands: ['pnpm vitest run'],
+                    testResults: [{ command: 'pnpm vitest run', status: 'passed', summary: 'All passing' }],
+                    filesReviewed: ['src/server/work-item-execution.ts'],
+                    planReviewed: true,
+                  },
+                  blockers: [],
+                  risks: [],
+                })}`,
+              },
+            },
+          ])
+        }
+        return Promise.resolve([])
+      })
+
+      // Need to create a pending review approval first for the auto-resolve to find
+      const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'system',
+        notes: 'Awaiting Planner review.',
+      })
+
+      const result = await syncWorkItemExecutionState(workItem.id)
+
+      expect(result.workItem.reviewDecision).toBe('approved')
+      expect(result.workItem.reviewDecisionConfidence).toBe('high')
+      expect(result.workItem.reviewDecisionSource).toBe('json')
+      expect(result.workItem.reviewQualityGateStatus).toBe('pass')
+      expect(result.workItem.status).toBe('active')
+      expect(result.workItem.phase).toBe('deploy')
+    })
+
+    it('resolves changes_requested decision with failing gates and returns to build', async () => {
+      const project = createProject({
+        name: 'Mission Control Demo',
+        repoPath: '/repos/mission-control-demo',
+        defaultBranch: 'main',
+      })
+      let workItem = createWorkItem({
+        projectId: project.id,
+        title: 'Changes requested gate',
+        status: 'active',
+        phase: 'review',
+        priority: 'medium',
+        riskLevel: 'medium',
+        repoPathSnapshot: project.repoPath,
+        reviewJobId: 'review-job-2',
+      })
+
+      getHermesJobById.mockImplementation((id: string) => {
+        if (id === workItem.reviewJobId) {
+          return Promise.resolve({
+            id: 'review-job-2',
+            name: 'planner-review-2',
+            state: 'scheduled',
+            last_status: 'ok',
+            last_run_at: '2026-04-26T01:00:00Z',
+            last_error: null,
+            next_run_at: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+      listHermesJobs.mockResolvedValue([])
+      getHermesJobRuns.mockImplementation((id: string) => {
+        if (id === 'review-job-2') {
+          return Promise.resolve([
+            {
+              id: 'review-run-2',
+              status: 'success',
+              startedAt: '2026-04-26T01:00:00Z',
+              finishedAt: '2026-04-26T01:05:00Z',
+              output: {
+                reviewOutput: `DECISION: CHANGES_REQUESTED`,
+              },
+            },
+          ])
+        }
+        return Promise.resolve([])
+      })
+
+      const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'system',
+      })
+
+      const result = await syncWorkItemExecutionState(workItem.id)
+
+      expect(result.workItem.reviewDecision).toBe('changes_requested')
+      expect(result.workItem.reviewQualityGateStatus).toBe('fail')
+      expect(result.workItem.status).toBe('active')
+      expect(result.workItem.phase).toBe('build')
+    })
+
+    it('marks review as manual_review when review output has no valid structured decision', async () => {
+      const project = createProject({
+        name: 'Mission Control Demo',
+        repoPath: '/repos/mission-control-demo',
+        defaultBranch: 'main',
+        reviewAutoApproval: { enabled: false, maxPriority: 'low' },
+      })
+      let workItem = createWorkItem({
+        projectId: project.id,
+        title: 'Manual review needed',
+        status: 'active',
+        phase: 'review',
+        priority: 'medium',
+        riskLevel: 'medium',
+        repoPathSnapshot: project.repoPath,
+        reviewJobId: 'review-job-3',
+      })
+
+      getHermesJobById.mockImplementation((id: string) => {
+        if (id === workItem.reviewJobId) {
+          return Promise.resolve({
+            id: 'review-job-3',
+            name: 'planner-review-3',
+            state: 'scheduled',
+            last_status: 'ok',
+            last_run_at: '2026-04-26T01:00:00Z',
+            last_error: null,
+            next_run_at: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+      listHermesJobs.mockResolvedValue([])
+      getHermesJobRuns.mockImplementation((id: string) => {
+        if (id === 'review-job-3') {
+          return Promise.resolve([
+            {
+              id: 'review-run-3',
+              status: 'success',
+              startedAt: '2026-04-26T01:00:00Z',
+              finishedAt: '2026-04-26T01:05:00Z',
+              output: {
+                reviewOutput: 'Looks good to me.',
+              },
+            },
+          ])
+        }
+        return Promise.resolve([])
+      })
+
+      const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'system',
+      })
+
+      const result = await syncWorkItemExecutionState(workItem.id)
+
+      expect(result.workItem.reviewDecision).toBe('manual_review')
+      expect(result.workItem.reviewQualityGateStatus).toBe('manual_review')
+      expect(result.workItem.reviewParserError).toBeTruthy()
+      // Approval remains pending
+      const { listWorkItemApprovals } = await import('./work-item-approvals')
+      const approvals = listWorkItemApprovals(workItem.id)
+      expect(approvals[0]?.status).toBe('pending')
+    })
+
+    it('high-risk approved output remains in manual review state', async () => {
+      const project = createProject({
+        name: 'Mission Control Demo',
+        repoPath: '/repos/mission-control-demo',
+        defaultBranch: 'main',
+        reviewAutoApproval: { enabled: true, maxPriority: 'medium' },
+      })
+      let workItem = createWorkItem({
+        projectId: project.id,
+        title: 'High risk manual',
+        status: 'active',
+        phase: 'review',
+        priority: 'high',
+        riskLevel: 'high',
+        repoPathSnapshot: project.repoPath,
+        reviewJobId: 'review-job-4',
+      })
+
+      getHermesJobById.mockImplementation((id: string) => {
+        if (id === workItem.reviewJobId) {
+          return Promise.resolve({
+            id: 'review-job-4',
+            name: 'planner-review-4',
+            state: 'scheduled',
+            last_status: 'ok',
+            last_run_at: '2026-04-26T01:00:00Z',
+            last_error: null,
+            next_run_at: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+      listHermesJobs.mockResolvedValue([])
+      getHermesJobRuns.mockImplementation((id: string) => {
+        if (id === 'review-job-4') {
+          return Promise.resolve([
+            {
+              id: 'review-run-4',
+              status: 'success',
+              startedAt: '2026-04-26T01:00:00Z',
+              finishedAt: '2026-04-26T01:05:00Z',
+              output: {
+                reviewOutput: `REVIEW_DECISION_JSON: ${JSON.stringify({
+                  decision: 'approved',
+                  confidence: 'high',
+                  summary: 'Looks good.',
+                  criteria: [{ text: 'All good', met: true }],
+                  evidence: { planReviewed: true },
+                  blockers: [],
+                  risks: [],
+                })}
+DECISION: APPROVED`,
+              },
+            },
+          ])
+        }
+        return Promise.resolve([])
+      })
+
+      const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
+      requestWorkItemReviewApproval(workItem.id, { requestedBy: 'system' })
+
+      const result = await syncWorkItemExecutionState(workItem.id)
+
+      // High-risk should stay manual_review
+      expect(result.workItem.reviewDecision).toBe('manual_review')
+      expect(result.workItem.reviewQualityGateStatus).toBe('manual_review')
+      const { listWorkItemApprovals } = await import('./work-item-approvals')
+      const approvals = listWorkItemApprovals(workItem.id)
+      expect(approvals[0]?.status).toBe('pending')
+    })
+
+    it('dedups history notes on repeated sync cycle', async () => {
+      const project = createProject({
+        name: 'Mission Control Demo',
+        repoPath: '/repos/mission-control-demo',
+        defaultBranch: 'main',
+      })
+      let workItem = createWorkItem({
+        projectId: project.id,
+        title: 'Dedup test',
+        status: 'active',
+        phase: 'review',
+        priority: 'medium',
+        riskLevel: 'low',
+        repoPathSnapshot: project.repoPath,
+        reviewJobId: 'review-job-5',
+      })
+
+      getHermesJobById.mockImplementation((id: string) => {
+        if (id === workItem.reviewJobId) {
+          return Promise.resolve({
+            id: 'review-job-5',
+            name: 'planner-review-5',
+            state: 'scheduled',
+            last_status: 'ok',
+            last_run_at: '2026-04-26T01:00:00Z',
+            last_error: null,
+            next_run_at: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+      listHermesJobs.mockResolvedValue([])
+      getHermesJobRuns.mockImplementation((id: string) => {
+        if (id === 'review-job-5') {
+          return Promise.resolve([
+            {
+              id: 'review-run-5',
+              status: 'success',
+              startedAt: '2026-04-26T01:00:00Z',
+              finishedAt: '2026-04-26T01:05:00Z',
+              output: {
+                reviewOutput: `DECISION: CHANGES_REQUESTED`,
+              },
+            },
+          ])
+        }
+        return Promise.resolve([])
+      })
+
+      const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
+      requestWorkItemReviewApproval(workItem.id, { requestedBy: 'system' })
+
+      // First sync
+      const result1 = await syncWorkItemExecutionState(workItem.id)
+      const historyLengthAfterFirst = result1.workItem.history.length
+
+      // Second sync — should not add duplicate history entry
+      const result2 = await syncWorkItemExecutionState(workItem.id)
+      expect(result2.workItem.history.length).toBe(historyLengthAfterFirst)
+    })
+
+    it('failed review job without parseable decision keeps approval pending', async () => {
+      const project = createProject({
+        name: 'Mission Control Demo',
+        repoPath: '/repos/mission-control-demo',
+        defaultBranch: 'main',
+        reviewAutoApproval: { enabled: false, maxPriority: 'low' },
+      })
+      let workItem = createWorkItem({
+        projectId: project.id,
+        title: 'Failed review no output',
+        status: 'active',
+        phase: 'review',
+        priority: 'medium',
+        riskLevel: 'low',
+        repoPathSnapshot: project.repoPath,
+        reviewJobId: 'review-job-6',
+      })
+
+      getHermesJobById.mockImplementation((id: string) => {
+        if (id === workItem.reviewJobId) {
+          return Promise.resolve({
+            id: 'review-job-6',
+            name: 'planner-review-6',
+            state: 'scheduled',
+            last_status: 'error',
+            last_run_at: '2026-04-26T01:00:00Z',
+            last_error: 'Review worker crashed with timeout',
+            next_run_at: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+      listHermesJobs.mockResolvedValue([])
+      getHermesJobRuns.mockImplementation((id: string) => {
+        if (id === 'review-job-6') {
+          return Promise.resolve([])
+        }
+        return Promise.resolve([])
+      })
+
+      const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
+      requestWorkItemReviewApproval(workItem.id, { requestedBy: 'system' })
+
+      const result = await syncWorkItemExecutionState(workItem.id)
+
+      // Failed job without parseable structured decision = manual_review
+      expect(result.workItem.reviewDecision).toBe('manual_review')
+      expect(result.workItem.reviewQualityGateStatus).toBe('manual_review')
+      const { listWorkItemApprovals } = await import('./work-item-approvals')
+      const approvals = listWorkItemApprovals(workItem.id)
+      expect(approvals[0]?.status).toBe('pending')
+    })
   })
 })

@@ -29,7 +29,7 @@ export type WorkItemHistoryEntry = {
 
 export type WorkItemMissionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 export type WorkItemReviewState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
-export type WorkItemReviewDecision = 'approved' | 'changes_requested'
+export type WorkItemReviewDecision = 'approved' | 'changes_requested' | 'manual_review'
 
 export type WorkItemStructuredReviewDecision = 'approved' | 'changes_requested' | 'manual_review'
 export type WorkItemReviewQualityGateStatus = 'pass' | 'fail' | 'manual_review'
@@ -326,7 +326,8 @@ function normalizeWorkItem(
         ? (workItem as Partial<WorkItemRecord>).reviewState
         : undefined,
     reviewDecision: (workItem as Partial<WorkItemRecord>).reviewDecision === 'approved' ||
-      (workItem as Partial<WorkItemRecord>).reviewDecision === 'changes_requested'
+      (workItem as Partial<WorkItemRecord>).reviewDecision === 'changes_requested' ||
+      (workItem as Partial<WorkItemRecord>).reviewDecision === 'manual_review'
       ? (workItem as Partial<WorkItemRecord>).reviewDecision
       : undefined,
     reviewDecisionSummary: asOptionalString((workItem as Partial<WorkItemRecord>).reviewDecisionSummary),
