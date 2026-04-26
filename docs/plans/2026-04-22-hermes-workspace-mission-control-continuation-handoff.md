@@ -907,4 +907,41 @@ Grounded updates from this session:
   - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
   - Live smoke: `GET /api/role-capacity-policy` → `200` with default roles `research, build, review, deploy, supervisor`
 
-If resuming later, start from `docs/handoff/current-slice-status.md`; the next task is Slice R/S PR 8 — Launch advisory integration.
+### 2026-04-26 Slice R/S PR 8 completion snapshot
+
+Grounded updates from this session:
+
+- Integrated advisory role capacity into work-item launch:
+  - `src/server/work-item-launch.ts`
+  - evaluates `evaluateLaunchCapacity({ role: phase, profile })` before calling Conductor
+  - includes top-level `capacityDecision` in `launchWorkItemIntoConductor` responses
+  - preserves advisory-only behavior: over-capacity launches still proceed
+  - appends `Capacity advisory: ...` to launch history when over capacity
+  - upserts a `capacity_exceeded` item into the global attention queue for over-capacity launches
+- Updated client launch API contract:
+  - `src/lib/work-item-launch-api.ts`
+  - adds explicit imported `ProjectRecord`, `WorkItemRecord`, `WorkItemPhase`, `LaunchCapacityDecision` types
+  - exposes `capacityDecision` on `WorkItemLaunchResponse`
+- Added RED→GREEN coverage in `src/server/work-item-launch.test.ts`:
+  - over-capacity launch response includes advisory capacity decision and does not block launch
+  - over-capacity launch history includes advisory text
+  - over-capacity launch creates a persisted capacity attention item
+- Verified commands:
+  - RED: `pnpm vitest run src/server/work-item-launch.test.ts --testNamePattern "capacity"` failed on missing `capacityDecision`/history advisory
+  - GREEN: focused capacity tests → `2/2`
+  - Adjacent: `pnpm vitest run src/server/work-item-launch.test.ts src/server/role-capacity-policy.test.ts src/server/attention-queue.test.ts src/server/attention-queue-store.test.ts` → `29/29`
+  - Full: `pnpm vitest run` → `261/261`
+  - Build: `pnpm build` passed with existing Vite chunk/dynamic-import warnings
+  - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
+  - Live smoke: `GET /api/role-capacity-policy` → `200`; `GET /api/attention-queue` → `200 {"items":[]}` on current live data
+
+### Current cycle closeout
+
+All 4 planned Dream Mission Control slices are now shipped and verified:
+
+1. Slice N/O — Idea Intake + Planner Enrichment + Structured Planner Output
+2. Slice P/Q — Autopilot Suggestions
+3. Slice T/U — Structured Review Quality Gates
+4. Slice R/S — Execution Runs + Supervisor + Attention Queue + Role Capacity/Launch Advisory
+
+If resuming later, start from `docs/handoff/current-slice-status.md`; it now points to cycle completion. Builder should not invent new feature work until Main/Architect creates the next cycle of slice plans.

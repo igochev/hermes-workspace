@@ -21,6 +21,8 @@ import {
   launchWorkItemIntoConductor,
 } from './work-item-launch'
 import { listExecutionRuns } from './execution-runs-store'
+import { upsertRoleCapacityRule } from './role-capacity-policy'
+import { listAttentionQueueItems } from './attention-queue-store'
 
 describe('work-item-launch', () => {
   let tempHome: string
@@ -479,6 +481,115 @@ describe('work-item-launch', () => {
     )
     expect(result.launch.profile).toBe('researcher')
     expect(result.workItem.history.at(-1)?.profile).toBe('researcher')
+  })
+
+  it('includes an advisory capacity decision in the launch response without blocking over-capacity work', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+      phaseProfiles: { build: 'builder' },
+    })
+    upsertRoleCapacityRule({ role: 'build', profile: 'builder', maxActive: 1, enabled: true })
+    createWorkItem({
+      projectId: project.id,
+      title: 'Already active build',
+      status: 'active',
+      phase: 'build',
+      priority: 'medium',
+      assignedProfile: 'builder',
+      repoPathSnapshot: project.repoPath,
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Launch despite advisory capacity',
+      status: 'ready',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      planFilePath: 'docs/plans/advisory-capacity.md',
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-901_pending',
+      sessionKeyPrefix: 'cron_job-901_',
+      jobId: 'job-901',
+      jobName: 'work-item-build-capacity',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'build',
+      phaseProfiles: { build: 'builder' },
+    })
+
+    expect(result.launch.jobId).toBe('job-901')
+    expect(result.capacityDecision).toMatchObject({
+      role: 'build',
+      profile: 'builder',
+      activeCount: 1,
+      maxActive: 1,
+      allowed: false,
+      advisoryOnly: true,
+      message: 'build capacity is at 1/1 active work items; launch may proceed with operator awareness.',
+    })
+    expect(result.workItem.status).toBe('active')
+  })
+
+  it('records capacity advisory history and creates an attention item when launch is over capacity', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+      phaseProfiles: { build: 'builder' },
+    })
+    upsertRoleCapacityRule({ role: 'build', profile: 'builder', maxActive: 1, enabled: true })
+    createWorkItem({
+      projectId: project.id,
+      title: 'Active build occupying capacity',
+      status: 'active',
+      phase: 'build',
+      priority: 'medium',
+      assignedProfile: 'builder',
+      repoPathSnapshot: project.repoPath,
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Over capacity launch creates attention',
+      status: 'ready',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      planFilePath: 'docs/plans/over-capacity.md',
+    })
+
+    launchConductorMission.mockResolvedValue({
+      ok: true,
+      sessionKey: 'cron_job-902_pending',
+      sessionKeyPrefix: 'cron_job-902_',
+      jobId: 'job-902',
+      jobName: 'work-item-build-capacity-attention',
+      runId: null,
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'build',
+      phaseProfiles: { build: 'builder' },
+    })
+
+    expect(result.workItem.history.at(-1)?.note).toContain('Capacity advisory: build capacity is at 1/1 active work items')
+    expect(listAttentionQueueItems({ status: 'open' })).toContainEqual(
+      expect.objectContaining({
+        dedupeKey: `capacity:launch:${workItem.id}:build`,
+        kind: 'capacity_exceeded',
+        severity: 'warning',
+        source: 'capacity',
+        projectId: project.id,
+        workItemId: workItem.id,
+        href: `/projects/${project.id}/work-items/${workItem.id}`,
+      }),
+    )
   })
 })
 

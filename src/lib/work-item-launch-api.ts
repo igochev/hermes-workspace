@@ -1,3 +1,8 @@
+import type { ProjectRecord, WorkItemPhase, WorkItemRecord } from './projects-api'
+import type { LaunchCapacityDecision } from '../server/role-capacity-policy'
+
+const WORK_ITEMS_BASE = '/api/work-items'
+
 export type WorkItemLaunchRequest = {
   phase?: 'research' | 'build' | 'review' | 'deploy'
   orchestratorModel?: string
@@ -11,6 +16,7 @@ export type WorkItemLaunchRequest = {
 export type WorkItemLaunchResponse = {
   workItem: WorkItemRecord
   project: ProjectRecord
+  capacityDecision: LaunchCapacityDecision
   launch: {
     ok: true
     sessionKey: string
@@ -21,6 +27,21 @@ export type WorkItemLaunchResponse = {
     phase: WorkItemPhase
     profile: string | null
   }
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  return (await response.json()) as T
+}
+
+async function readError(response: Response, fallback: string): Promise<Error> {
+  const body = await response.json().catch(() => ({}))
+  const message =
+    typeof body?.error === 'string'
+      ? body.error
+      : typeof body?.detail === 'string'
+        ? body.detail
+        : fallback
+  return new Error(message)
 }
 
 export async function launchWorkItem(

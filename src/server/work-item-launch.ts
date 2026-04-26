@@ -19,6 +19,8 @@ import {
   type ConductorLaunchResult,
 } from './conductor-launch'
 import { upsertExecutionRun } from './execution-runs-store'
+import { evaluateLaunchCapacity, type LaunchCapacityDecision } from './role-capacity-policy'
+import { refreshAttentionQueue } from './attention-queue'
 
 export type WorkItemLaunchRequest = {
   phase?: unknown
@@ -33,6 +35,7 @@ export type WorkItemLaunchRequest = {
 export type WorkItemLaunchResponse = {
   workItem: WorkItemRecord
   project: ProjectRecord
+  capacityDecision: LaunchCapacityDecision
   launch: ConductorLaunchResult & {
     phase: WorkItemPhase
     profile: string | null
@@ -395,6 +398,11 @@ export async function launchWorkItemIntoConductor(
     })
   }
 
+  const capacityDecision = evaluateLaunchCapacity({
+    role: phase,
+    profile: resolvedProfile ?? undefined,
+  })
+
   const launch = await launchConductorMission({
     goal,
     orchestratorModel: readOptionalString(request.orchestratorModel),
@@ -451,7 +459,7 @@ export async function launchWorkItemIntoConductor(
 
   if (!nextWorkItem) throw new Error('Failed to update work item after launch')
 
-  const note = isTwoPhase
+  const baseNote = isTwoPhase
     ? `Launched two-phase pipeline (Phase 1: ${resolvedProfile} plan → Phase 2: build) via Conductor. Plan path: ${planFilePath}`
     : wasRecoveryLaunch
       ? resolvedProfile
@@ -460,6 +468,9 @@ export async function launchWorkItemIntoConductor(
       : resolvedProfile
         ? `Launched ${phase} via Conductor using profile ${resolvedProfile}.`
         : `Launched ${phase} via Conductor.`
+  const note = !capacityDecision.allowed && capacityDecision.message
+    ? `${baseNote} Capacity advisory: ${capacityDecision.message}`
+    : baseNote
 
   const updatedWithHistory = appendWorkItemHistoryEntry(workItem.id, {
     action: 'launch',
@@ -474,9 +485,26 @@ export async function launchWorkItemIntoConductor(
 
   if (!updatedWithHistory) throw new Error('Failed to record work item launch history')
 
+  if (!capacityDecision.allowed && capacityDecision.message) {
+    refreshAttentionQueue({
+      capacityItems: [
+        {
+          dedupeKey: `launch:${workItem.id}:${phase}`,
+          projectId: project.id,
+          workItemId: workItem.id,
+          title: 'Launch capacity advisory',
+          detail: capacityDecision.message,
+          href: `/projects/${project.id}/work-items/${workItem.id}`,
+          severity: 'warning',
+        },
+      ],
+    })
+  }
+
   return {
     workItem: updatedWithHistory,
     project,
+    capacityDecision,
     launch: {
       ...launch,
       phase,
