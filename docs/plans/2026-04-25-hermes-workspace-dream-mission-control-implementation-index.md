@@ -2,7 +2,9 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current CEO/Architect gap analysis:** `docs/plans/2026-04-26-hermes-workspace-next-cycle-gap-analysis.md`
+> **Current active production-readiness plan:** `docs/plans/2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md`
+>
+> **Previous CEO/Architect gap analysis:** `docs/plans/2026-04-26-hermes-workspace-next-cycle-gap-analysis.md`
 >
 > **Repo:** `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
 
@@ -27,14 +29,20 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 | 3 | `2026-04-25-hermes-workspace-slice-t-u-structured-review-quality-gates-plan.md` | Parse Planner review output and enforce quality gates | Shipped |
 | 4 | `2026-04-25-hermes-workspace-slice-r-s-execution-runs-supervisor-plan.md` | Durable run records, stale supervisor, global attention, capacity policy | Shipped |
 
-### Cycle 2 — active next work
+### Cycle 2 — shipped
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| 1 | `2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md` | Dashboard token/session telemetry and realtime session updates | Shipped |
+| 2 | `2026-04-26-hermes-workspace-slice-x-y-profile-role-preflight-plan.md` | Profile/role readiness preflight for phase mappings and launches | Shipped but exposed production UX gap: readiness was not fully actionable |
+| 3 | `2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` | Developer-grade Autopilot delegation policies and Convert+Plan actions | Shipped |
+| 4 | `2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md` | Recovery actions and supervisor controls for failed/stale runs | Shipped |
+
+### Production Readiness Cycle — active
 
 | Order | Plan | Purpose | Why here |
 |---:|---|---|---|
-| 1 | `2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md` | Dashboard token/session telemetry and realtime session updates | Directly addresses reported dashboard stats + stale chat sessions |
-| 2 | `2026-04-26-hermes-workspace-slice-x-y-profile-role-preflight-plan.md` | Profile/role readiness preflight for phase mappings and launches | Proves Hermes multi-profile roles are real before scaling autonomy |
-| 3 | `2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` | Developer-grade Autopilot delegation policies and Convert+Plan actions | Turns safe suggestions into useful semi-autonomous delegation |
-| 4 | `2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md` | Recovery actions and supervisor controls for failed/stale runs | Converts attention signals into less-babysitting recovery workflow |
+| 1 | `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Real-project dogfood against `family_command_center-ABACUS`, Profile Readiness actionability, and UI clickability audit | Cycle 1/2 cannot be called production-ready until live UI click tests catch no-op / non-actionable UX |
 
 ---
 
@@ -120,12 +128,13 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-26-hermes-workspace-next-cycle-gap-analysis.md` | Current analysis | Strategy/context only; do not implement directly |
+| `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Active detailed plan | Builder implements now; starts with PR-1 Profile Readiness actionability |
+| `2026-04-26-hermes-workspace-next-cycle-gap-analysis.md` | Previous analysis | Strategy/context only; do not implement directly |
 | This index | Current implementation entrypoint | Builder reads after handoff |
-| `2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md` | Active detailed plan | Implement first in Cycle 2 |
-| `2026-04-26-hermes-workspace-slice-x-y-profile-role-preflight-plan.md` | Detailed plan | Implement second |
-| `2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` | Detailed plan | Implement third |
-| `2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md` | Detailed plan | Implement fourth |
+| `2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md` | Shipped | Historical context/regression expectations |
+| `2026-04-26-hermes-workspace-slice-x-y-profile-role-preflight-plan.md` | Shipped with discovered UX gap | Historical context; production readiness plan now fixes actionability |
+| `2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` | Shipped | Historical context/regression expectations |
+| `2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md` | Shipped | Historical context/regression expectations |
 | Cycle 1 slice plans N/O, P/Q, T/U, R/S | Shipped historical implementation plans | Use only for context/regression expectations |
 | `2026-04-25-hermes-workspace-profiles-workflow-rearchitecture.md` | Profile/pipeline architecture record | Use for profile assumptions |
 | `2026-04-25-hermes-workspace-workflow-quality-analysis.md` | Historical gap analysis | Mostly superseded by 2026-04-26 analysis |
@@ -170,10 +179,10 @@ A plan is not shipped until:
 
 Start with:
 
-`docs/plans/2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md`
+`docs/plans/2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md`
 
-The first implementation task should be **session telemetry aggregate helpers/tests**, not UI.
+The first implementation task should be **Slice PR-1 / Task 1: add RED tests proving Profile Readiness cannot currently configure every role it reports**, then implement profile mapping actionability before writing the dogfood harness.
 
-## 10. After Cycle 2 ships
+## 10. After Production Readiness ships
 
-When V/W, X/Y, Z/AA, and AB/AC are complete, Builder should update the handoff to say all Cycle 2 slices are shipped and ask Main/Architect for the next cycle.
+When PR-1, PR-2, and PR-3 are complete, Builder should update the handoff with the production dogfood report path, exact commands/results, and any remaining blockers. Main/Architect should then decide whether Hermes Workspace is production-usable or needs another hardening cycle.
