@@ -19,6 +19,8 @@ import {
   getWorkItemPrimaryLaunchLabel,
   parseWorkItemDetailListDraft,
   reviewDecisionLabel,
+  reviewQualityGateLabel,
+  getReviewEvidenceAttentionMessage,
   stringifyWorkItemDetailListDraft,
   WORK_ITEM_BLOCKED_REASON_FIELD_LABEL,
   WORK_ITEM_BLOCKED_REASON_HELP_TEXT,
@@ -186,8 +188,51 @@ describe('work item detail screen theme classes', () => {
     expect(reviewDecisionLabel('changes_requested')).toBe(
       '🔧 Changes Requested — return to build',
     )
+    expect(reviewDecisionLabel('manual_review')).toBe('🧑‍⚖️ Manual Review — CEO attention required')
     expect(reviewDecisionLabel('unknown')).toBe('unknown')
     expect(reviewDecisionLabel('')).toBe('—')
+  })
+
+  it('surfaces structured planner review gate labels and attention copy', () => {
+    expect(reviewQualityGateLabel('pass')).toBe('✅ Gate passed')
+    expect(reviewQualityGateLabel('fail')).toBe('🔧 Gate failed')
+    expect(reviewQualityGateLabel('manual_review')).toBe('🧑‍⚖️ Manual review required')
+    expect(reviewQualityGateLabel()).toBe('—')
+
+    expect(
+      getReviewEvidenceAttentionMessage({
+        reviewDecision: 'manual_review',
+        reviewParserError: 'No REVIEW_DECISION_JSON block found.',
+      }),
+    ).toBe('Manual review required — Planner review completed without valid structured decision.')
+
+    expect(
+      getReviewEvidenceAttentionMessage({
+        reviewDecision: 'manual_review',
+        reviewQualityGateStatus: 'manual_review',
+      }),
+    ).toBe('Manual review required — approved decision failed quality gates.')
+
+    expect(
+      getReviewEvidenceAttentionMessage({
+        reviewDecision: 'approved',
+        reviewQualityGateStatus: 'pass',
+      }),
+    ).toBe('Review gate passed — structured Planner approval verified.')
+
+    expect(
+      getReviewEvidenceAttentionMessage({
+        reviewDecision: 'changes_requested',
+        reviewQualityGateStatus: 'fail',
+      }),
+    ).toBe('Changes requested — Planner review found blockers or unmet criteria.')
+
+    expect(
+      getReviewEvidenceAttentionMessage({
+        reviewDecision: 'approved',
+        reviewMissingEvidence: ['test evidence'],
+      }),
+    ).toContain('Missing review evidence: test evidence')
   })
 
   it('maps planner enrichment statuses to operator labels, guidance, launch gating, and diff previews', () => {

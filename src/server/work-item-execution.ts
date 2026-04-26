@@ -198,7 +198,6 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
   const state = deriveExecutionState(job)
   const missionFields = applyMissionFields(workItem, job, state)
   let updated = updateWorkItem(workItem.id, missionFields)
-  console.log('[AFTER_MISSION_UPDATE] reviewJobId=', updated?.reviewJobId, 'reviewDecision=', updated?.reviewDecision, 'id=', updated?.id)
   if (!updated) throw new Error('Failed to persist mission sync state')
 
   const resolvedJobId = readOptionalString((missionFields as { missionJobId?: string }).missionJobId)
@@ -216,7 +215,6 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       sessionKeys: Array.from(new Set([...updated.sessionKeys, latestSessionKey])),
       ...missionFields,
     })
-    console.log('[AFTER_SESSIONKEYS_UPDATE] reviewJobId=', updated?.reviewJobId)
     if (!updated) throw new Error('Failed to persist latest execution session key')
   }
 
@@ -234,7 +232,6 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
           : updated.artifactPaths,
       ...missionFields,
     })
-    console.log('[AFTER_EVIDENCE_UPDATE] reviewJobId=', updated?.reviewJobId)
     if (!updated) throw new Error('Failed to persist Hermes execution evidence')
   }
 
@@ -343,7 +340,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
           const latestRun = jobRuns[0] ?? null
           const runOutputStr =
             latestRun?.output && typeof latestRun.output === 'object'
-              ? JSON.stringify(latestRun.output, null, 2)
+              ? Object.values(latestRun.output).filter((v): v is string => typeof v === 'string').join('\n')
               : typeof latestRun?.output === 'string'
                 ? latestRun.output
                 : ''
@@ -365,7 +362,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
             workItemUpdates.reviewDecisionConfidence = parseResult.parsed.confidence
             workItemUpdates.reviewDecisionSource = parseResult.source
           } else {
-            workItemUpdates.reviewParserError = parseResult.error || 'Unknown parse error'
+            workItemUpdates.reviewParserError = (parseResult as { ok: false; error: string }).error || 'Unknown parse error'
           }
 
           // Evaluate quality gates
@@ -400,7 +397,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
                 reviewState: 'failed' as const,
                 reviewDecision: 'changes_requested' as const,
               }) ?? updated
-              appendWorkItemHistoryEntry(updated.id, {
+              updated = appendWorkItemHistoryEntry(updated.id, {
                 action: 'status-change',
                 status: 'active',
                 phase: 'build',
@@ -408,7 +405,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
                 missionId: updated.missionId,
                 sessionKey: updated.sessionKeys.at(-1),
                 profile: updated.assignedProfile,
-              })
+              }) ?? updated
             }
           } else if (gateResult.autoResolvable && gateResult.status === 'pass') {
             // Approved with passing gates — auto-resolve and advance to deploy
@@ -424,7 +421,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
                 reviewState: 'succeeded' as const,
                 reviewDecision: 'approved' as const,
               }) ?? updated
-              appendWorkItemHistoryEntry(updated.id, {
+              updated = appendWorkItemHistoryEntry(updated.id, {
                 action: 'status-change',
                 status: 'active',
                 phase: 'deploy',
@@ -432,7 +429,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
                 missionId: updated.missionId,
                 sessionKey: updated.sessionKeys.at(-1),
                 profile: updated.assignedProfile,
-              })
+              }) ?? updated
             }
           } else {
             // Manual review needed — set reviewDecision=manual_review, keep approval pending
@@ -445,7 +442,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
 
             const lastHistoryNote = updated.history.at(-1)?.note ?? ''
             if (!lastHistoryNote.includes('Manual review')) {
-              appendWorkItemHistoryEntry(updated.id, {
+              updated = appendWorkItemHistoryEntry(updated.id, {
                 action: 'note',
                 status: 'active',
                 phase: 'review',
@@ -455,7 +452,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
                 missionId: updated.missionId,
                 sessionKey: updated.sessionKeys.at(-1),
                 profile: updated.assignedProfile,
-              })
+              }) ?? updated
             }
           }
         }

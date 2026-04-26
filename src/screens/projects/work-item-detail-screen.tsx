@@ -367,7 +367,39 @@ export function getWorkItemLifecycleActionLabel(action: WorkItemDetailLifecycleA
 export function reviewDecisionLabel(decision: string): string {
   if (decision === 'approved') return '✅ Approved — advance to deploy'
   if (decision === 'changes_requested') return '🔧 Changes Requested — return to build'
+  if (decision === 'manual_review') return '🧑‍⚖️ Manual Review — CEO attention required'
   return decision || '—'
+}
+
+export function reviewQualityGateLabel(status?: string): string {
+  if (status === 'pass') return '✅ Gate passed'
+  if (status === 'fail') return '🔧 Gate failed'
+  if (status === 'manual_review') return '🧑‍⚖️ Manual review required'
+  return '—'
+}
+
+export function getReviewEvidenceAttentionMessage(workItemLike: {
+  reviewDecision?: string
+  reviewParserError?: string
+  reviewQualityGateStatus?: string
+  reviewMissingEvidence?: Array<string>
+}): string | null {
+  if (workItemLike.reviewDecision === 'changes_requested') {
+    return 'Changes requested — Planner review found blockers or unmet criteria.'
+  }
+  if (workItemLike.reviewParserError) {
+    return 'Manual review required — Planner review completed without valid structured decision.'
+  }
+  if (workItemLike.reviewQualityGateStatus === 'pass') {
+    return 'Review gate passed — structured Planner approval verified.'
+  }
+  if (workItemLike.reviewQualityGateStatus === 'manual_review' || workItemLike.reviewDecision === 'manual_review') {
+    return 'Manual review required — approved decision failed quality gates.'
+  }
+  if (workItemLike.reviewMissingEvidence && workItemLike.reviewMissingEvidence.length > 0) {
+    return `Missing review evidence: ${workItemLike.reviewMissingEvidence.join(', ')}.`
+  }
+  return null
 }
 
 export function getAvailableWorkItemLifecycleActions(state: {
@@ -1053,6 +1085,30 @@ export function WorkItemDetailScreen({
                       <Detail
                         label="Planner Review Decision"
                         value={reviewDecisionLabel(workItem.reviewDecision)}
+                      />
+                    ) : null}
+                    <Detail label="Review Confidence" value={workItem.reviewDecisionConfidence || '—'} />
+                    <Detail
+                      label="Review Quality Gate"
+                      value={reviewQualityGateLabel(workItem.reviewQualityGateStatus)}
+                    />
+                    <Detail
+                      label="Review Summary"
+                      value={workItem.reviewDecisionSummary || '—'}
+                    />
+                    <Detail label="Parser Error" value={workItem.reviewParserError || '—'} />
+                    <Detail
+                      label="Missing Evidence"
+                      value={workItem.reviewMissingEvidence?.join(', ') || '—'}
+                    />
+                    <Detail
+                      label="Gate Reasons"
+                      value={workItem.reviewQualityGateReasons?.join('; ') || '—'}
+                    />
+                    {getReviewEvidenceAttentionMessage(workItem) ? (
+                      <Detail
+                        label="Review Attention"
+                        value={getReviewEvidenceAttentionMessage(workItem) ?? '—'}
                       />
                     ) : null}
                   </>

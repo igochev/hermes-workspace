@@ -157,6 +157,16 @@ function shouldAutoApproveReview(workItemId: string): boolean {
   const workItem = getWorkItem(workItemId)
   if (!workItem) return false
 
+  // Never auto-approve when Planner review is in progress — structured review must complete first.
+  if (workItem.reviewJobId) {
+    return false
+  }
+
+  // Skip if review decision has already been made (structured review ran).
+  if (workItem.reviewDecision) {
+    return false
+  }
+
   // Low-risk items auto-approve through review regardless of project policy
   if (workItem.riskLevel === 'low') return true
 
@@ -224,7 +234,7 @@ function updateWorkItemApproval(
 export function requestWorkItemApproval(
   workItemId: string,
   input: RequestWorkItemApprovalInput = {},
-): WorkItemApprovalRecord {
+): WorkItemApprovalRecord | null {
   const workItem = getWorkItem(workItemId)
   if (!workItem) throw new Error('Work item not found')
   const phase = input.phase ?? 'review'
@@ -232,10 +242,16 @@ export function requestWorkItemApproval(
   const project = getProject(workItem.projectId)
   if (!project) throw new Error('Project not found')
 
-  const existing = listWorkItemApprovals(workItemId).find(
+  const approvals = listWorkItemApprovals(workItemId)
+  const existing = approvals.find(
     (approval) => approval.phase === phase && approval.status === 'pending',
   )
   if (existing) return existing
+
+  // If structured review already made a decision, don't re-request approval or append history.
+  if (phase === 'review' && workItem.reviewDecision) {
+    return approvals.find((approval) => approval.phase === phase) ?? null
+  }
 
   const now = new Date().toISOString()
   const autoApproved = phase === 'review' && shouldAutoApproveReview(workItem.id)
@@ -295,7 +311,7 @@ export function requestWorkItemApproval(
 export function requestWorkItemReviewApproval(
   workItemId: string,
   input: Omit<RequestWorkItemApprovalInput, 'phase'> = {},
-): WorkItemApprovalRecord {
+): WorkItemApprovalRecord | null {
   return requestWorkItemApproval(workItemId, { ...input, phase: 'review' })
 }
 

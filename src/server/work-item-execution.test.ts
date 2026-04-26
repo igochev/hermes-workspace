@@ -645,13 +645,17 @@ DECISION: APPROVED`,
       const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
       requestWorkItemReviewApproval(workItem.id, { requestedBy: 'system' })
 
-      // First sync
+      // First sync adds: 1) approval request note, 2) approval-resolution note,
+      // 3) structured review auto-resolution note.
       const result1 = await syncWorkItemExecutionState(workItem.id)
-      const historyLengthAfterFirst = result1.workItem.history.length
+      expect(result1.workItem.history.length).toBe(3)
+      expect(result1.workItem.history[0]?.note).toContain('Review approval requested')
+      expect(result1.workItem.history[1]?.note).toContain('Review requested changes')
+      expect(result1.workItem.history[2]?.note).toContain('Planner review requested changes')
 
       // Second sync — should not add duplicate history entry
       const result2 = await syncWorkItemExecutionState(workItem.id)
-      expect(result2.workItem.history.length).toBe(historyLengthAfterFirst)
+      expect(result2.workItem.history.length).toBe(result1.workItem.history.length)
     })
 
     it('failed review job without parseable decision keeps approval pending', async () => {
