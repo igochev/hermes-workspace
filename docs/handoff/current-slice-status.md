@@ -20,21 +20,24 @@
 - Slice R/S PR 2 — Execution runs launch/sync integration and work-item API route (`src/server/work-item-launch.ts`, `src/server/work-item-execution.ts`, `src/routes/api/work-items.$workItemId.execution-runs.ts`, `src/lib/work-item-execution-runs-api.ts`) ✅
 - Slice R/S PR 3 — Supervisor pure helpers (`src/server/work-item-supervisor.ts`, `src/server/work-item-supervisor.test.ts`) ✅
 - Slice R/S PR 4 — Supervisor reconcile route/client (`src/routes/api/work-items.supervisor.reconcile.ts`, `src/lib/work-item-supervisor-api.ts`, `src/server/work-item-supervisor-routes.test.ts`) ✅
+- Slice R/S PR 5 — Attention queue store/builder/route (`src/server/attention-queue-store.ts`, `src/server/attention-queue.ts`, `src/routes/api/attention-queue.ts`, `src/lib/attention-queue-api.ts`) ✅
 
 ## Current State
-- Slice R/S PR 1–4 implementation complete.
+- Slice R/S PR 1–5 implementation complete.
 - Durable execution-run store writes `work-item-execution-runs.json` under `HERMES_HOME`, supports create/upsert, dedupe by `workItemId + role + jobId + runId` (or without runId), filters, deletion by work item/project, and invalid JSON safe fallback.
 - Work-item launch now records scheduled mission execution runs; execution sync records mission run state/evidence/session details; structured review sync records review run details.
 - New API route/client helper: `GET /api/work-items/:workItemId/execution-runs` → `{ workItemId, runs }`.
 - Supervisor helper module exports default thresholds, candidate detection, stale/failed/job-missing finding derivation, and reconcile functions that call execution sync then report findings without stale-only status mutation or retry.
 - New supervisor reconcile API route/client helper: `POST /api/work-items/supervisor/reconcile` with optional `?workItemId=...` → `{ checked, findings }`; authenticated route returns `401` when required credentials are missing.
-- Tests passing: PR 4 RED/GREEN focused `work-item-supervisor-routes` → **3/3**; adjacent PR 1–4 targeted verification (`work-item-supervisor-routes`, `work-item-supervisor`, `execution-runs-routes`, `execution-runs-store`, `work-item-execution`) → **32/32**; full `pnpm vitest run` → **239/239**.
-- Build passing: `pnpm build`.
-- Service status: restarted after PR 4 route addition; `hermes-workspace.service` is active.
-- Live API smoke: `POST /api/work-items/supervisor/reconcile?workItemId=missing-smoke` returned `200 {"checked":0,"findings":[]}`.
+- New attention queue store writes `attention-queue.json` under `HERMES_HOME`, upserts by `dedupeKey`, reopens resolved items when seen again, and sorts open critical items before warnings/resolved items.
+- New attention queue builder derives pending approvals, failed missions/reviews, blocked work, supervisor stale findings, and capacity advisory items; `GET /api/attention-queue?refresh=true` refreshes/persists open queue items and `src/lib/attention-queue-api.ts` exposes the client helper.
+- Tests passing: PR 5 RED/GREEN focused attention queue tests (`attention-queue-store`, `attention-queue`, `attention-queue-routes`) → **12/12**; adjacent PR 1–5 targeted verification (`attention-queue*`, `work-item-supervisor*`, `execution-runs*`, `work-item-execution`) → **44/44**; full `pnpm vitest run` → **251/251**.
+- Build passing: `pnpm build` with existing Vite chunk/dynamic-import warnings.
+- Service status: restarted after PR 5 route addition; `hermes-workspace.service` is active.
+- Live API smoke: `GET /api/attention-queue?refresh=true` returned `200 {"items":[]}` on current live data.
 
 ## Next Steps
-**Next:** Slice R/S PR 5 — attention queue store/builder (`src/server/attention-queue-store.ts`, `src/server/attention-queue.ts`, `src/routes/api/attention-queue.ts`, `src/lib/attention-queue-api.ts`).
+**Next:** Slice R/S PR 6 — Dashboard attention surface (`src/screens/dashboard/dashboard-screen.tsx`, `src/screens/dashboard/dashboard-screen.test.ts`).
 
 ## Notes
 - Build still emits existing Vite chunk-size/dynamic-import warnings; build exits successfully.

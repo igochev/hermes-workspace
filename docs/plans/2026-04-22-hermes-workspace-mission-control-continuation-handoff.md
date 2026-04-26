@@ -814,4 +814,37 @@ Grounded updates from this session:
   - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
   - Live smoke: `POST /api/work-items/supervisor/reconcile?workItemId=missing-smoke` → `200 {"checked":0,"findings":[]}`
 
-If resuming later, start from `docs/handoff/current-slice-status.md`; the next task is Slice R/S PR 5 — Attention queue store/builder.
+### 2026-04-26 Slice R/S PR 5 completion snapshot
+
+Grounded updates from this session:
+
+- Added file-backed global attention queue persistence:
+  - `src/server/attention-queue-store.ts`
+  - backs onto `attention-queue.json` under `HERMES_HOME`
+  - supports list/get/upsert/resolve/replace primitives
+  - dedupes by `dedupeKey`, preserves `firstSeenAt`, updates `lastSeenAt`, and reopens resolved items when the condition is seen again
+- Added attention derivation builder:
+  - `src/server/attention-queue.ts`
+  - derives open queue items for pending approvals, failed missions, failed/rejected reviews, blocked work, supervisor stale/sync findings, and capacity advisory placeholders
+  - deterministic sort keeps open critical items ahead of warnings/resolved items
+- Added authenticated API route and client helper:
+  - `GET /api/attention-queue`
+  - `GET /api/attention-queue?refresh=true`
+  - `src/routes/api/attention-queue.ts`
+  - `src/lib/attention-queue-api.ts`
+- Added RED→GREEN coverage:
+  - `src/server/attention-queue-store.test.ts`
+  - `src/server/attention-queue.test.ts`
+  - `src/server/attention-queue-routes.test.ts`
+- Generated route tree updated via `pnpm build`:
+  - `src/routeTree.gen.ts`
+- Verified commands:
+  - RED: `pnpm vitest run src/server/attention-queue-store.test.ts src/server/attention-queue.test.ts src/server/attention-queue-routes.test.ts` failed on missing modules/routes
+  - GREEN: focused attention queue tests → `12/12`
+  - Adjacent: `pnpm vitest run src/server/attention-queue-store.test.ts src/server/attention-queue.test.ts src/server/attention-queue-routes.test.ts src/server/work-item-supervisor-routes.test.ts src/server/work-item-supervisor.test.ts src/server/execution-runs-routes.test.ts src/server/execution-runs-store.test.ts src/server/work-item-execution.test.ts` → `44/44`
+  - Full: `pnpm vitest run` → `251/251`
+  - Build: `pnpm build` passed with existing Vite chunk/dynamic-import warnings
+  - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
+  - Live smoke: `GET /api/attention-queue?refresh=true` → `200 {"items":[]}` on current live data
+
+If resuming later, start from `docs/handoff/current-slice-status.md`; the next task is Slice R/S PR 6 — Dashboard attention surface.

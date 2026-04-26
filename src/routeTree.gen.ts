@@ -73,6 +73,7 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAutopilotSuggestionsRouteImport } from './routes/api/autopilot-suggestions'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
+import { Route as ApiAttentionQueueRouteImport } from './routes/api/attention-queue'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
 import { Route as ProjectsProjectIdAutopilotRouteImport } from './routes/projects/$projectId/autopilot'
 import { Route as ApiWorkItemsWorkItemIdRouteImport } from './routes/api/work-items.$workItemId'
@@ -447,6 +448,11 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
   path: '/api/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAttentionQueueRoute = ApiAttentionQueueRouteImport.update({
+  id: '/api/attention-queue',
+  path: '/api/attention-queue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -742,6 +748,7 @@ export interface FileRoutesByFullPath {
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/attention-queue': typeof ApiAttentionQueueRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
@@ -858,6 +865,7 @@ export interface FileRoutesByTo {
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/attention-queue': typeof ApiAttentionQueueRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
@@ -976,6 +984,7 @@ export interface FileRoutesById {
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/attention-queue': typeof ApiAttentionQueueRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
@@ -1096,6 +1105,7 @@ export interface FileRouteTypes {
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/api/attention-queue'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/autopilot-suggestions'
@@ -1212,6 +1222,7 @@ export interface FileRouteTypes {
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/api/attention-queue'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/autopilot-suggestions'
@@ -1329,6 +1340,7 @@ export interface FileRouteTypes {
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/api/attention-queue'
     | '/api/auth'
     | '/api/auth-check'
     | '/api/autopilot-suggestions'
@@ -1448,6 +1460,7 @@ export interface RootRouteChildren {
   SkillsRoute: typeof SkillsRoute
   TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
+  ApiAttentionQueueRoute: typeof ApiAttentionQueueRoute
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
   ApiAutopilotSuggestionsRoute: typeof ApiAutopilotSuggestionsRouteWithChildren
@@ -1961,6 +1974,13 @@ declare module '@tanstack/react-router' {
       path: '/api/auth'
       fullPath: '/api/auth'
       preLoaderRoute: typeof ApiAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attention-queue': {
+      id: '/api/attention-queue'
+      path: '/api/attention-queue'
+      fullPath: '/api/attention-queue'
+      preLoaderRoute: typeof ApiAttentionQueueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projects/$projectId/': {
@@ -2595,6 +2615,7 @@ const rootRouteChildren: RootRouteChildren = {
   SkillsRoute: SkillsRoute,
   TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
+  ApiAttentionQueueRoute: ApiAttentionQueueRoute,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
   ApiAutopilotSuggestionsRoute: ApiAutopilotSuggestionsRouteWithChildren,
