@@ -18,6 +18,7 @@ import {
   launchConductorMission,
   type ConductorLaunchResult,
 } from './conductor-launch'
+import { upsertExecutionRun } from './execution-runs-store'
 
 export type WorkItemLaunchRequest = {
   phase?: unknown
@@ -407,6 +408,20 @@ export async function launchWorkItemIntoConductor(
     phaseProfiles: launchPhaseProfiles,
     name: `work-item-${phase}-${project.slug}-${workItem.id.slice(0, 8)}`,
     deliver: 'local',
+  })
+
+  upsertExecutionRun({
+    workItemId: workItem.id,
+    projectId: project.id,
+    role: 'mission',
+    phase,
+    engine: 'conductor',
+    jobId: launch.jobId,
+    jobName: launch.jobName,
+    runId: readOptionalString(launch.runId),
+    state: 'scheduled',
+    sessionKey: launch.sessionKey,
+    sessionKeyPrefix: launch.sessionKeyPrefix,
   })
 
   const sessionKeys = Array.from(new Set([...workItem.sessionKeys, launch.sessionKey]))

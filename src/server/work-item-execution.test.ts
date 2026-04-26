@@ -16,6 +16,7 @@ import { createProject } from './projects-store'
 import { createWorkItem, getWorkItem, type WorkItemRecord } from './work-items-store'
 import { listWorkItemApprovals } from './work-item-approvals'
 import { syncWorkItemExecutionState } from './work-item-execution'
+import { listExecutionRuns } from './execution-runs-store'
 
 describe('work-item-execution', () => {
   let tempHome: string
@@ -113,6 +114,24 @@ describe('work-item-execution', () => {
     expect(persisted?.missionJobId).toBe('job-123')
     expect(persisted?.missionJobName).toBe('work-item-build-demo')
     expect(persisted?.missionSessionKeyPrefix).toBe('cron_job-123_')
+    expect(listExecutionRuns({ workItemId: workItem.id, role: 'mission' })).toMatchObject([
+      {
+        workItemId: workItem.id,
+        projectId: project.id,
+        role: 'mission',
+        phase: 'build',
+        engine: 'conductor',
+        jobId: 'job-123',
+        jobName: 'work-item-build-demo',
+        runId: 'run-123',
+        state: 'succeeded',
+        sessionKey: 'cron_job-123_20260421_213500',
+        sessionKeyPrefix: 'cron_job-123_',
+        startedAt: '2026-04-21T21:35:00Z',
+        finishedAt: '2026-04-21T21:36:00Z',
+        lastRunAt: '2026-04-21T21:35:00Z',
+      },
+    ])
   })
 
   it('blocks a work item and records error details when the mission fails', async () => {
@@ -391,6 +410,24 @@ describe('work-item-execution', () => {
       expect(result.workItem.reviewQualityGateStatus).toBe('pass')
       expect(result.workItem.status).toBe('active')
       expect(result.workItem.phase).toBe('deploy')
+      expect(listExecutionRuns({ workItemId: workItem.id, role: 'review' })).toMatchObject([
+        {
+          workItemId: workItem.id,
+          projectId: project.id,
+          role: 'review',
+          phase: 'review',
+          engine: 'conductor',
+          jobId: 'review-job-1',
+          jobName: 'planner-review-1',
+          runId: 'review-run-1',
+          state: 'succeeded',
+          sessionKey: 'cron_review-job-1_run',
+          sessionKeyPrefix: 'cron_review-job-1_',
+          startedAt: '2026-04-26T01:00:00Z',
+          finishedAt: '2026-04-26T01:05:00Z',
+          lastRunAt: '2026-04-26T01:00:00Z',
+        },
+      ])
     })
 
     it('resolves changes_requested decision with failing gates and returns to build', async () => {

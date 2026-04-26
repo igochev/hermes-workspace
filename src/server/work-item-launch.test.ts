@@ -20,6 +20,7 @@ import {
   buildWorkItemLaunchGoal,
   launchWorkItemIntoConductor,
 } from './work-item-launch'
+import { listExecutionRuns } from './execution-runs-store'
 
 describe('work-item-launch', () => {
   let tempHome: string
@@ -214,6 +215,20 @@ describe('work-item-launch', () => {
 
     expect(result.launch.jobId).toBe('job-122')
     expect(launchConductorMission).toHaveBeenCalledTimes(1)
+    expect(listExecutionRuns({ workItemId: workItem.id })).toMatchObject([
+      {
+        workItemId: workItem.id,
+        projectId: project.id,
+        role: 'mission',
+        phase: 'build',
+        engine: 'conductor',
+        jobId: 'job-122',
+        jobName: 'work-item-build-ready',
+        state: 'scheduled',
+        sessionKey: 'cron_job-122_pending',
+        sessionKeyPrefix: 'cron_job-122_',
+      },
+    ])
   })
 
   it('still allows research launch for rough ideas', async () => {

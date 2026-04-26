@@ -12,6 +12,7 @@ import { requestWorkItemReviewApproval, resolveWorkItemApprovalDecision } from '
 import { getHermesJobById, getHermesJobRuns, listHermesJobs, type HermesJobInfo } from './hermes-jobs'
 import { buildMissionLink, launchConductorMission } from './conductor-launch'
 import { launchPlannerReview } from './work-item-launch'
+import { upsertExecutionRun, type ExecutionRunState } from './execution-runs-store'
 import {
   parsePlannerReviewDecision,
   evaluateReviewQualityGate,
@@ -106,6 +107,49 @@ function deriveExecutionState(job: HermesJobInfo | null): SyncedExecutionState {
   if (job.state === 'running' || job.state === 'active') return 'running'
   if (job.state === 'scheduled' || job.state === 'queued' || job.state === 'pending') return 'scheduled'
   return 'unknown'
+}
+
+function deriveRunState(jobState: SyncedExecutionState, run: CronRun | null): ExecutionRunState {
+  if (!run) return jobState
+  const status = readOptionalString(run.status)
+  if (status === 'success' || status === 'ok') return 'succeeded'
+  if (status === 'error' || status === 'failed') return 'failed'
+  if (status === 'running') return 'running'
+  if (status === 'queued' || status === 'pending' || status === 'scheduled') return 'scheduled'
+  return jobState
+}
+
+function recordExecutionRun(params: {
+  workItem: WorkItemRecord
+  project: ProjectRecord
+  role: 'mission' | 'review'
+  state: SyncedExecutionState
+  job: HermesJobInfo
+  run: CronRun | null
+  sessionKeyPrefix?: string
+  evidence?: { branchName?: string; prUrl?: string; artifactPaths?: Array<string> }
+}): void {
+  const run = params.run
+  upsertExecutionRun({
+    workItemId: params.workItem.id,
+    projectId: params.project.id,
+    role: params.role,
+    phase: params.role === 'review' ? 'review' : params.workItem.phase,
+    engine: 'conductor',
+    jobId: params.job.id,
+    jobName: params.job.name,
+    runId: readOptionalString(run?.id),
+    state: deriveRunState(params.state, run),
+    sessionKey: readOptionalString(run?.chatSessionKey),
+    sessionKeyPrefix: params.sessionKeyPrefix ?? (params.job.id ? `cron_${params.job.id}_` : undefined),
+    startedAt: readOptionalString(run?.startedAt),
+    finishedAt: readOptionalString(run?.finishedAt),
+    lastRunAt: readOptionalString(params.job.last_run_at),
+    error: params.state === 'failed' ? readOptionalString(params.job.last_error) || readOptionalString((run as CronRun & { error?: unknown } | null)?.error) : undefined,
+    branchName: params.evidence?.branchName,
+    prUrl: params.evidence?.prUrl,
+    artifactPaths: params.evidence?.artifactPaths,
+  })
 }
 
 async function resolveJobForWorkItem(workItem: WorkItemRecord): Promise<HermesJobInfo | null> {
@@ -209,6 +253,19 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       ?.chatSessionKey ??
       null)
   const runEvidence = extractRunEvidence(latestRun)
+
+  if (job) {
+    recordExecutionRun({
+      workItem,
+      project,
+      role: 'mission',
+      state,
+      job,
+      run: latestRun,
+      sessionKeyPrefix: missionFields.missionSessionKeyPrefix,
+      evidence: runEvidence,
+    })
+  }
 
   if (latestSessionKey && !updated.sessionKeys.includes(latestSessionKey)) {
     updated = updateWorkItem(updated.id, {
@@ -338,6 +395,15 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
           // Extract review output text: latest run output, job last_error, or empty
           const jobRuns = await getHermesJobRuns(updated.reviewJobId).catch(() => [])
           const latestRun = jobRuns[0] ?? null
+          recordExecutionRun({
+            workItem: updated,
+            project,
+            role: 'review',
+            state: reviewState,
+            job: reviewJob,
+            run: latestRun,
+            sessionKeyPrefix: `cron_${reviewJob.id}_`,
+          })
           const runOutputStr =
             latestRun?.output && typeof latestRun.output === 'object'
               ? Object.values(latestRun.output).filter((v): v is string => typeof v === 'string').join('\n')

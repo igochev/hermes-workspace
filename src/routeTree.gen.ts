@@ -115,6 +115,7 @@ import { Route as ApiWorkItemsWorkItemIdPrepareRouteImport } from './routes/api/
 import { Route as ApiWorkItemsWorkItemIdPlanningDraftsRouteImport } from './routes/api/work-items.$workItemId.planning-drafts'
 import { Route as ApiWorkItemsWorkItemIdLifecycleRouteImport } from './routes/api/work-items.$workItemId.lifecycle'
 import { Route as ApiWorkItemsWorkItemIdLaunchRouteImport } from './routes/api/work-items.$workItemId.launch'
+import { Route as ApiWorkItemsWorkItemIdExecutionRunsRouteImport } from './routes/api/work-items.$workItemId.execution-runs'
 import { Route as ApiWorkItemsWorkItemIdApprovalsRouteImport } from './routes/api/work-items.$workItemId.approvals'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
@@ -664,6 +665,12 @@ const ApiWorkItemsWorkItemIdLaunchRoute =
     path: '/launch',
     getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
   } as any)
+const ApiWorkItemsWorkItemIdExecutionRunsRoute =
+  ApiWorkItemsWorkItemIdExecutionRunsRouteImport.update({
+    id: '/execution-runs',
+    path: '/execution-runs',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
 const ApiWorkItemsWorkItemIdApprovalsRoute =
   ApiWorkItemsWorkItemIdApprovalsRouteImport.update({
     id: '/approvals',
@@ -823,6 +830,7 @@ export interface FileRoutesByFullPath {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
@@ -936,6 +944,7 @@ export interface FileRoutesByTo {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
@@ -1053,6 +1062,7 @@ export interface FileRoutesById {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
@@ -1171,6 +1181,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/execution-runs'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
     | '/api/work-items/$workItemId/planning-drafts'
@@ -1284,6 +1295,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/execution-runs'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
     | '/api/work-items/$workItemId/planning-drafts'
@@ -1400,6 +1412,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/execution-runs'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
     | '/api/work-items/$workItemId/planning-drafts'
@@ -2231,6 +2244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkItemsWorkItemIdLaunchRouteImport
       parentRoute: typeof ApiWorkItemsWorkItemIdRoute
     }
+    '/api/work-items/$workItemId/execution-runs': {
+      id: '/api/work-items/$workItemId/execution-runs'
+      path: '/execution-runs'
+      fullPath: '/api/work-items/$workItemId/execution-runs'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdExecutionRunsRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
     '/api/work-items/$workItemId/approvals': {
       id: '/api/work-items/$workItemId/approvals'
       path: '/approvals'
@@ -2486,6 +2506,7 @@ const ApiWorkItemApprovalsRouteWithChildren =
 
 interface ApiWorkItemsWorkItemIdRouteChildren {
   ApiWorkItemsWorkItemIdApprovalsRoute: typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  ApiWorkItemsWorkItemIdExecutionRunsRoute: typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
   ApiWorkItemsWorkItemIdLaunchRoute: typeof ApiWorkItemsWorkItemIdLaunchRoute
   ApiWorkItemsWorkItemIdLifecycleRoute: typeof ApiWorkItemsWorkItemIdLifecycleRoute
   ApiWorkItemsWorkItemIdPlanningDraftsRoute: typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
@@ -2495,6 +2516,8 @@ interface ApiWorkItemsWorkItemIdRouteChildren {
 const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
   {
     ApiWorkItemsWorkItemIdApprovalsRoute: ApiWorkItemsWorkItemIdApprovalsRoute,
+    ApiWorkItemsWorkItemIdExecutionRunsRoute:
+      ApiWorkItemsWorkItemIdExecutionRunsRoute,
     ApiWorkItemsWorkItemIdLaunchRoute: ApiWorkItemsWorkItemIdLaunchRoute,
     ApiWorkItemsWorkItemIdLifecycleRoute: ApiWorkItemsWorkItemIdLifecycleRoute,
     ApiWorkItemsWorkItemIdPlanningDraftsRoute:
