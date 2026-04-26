@@ -13,6 +13,11 @@ import {
   PROJECT_FORM_NATIVE_SELECT_STYLE,
   PROJECT_FORM_SELECT_CLASS,
   PROJECT_PHASE_ROUTING_POLICY_LABELS,
+  PROJECT_PROFILE_READINESS_COPY,
+  PROJECT_PROFILE_READINESS_PANEL_TITLE,
+  PROJECT_PROFILE_READINESS_ROLE_LABELS,
+  PROJECT_PROFILE_READINESS_STATUS_LABELS,
+  PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES,
   PROJECT_RECOVERY_HINT_CLASS,
   PROJECT_ROUTING_PRECEDENCE_LABELS,
   PROJECT_ROUTING_POLICY_EMPTY_VALUE,
@@ -119,6 +124,31 @@ describe('project detail screen board constants', () => {
       ['planner', 'planner'],
       ['reviewer', 'reviewer'],
     ])
+  })
+
+  it('surfaces project profile readiness labels and status tone mapping', () => {
+    expect(PROJECT_PROFILE_READINESS_PANEL_TITLE).toBe('Profile Readiness')
+    expect(PROJECT_PROFILE_READINESS_COPY).toBe(
+      'Profile readiness checks whether mapped Hermes profiles exist before launches use them.',
+    )
+    expect(PROJECT_PROFILE_READINESS_ROLE_LABELS).toEqual({
+      'autopilot-scout': 'Autopilot Scout',
+      build: 'Build',
+      deploy: 'Deploy',
+      research: 'Research',
+      review: 'Review',
+      supervisor: 'Supervisor',
+    })
+    expect(PROJECT_PROFILE_READINESS_STATUS_LABELS).toEqual({
+      missing: 'Missing',
+      ready: 'Ready',
+      unknown: 'Unknown',
+      unmapped: 'Unmapped',
+    })
+    expect(PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES.ready).toContain('emerald')
+    expect(PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES.unmapped).toContain('sky')
+    expect(PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES.missing).toContain('amber')
+    expect(PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES.unknown).toContain('slate')
   })
 
   it('surfaces project workflow policy copy and helper summaries for routing governance', () => {

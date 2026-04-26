@@ -47,6 +47,12 @@ import {
   type ProjectBoardUrgencySummary,
   type WorkItemUrgencyTone,
 } from '@/lib/projects-view-model'
+import { fetchProjectProfileReadiness } from '@/lib/profile-readiness-api'
+import type {
+  ProfileReadinessRole,
+  ProfileReadinessRoleReport,
+  ProfileReadinessStatus,
+} from '@/server/profile-readiness'
 import { cn } from '@/lib/utils'
 
 const EMPTY_WORK_ITEM_FORM: Omit<CreateWorkItemInput, 'projectId'> = {
@@ -117,6 +123,29 @@ export const PROJECT_PHASE_ROUTING_POLICY_LABELS: Record<keyof PhaseProfiles, st
   build: 'Build launches route to builder by default.',
   review: 'Review launches route to reviewer by default.',
   deploy: 'Deploy launches route to deployer by default.',
+}
+export const PROJECT_PROFILE_READINESS_PANEL_TITLE = 'Profile Readiness'
+export const PROJECT_PROFILE_READINESS_COPY =
+  'Profile readiness checks whether mapped Hermes profiles exist before launches use them.'
+export const PROJECT_PROFILE_READINESS_ROLE_LABELS: Record<ProfileReadinessRole, string> = {
+  research: 'Research',
+  build: 'Build',
+  review: 'Review',
+  deploy: 'Deploy',
+  supervisor: 'Supervisor',
+  'autopilot-scout': 'Autopilot Scout',
+}
+export const PROJECT_PROFILE_READINESS_STATUS_LABELS: Record<ProfileReadinessStatus, string> = {
+  ready: 'Ready',
+  unmapped: 'Unmapped',
+  missing: 'Missing',
+  unknown: 'Unknown',
+}
+export const PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES: Record<ProfileReadinessStatus, string> = {
+  ready: 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200',
+  unmapped: 'border-sky-500/35 bg-sky-500/10 text-sky-200',
+  missing: 'border-amber-500/35 bg-amber-500/10 text-amber-200',
+  unknown: 'border-slate-500/35 bg-slate-500/10 text-slate-200',
 }
 
 const REVIEW_AUTO_APPROVAL_PRIORITY_LABELS: Record<ReviewAutoApprovalPolicy['maxPriority'], string> = {
@@ -240,10 +269,16 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
     DEFAULT_REVIEW_AUTO_APPROVAL,
   )
 
+  const readinessQueryKey = ['mission-control', 'projects', projectId, 'profile-readiness'] as const
   const projectQuery = useQuery({
     queryKey,
     queryFn: () => fetchProject(projectId),
     refetchInterval: 30_000,
+  })
+  const profileReadinessQuery = useQuery({
+    queryKey: readinessQueryKey,
+    queryFn: () => fetchProjectProfileReadiness(projectId),
+    refetchInterval: 60_000,
   })
   const profilesQuery = useQuery({
     queryKey: ['project-detail', 'profiles', 'list'],
@@ -348,6 +383,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey })
       await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects'] })
+      await queryClient.invalidateQueries({ queryKey: readinessQueryKey })
       toast('Project launch routing updated')
       setShowProjectRouting(false)
     },
@@ -469,7 +505,10 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => void projectQuery.refetch()}
+                onClick={() => {
+                  void projectQuery.refetch()
+                  void profileReadinessQuery.refetch()
+                }}
                 className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]/80"
               >
                 <HugeiconsIcon icon={RefreshIcon} size={14} />
@@ -533,6 +572,14 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
               <span>{projectWipLaunchHint}</span>
             </div>
           ) : null}
+
+          <ProjectProfileReadinessPanel
+            isLoading={profileReadinessQuery.isLoading}
+            error={profileReadinessQuery.error}
+            roles={profileReadinessQuery.data?.report.roles ?? []}
+            profileDiscoveryAvailable={profileReadinessQuery.data?.profileDiscoveryAvailable}
+            profileDiscoveryError={profileReadinessQuery.data?.profileDiscoveryError}
+          />
 
           {showProjectRouting ? (
             <div className="mt-5 space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4">
@@ -1189,6 +1236,94 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
           </div>
         </section>
       </div>
+    </div>
+  )
+}
+
+function ProjectProfileReadinessPanel({
+  isLoading,
+  error,
+  roles,
+  profileDiscoveryAvailable,
+  profileDiscoveryError,
+}: {
+  isLoading: boolean
+  error: Error | null
+  roles: Array<ProfileReadinessRoleReport>
+  profileDiscoveryAvailable?: boolean
+  profileDiscoveryError?: string
+}) {
+  return (
+    <div className="mt-5 space-y-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-ink">{PROJECT_PROFILE_READINESS_PANEL_TITLE}</h2>
+          <p className="mt-1 text-sm text-[var(--theme-muted)]">
+            {PROJECT_PROFILE_READINESS_COPY}
+          </p>
+        </div>
+        {profileDiscoveryAvailable === false ? (
+          <span className="rounded-full border border-slate-500/35 bg-slate-500/10 px-2 py-0.5 text-[11px] font-medium text-slate-200">
+            Discovery unavailable
+          </span>
+        ) : null}
+      </div>
+
+      {isLoading ? (
+        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-muted)]">
+          Checking profile readiness…
+        </div>
+      ) : error ? (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          Profile readiness unavailable: {error.message}
+        </div>
+      ) : roles.length === 0 ? (
+        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-muted)]">
+          No profile readiness roles reported yet.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
+          <table className="min-w-full divide-y divide-[var(--theme-border)] text-sm">
+            <thead className="bg-[var(--theme-card2)] text-left text-xs uppercase tracking-wide text-[var(--theme-muted)]">
+              <tr>
+                <th className="px-3 py-2 font-medium">Role</th>
+                <th className="px-3 py-2 font-medium">Mapped Profile</th>
+                <th className="px-3 py-2 font-medium">Source</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Fix Hint</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--theme-border)]">
+              {roles.map((role) => (
+                <tr key={role.role}>
+                  <td className="px-3 py-2 font-medium text-ink">
+                    {PROJECT_PROFILE_READINESS_ROLE_LABELS[role.role]}
+                  </td>
+                  <td className="px-3 py-2 text-[var(--theme-text)]">
+                    {role.mappedProfile ?? 'Auto fallback'}
+                  </td>
+                  <td className="px-3 py-2 text-[var(--theme-muted)]">{role.source}</td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={cn(
+                        'inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                        PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES[role.status],
+                      )}
+                    >
+                      {PROJECT_PROFILE_READINESS_STATUS_LABELS[role.status]}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-[var(--theme-muted)]">{role.fixHint}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {profileDiscoveryError ? (
+        <p className="text-xs text-[var(--theme-muted)]">Profile discovery note: {profileDiscoveryError}</p>
+      ) : null}
     </div>
   )
 }
