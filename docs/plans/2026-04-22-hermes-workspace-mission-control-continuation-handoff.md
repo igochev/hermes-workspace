@@ -787,4 +787,31 @@ Detailed high-level roadmap:
 Detailed historic execution order and shipped slice scope:
 - `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-slices-plan.md`
 
-If resuming later, start from the implementation index above, then execute the Slice N/O detailed plan task-by-task.
+### 2026-04-26 Slice R/S PR 4 completion snapshot
+
+Grounded updates from this session:
+
+- Added authenticated supervisor reconcile API route:
+  - `POST /api/work-items/supervisor/reconcile`
+  - optional `?workItemId=...` for single-item reconciliation
+  - default body reconciles all execution candidates
+  - response shape: `{ checked, findings }`
+- Added client helper and typed response:
+  - `src/lib/work-item-supervisor-api.ts`
+- Added route coverage:
+  - unauthorized → `401`
+  - single work item reconciliation
+  - all-candidate reconciliation
+  - stable response shape
+- Generated route tree updated via `pnpm build`:
+  - `src/routeTree.gen.ts`
+- Verified commands:
+  - RED: `pnpm vitest run src/server/work-item-supervisor-routes.test.ts` failed on missing route module
+  - GREEN: `pnpm vitest run src/server/work-item-supervisor-routes.test.ts` → 3/3
+  - Adjacent: `pnpm vitest run src/server/work-item-supervisor-routes.test.ts src/server/work-item-supervisor.test.ts src/server/execution-runs-routes.test.ts src/server/execution-runs-store.test.ts src/server/work-item-execution.test.ts` → 32/32
+  - Full: `pnpm vitest run` → 239/239
+  - Build: `pnpm build` passed with existing Vite chunk/dynamic-import warnings
+  - Runtime: `systemctl --user restart hermes-workspace.service` then `is-active` → `active`
+  - Live smoke: `POST /api/work-items/supervisor/reconcile?workItemId=missing-smoke` → `200 {"checked":0,"findings":[]}`
+
+If resuming later, start from `docs/handoff/current-slice-status.md`; the next task is Slice R/S PR 5 — Attention queue store/builder.

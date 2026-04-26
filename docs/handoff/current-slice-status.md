@@ -19,20 +19,22 @@
 - Slice R/S PR 1 — Execution runs file-backed store and tests (`src/server/execution-runs-store.ts`, `src/server/execution-runs-store.test.ts`) ✅
 - Slice R/S PR 2 — Execution runs launch/sync integration and work-item API route (`src/server/work-item-launch.ts`, `src/server/work-item-execution.ts`, `src/routes/api/work-items.$workItemId.execution-runs.ts`, `src/lib/work-item-execution-runs-api.ts`) ✅
 - Slice R/S PR 3 — Supervisor pure helpers (`src/server/work-item-supervisor.ts`, `src/server/work-item-supervisor.test.ts`) ✅
+- Slice R/S PR 4 — Supervisor reconcile route/client (`src/routes/api/work-items.supervisor.reconcile.ts`, `src/lib/work-item-supervisor-api.ts`, `src/server/work-item-supervisor-routes.test.ts`) ✅
 
 ## Current State
-- Slice R/S PR 1–3 implementation complete.
+- Slice R/S PR 1–4 implementation complete.
 - Durable execution-run store writes `work-item-execution-runs.json` under `HERMES_HOME`, supports create/upsert, dedupe by `workItemId + role + jobId + runId` (or without runId), filters, deletion by work item/project, and invalid JSON safe fallback.
 - Work-item launch now records scheduled mission execution runs; execution sync records mission run state/evidence/session details; structured review sync records review run details.
 - New API route/client helper: `GET /api/work-items/:workItemId/execution-runs` → `{ workItemId, runs }`.
 - Supervisor helper module exports default thresholds, candidate detection, stale/failed/job-missing finding derivation, and reconcile functions that call execution sync then report findings without stale-only status mutation or retry.
-- Tests passing: PR 3 RED/GREEN focused `work-item-supervisor` → **8/8**; adjacent PR 1–3 targeted verification (`execution-runs-store`, `work-item-supervisor`, `work-item-execution`) → **26/26**; full `pnpm vitest run` → **236/236**.
+- New supervisor reconcile API route/client helper: `POST /api/work-items/supervisor/reconcile` with optional `?workItemId=...` → `{ checked, findings }`; authenticated route returns `401` when required credentials are missing.
+- Tests passing: PR 4 RED/GREEN focused `work-item-supervisor-routes` → **3/3**; adjacent PR 1–4 targeted verification (`work-item-supervisor-routes`, `work-item-supervisor`, `execution-runs-routes`, `execution-runs-store`, `work-item-execution`) → **32/32**; full `pnpm vitest run` → **239/239**.
 - Build passing: `pnpm build`.
-- Service status: not restarted for PR 3 pure helper-only change; previous PR 1–2 service restart was active.
-- Live API smoke: PR 3 has no route/UI yet; PR 4 will add supervisor reconcile API.
+- Service status: restarted after PR 4 route addition; `hermes-workspace.service` is active.
+- Live API smoke: `POST /api/work-items/supervisor/reconcile?workItemId=missing-smoke` returned `200 {"checked":0,"findings":[]}`.
 
 ## Next Steps
-**Next:** Slice R/S PR 4 — supervisor reconcile route/client (`src/routes/api/work-items.supervisor.reconcile.ts`, `src/lib/work-item-supervisor-api.ts`) for `POST /api/work-items/supervisor/reconcile` with optional `?workItemId=...`.
+**Next:** Slice R/S PR 5 — attention queue store/builder (`src/server/attention-queue-store.ts`, `src/server/attention-queue.ts`, `src/routes/api/attention-queue.ts`, `src/lib/attention-queue-api.ts`).
 
 ## Notes
 - Build still emits existing Vite chunk-size/dynamic-import warnings; build exits successfully.
