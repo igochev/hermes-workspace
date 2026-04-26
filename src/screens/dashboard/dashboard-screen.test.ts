@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest'
 import type { ProjectSummary, WorkItemRecord } from '@/lib/projects-api'
 import type { AttentionQueueItem } from '@/server/attention-queue-store'
 import type { ApprovalInboxEntry } from '@/lib/work-item-approvals-api'
+import type { SessionTelemetrySummary } from '@/server/session-telemetry'
 import {
   DASHBOARD_MISSION_CONTROL_QUERY_KEY,
   DASHBOARD_MISSION_CONTROL_QUEUE_TITLES,
   DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS,
+  DASHBOARD_SESSION_TELEMETRY_LABELS,
   buildDashboardAttentionSurface,
   buildDashboardMissionControlQueues,
   buildDashboardMissionControlSummary,
+  buildDashboardSessionTelemetryCards,
 } from './dashboard-screen'
 
 describe('dashboard mission control helpers', () => {
@@ -237,6 +240,56 @@ describe('dashboard mission control helpers', () => {
       items: [],
       emptyCopy: 'No global attention items right now. Mission Control is calm.',
     })
+  })
+
+  it('uses stable labels for session telemetry truth cards', () => {
+    expect(DASHBOARD_SESSION_TELEMETRY_LABELS).toEqual({
+      totalTokens: 'Session tokens',
+      recentSessions: 'Recent sessions',
+      highestContext: 'Highest context',
+      accuracy: 'Telemetry accuracy',
+    })
+  })
+
+  it('builds session telemetry cards from the server summary without false precision', () => {
+    const summary: SessionTelemetrySummary = {
+      totalSessions: 9,
+      totalMessages: 18,
+      totalInputTokens: 1_000,
+      totalOutputTokens: 500,
+      totalCacheReadTokens: 250,
+      totalTokens: 1_750,
+      contextPercent: 72.4,
+      accuracy: 'estimated',
+      topSessions: [],
+    }
+
+    expect(buildDashboardSessionTelemetryCards(summary)).toEqual([
+      {
+        key: 'totalTokens',
+        label: 'Session tokens',
+        value: '1.8K',
+        detail: 'Estimated from Hermes session metadata',
+      },
+      {
+        key: 'recentSessions',
+        label: 'Recent sessions',
+        value: '9',
+        detail: '18 messages visible to Mission Control',
+      },
+      {
+        key: 'highestContext',
+        label: 'Highest context',
+        value: '72%',
+        detail: 'Highest reported session context usage',
+      },
+      {
+        key: 'accuracy',
+        label: 'Telemetry accuracy',
+        value: 'Estimated',
+        detail: 'Token totals are derived from partial Hermes metadata',
+      },
+    ])
   })
 })
 

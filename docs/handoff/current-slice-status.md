@@ -13,6 +13,7 @@
 - Main/Architect created Cycle 2 gap analysis and slice plans ✅
 - Slice V/W Task 1 — Session telemetry aggregate helpers/tests (`src/server/session-telemetry.ts`, `src/server/session-telemetry.test.ts`) ✅
 - Slice V/W Task 2 — `/api/session-telemetry` route + route tests (`src/routes/api/session-telemetry.ts`, `src/server/session-telemetry-routes.test.ts`, `src/routeTree.gen.ts`) ✅
+- Slice V/W Task 3 — Client telemetry API + dashboard telemetry cards/table (`src/lib/session-telemetry-api.ts`, `src/screens/dashboard/dashboard-screen.tsx`, `src/screens/dashboard/dashboard-screen.test.ts`) ✅
 
 ## Current State
 - Baseline branch: `my-hermes-workspace-dev`; inspected commit: `ac52b9b`.
@@ -21,9 +22,10 @@
 - Cycle 2 plan order: V/W telemetry+realtime, X/Y profile readiness, Z/AA Autopilot delegation, AB/AC recovery actions.
 - Task 1 verification: `pnpm test src/server/session-telemetry.test.ts` passes (6/6); Prettier check passes; subagent spec review PASS and final quality review APPROVED.
 - Task 2 verification: `pnpm test src/server/session-telemetry.test.ts src/server/session-telemetry-routes.test.ts` passes (10/10); `pnpm build` passes with existing Vite chunk/dynamic-import warnings; subagent spec review PASS and quality review APPROVED after adding auth/error fallback coverage.
+- Task 3 verification: RED confirmed in `src/screens/dashboard/dashboard-screen.test.ts` for missing telemetry labels/helper; `pnpm test src/server/session-telemetry.test.ts src/server/session-telemetry-routes.test.ts src/screens/dashboard/dashboard-screen.test.ts` passes (17/17); `pnpm build` passes with existing Vite sourcemap/chunk/dynamic-import warnings. Prettier check on dashboard files still reports existing style issues, so broad formatting was intentionally avoided to keep the diff merge-safe.
 
 ## Next Steps
-**Next:** Builder should implement Slice V/W Task 3 from `docs/plans/2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md`: add client API helper and dashboard telemetry cards/table using `/api/session-telemetry`.
+**Next:** Builder should implement Slice V/W Task 4 from `docs/plans/2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md`: add realtime `/api/chat-events` session-refresh hook and wire it into `WorkspaceShell`.
 
 ## Notes
 - Keep using TDD and update this handoff after every completed task.

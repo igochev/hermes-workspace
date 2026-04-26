@@ -33,6 +33,12 @@ import { useFeatureAvailable } from '@/hooks/use-feature-available'
 import { cn } from '@/lib/utils'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { fetchSessionTelemetry } from '@/lib/session-telemetry-api'
+import type {
+  SessionTelemetryItem,
+  SessionTelemetrySummary,
+  TelemetryAccuracy,
+} from '@/server/session-telemetry'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Moon02Icon, Sun02Icon } from '@hugeicons/core-free-icons'
 
@@ -72,6 +78,21 @@ type MissionControlQueues = {
   blocked: Array<MissionControlQueueEntry>
   running: Array<MissionControlQueueEntry>
 }
+
+type DashboardSessionTelemetryCard = {
+  key: keyof typeof DASHBOARD_SESSION_TELEMETRY_LABELS
+  label: string
+  value: string
+  detail: string
+}
+
+export const DASHBOARD_SESSION_TELEMETRY_QUERY_KEY = ['dashboard', 'session-telemetry'] as const
+export const DASHBOARD_SESSION_TELEMETRY_LABELS = {
+  totalTokens: 'Session tokens',
+  recentSessions: 'Recent sessions',
+  highestContext: 'Highest context',
+  accuracy: 'Telemetry accuracy',
+} as const
 
 export const DASHBOARD_MISSION_CONTROL_QUERY_KEY = ['dashboard', 'mission-control'] as const
 export const DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS: Record<keyof MissionControlSummary, string> = {
@@ -118,6 +139,60 @@ function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) return '—'
+  return `${Math.round(value)}%`
+}
+
+function formatAccuracyLabel(accuracy: TelemetryAccuracy): string {
+  return accuracy.charAt(0).toUpperCase() + accuracy.slice(1)
+}
+
+function telemetryAccuracyDetail(accuracy: TelemetryAccuracy): string {
+  if (accuracy === 'exact') return 'Exact token totals from Hermes'
+  if (accuracy === 'estimated') return 'Token totals are derived from partial Hermes metadata'
+  return 'Telemetry unavailable from Hermes session metadata'
+}
+
+export function buildDashboardSessionTelemetryCards(
+  summary: SessionTelemetrySummary,
+): Array<DashboardSessionTelemetryCard> {
+  return [
+    {
+      key: 'totalTokens',
+      label: DASHBOARD_SESSION_TELEMETRY_LABELS.totalTokens,
+      value: formatNumber(summary.totalTokens),
+      detail:
+        summary.accuracy === 'exact'
+          ? 'Exact token totals from Hermes'
+          : summary.accuracy === 'estimated'
+            ? 'Estimated from Hermes session metadata'
+            : 'Telemetry unavailable from Hermes session metadata',
+    },
+    {
+      key: 'recentSessions',
+      label: DASHBOARD_SESSION_TELEMETRY_LABELS.recentSessions,
+      value: formatNumber(summary.totalSessions),
+      detail: `${formatNumber(summary.totalMessages)} messages visible to Mission Control`,
+    },
+    {
+      key: 'highestContext',
+      label: DASHBOARD_SESSION_TELEMETRY_LABELS.highestContext,
+      value: formatPercent(summary.contextPercent),
+      detail:
+        summary.contextPercent === null
+          ? 'No context usage percentage reported'
+          : 'Highest reported session context usage',
+    },
+    {
+      key: 'accuracy',
+      label: DASHBOARD_SESSION_TELEMETRY_LABELS.accuracy,
+      value: formatAccuracyLabel(summary.accuracy),
+      detail: telemetryAccuracyDetail(summary.accuracy),
+    },
+  ]
 }
 
 function themeColor(name: string, fallback: string): string {
@@ -945,6 +1020,83 @@ function QuickAction({
   )
 }
 
+// ── Session Telemetry ─────────────────────────────────────────────
+
+function SessionTelemetryPanel({
+  cards,
+  items,
+  message,
+  palette,
+}: {
+  cards: Array<DashboardSessionTelemetryCard>
+  items: Array<SessionTelemetryItem>
+  message?: string
+  palette: ReturnType<typeof readDashboardPalette>
+}) {
+  return (
+    <GlassCard
+      title="Mission Control telemetry"
+      titleRight={<span className="text-[10px] text-muted">15s refresh</span>}
+      accentColor={palette.accentSecondary}
+      noPadding
+    >
+      <div className="grid grid-cols-2 gap-px bg-[var(--theme-border)] lg:grid-cols-4">
+        {cards.map((card) => (
+          <div key={card.key} className="bg-[var(--theme-card)] p-4">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+              {card.label}
+            </div>
+            <div className="mt-1 text-2xl font-bold tabular-nums text-ink">{card.value}</div>
+            <div className="mt-1 text-[11px] text-muted">{card.detail}</div>
+          </div>
+        ))}
+      </div>
+      <div className="p-4">
+        {message ? <div className="mb-3 text-xs text-amber-300">{message}</div> : null}
+        {items.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[var(--theme-border)] py-6 text-center text-xs text-muted">
+            Session telemetry unavailable — waiting for Hermes session metadata.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-[var(--theme-border)]">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[var(--theme-card2)] text-[10px] uppercase tracking-[0.14em] text-muted">
+                <tr>
+                  <th className="px-3 py-2 font-semibold">Session</th>
+                  <th className="px-3 py-2 font-semibold">Model / provider</th>
+                  <th className="px-3 py-2 text-right font-semibold">Tokens</th>
+                  <th className="px-3 py-2 text-right font-semibold">Context</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.slice(0, 5).map((item) => (
+                  <tr key={item.key} className="border-t border-[var(--theme-border)]">
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-ink">{item.label}</div>
+                      <div className="text-[10px] text-muted">
+                        {item.messageCount} messages · {item.accuracy}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-muted">
+                      {item.model ?? 'Unknown model'}{item.provider ? ` · ${item.provider}` : ''}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums text-ink">
+                      {formatNumber(item.totalTokens)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums text-muted">
+                      {formatPercent(item.contextPercent)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </GlassCard>
+  )
+}
+
 // ── Session Row (minimal) ────────────────────────────────────────
 
 function SessionRow({
@@ -1041,6 +1193,25 @@ export function DashboardScreen() {
   })
 
   const sessions = (sessionsQuery.data ?? []) as HermesSession[]
+  const sessionTelemetryQuery = useQuery({
+    queryKey: DASHBOARD_SESSION_TELEMETRY_QUERY_KEY,
+    queryFn: fetchSessionTelemetry,
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+    enabled: sessionsAvailable,
+  })
+
+  const emptySessionTelemetrySummary: SessionTelemetrySummary = {
+    totalSessions: 0,
+    totalMessages: 0,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCacheReadTokens: 0,
+    totalTokens: 0,
+    contextPercent: null,
+    accuracy: 'unavailable',
+    topSessions: [],
+  }
 
   const missionProjectsQuery = useQuery({
     queryKey: [...DASHBOARD_MISSION_CONTROL_QUERY_KEY, 'projects'],
@@ -1120,6 +1291,17 @@ export function DashboardScreen() {
     () => buildDashboardAttentionSurface(missionAttentionItems),
     [missionAttentionItems],
   )
+  const sessionTelemetrySummary = sessionTelemetryQuery.data?.summary ?? emptySessionTelemetrySummary
+  const sessionTelemetryCards = useMemo(
+    () => buildDashboardSessionTelemetryCards(sessionTelemetrySummary),
+    [sessionTelemetrySummary],
+  )
+  const sessionTelemetryItems = sessionTelemetryQuery.data?.items ?? sessionTelemetrySummary.topSessions
+  const sessionTelemetryMessage = sessionTelemetryQuery.error
+    ? sessionTelemetryQuery.error instanceof Error
+      ? sessionTelemetryQuery.error.message
+      : String(sessionTelemetryQuery.error)
+    : sessionTelemetryQuery.data?.message
 
   const updateSettings = useSettingsStore((state) => state.updateSettings)
   const [isDark, setIsDark] = useState(() => {
@@ -1366,6 +1548,21 @@ export function DashboardScreen() {
           }}
         />
       </div>
+
+      {/* ── Session Telemetry Truth ── */}
+      {sessionsAvailable ? (
+        <SessionTelemetryPanel
+          cards={sessionTelemetryCards}
+          items={sessionTelemetryItems}
+          message={sessionTelemetryMessage}
+          palette={palette}
+        />
+      ) : (
+        <UnavailableWidget
+          title="Mission Control telemetry"
+          description={getUnavailableReason('sessions')}
+        />
+      )}
 
       {/* ── Metrics Row ── */}
       {sessionsAvailable ? (
