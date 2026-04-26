@@ -74,6 +74,28 @@ export const WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL = 'Open Conductor'
 export const WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE = 'Execution sync warning'
 export const WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE = 'Profile Preflight'
 export const WORK_ITEM_RECOVERY_PANEL_TITLE = 'Recovery Actions'
+export const WORK_ITEM_DETAIL_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescriptor> = [
+  { surface: 'work-item-back-link', label: 'Back to Project', kind: 'link', target: '/projects/:projectId' },
+  {
+    surface: 'operator-lifecycle-actions',
+    label: 'Operator Workflow',
+    kind: 'button',
+    target: 'apply lifecycle transition',
+  },
+  { surface: 'execution-refresh', label: 'Refresh', kind: 'button', target: 'refetch work item and profile readiness' },
+  { surface: 'execution-sync', label: 'Sync Execution', kind: 'button', target: 'sync work item execution evidence' },
+  { surface: 'execution-launch', label: 'Launch/Relaunch phase', kind: 'button', target: 'launch selected work item phase' },
+  { surface: 'profile-preflight-card', label: WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE, kind: 'static', target: null },
+  {
+    surface: 'open-conductor',
+    label: WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL,
+    kind: 'link',
+    target: '/conductor?mode=work-item&id=:workItemId',
+  },
+  { surface: 'recovery-actions', label: WORK_ITEM_RECOVERY_PANEL_TITLE, kind: 'button', target: 'execute selected recovery action' },
+  { surface: 'approvals-attention-card', label: 'Approvals Attention', kind: 'static', target: null },
+  { surface: 'mission-control-summary', label: 'Mission Control Summary', kind: 'static', target: null },
+]
 
 type WorkItemRecoveryPanelSourceItem = Pick<
   AttentionQueueItem,
@@ -330,6 +352,13 @@ export function getWorkItemAcceptanceCriteriaProgressLabel(progress: {
   totalCount: number
 }): string {
   return `${progress.metCount}/${progress.totalCount} criteria met`
+}
+
+export type ClickabilityAuditDescriptor = {
+  surface: string
+  label: string
+  kind: 'button' | 'link' | 'static'
+  target: string | null
 }
 
 export const WORK_ITEM_DETAIL_ACTION_GROUP_TITLES = {

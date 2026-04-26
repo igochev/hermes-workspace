@@ -34,10 +34,12 @@ import {
   WORK_ITEM_DETAIL_HEADER_CLASS,
   WORK_ITEM_DETAIL_MUTED_TEXT_CLASS,
   WORK_ITEM_DETAIL_NOTES_HELP_TEXT,
+  WORK_ITEM_DETAIL_CLICKABILITY_AUDIT,
   WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL,
   WORK_ITEM_DETAIL_PANEL_CLASS,
   WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE,
   WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE,
+  WORK_ITEM_RECOVERY_PANEL_TITLE,
 } from './work-item-detail-screen'
 
 describe('work item detail screen theme classes', () => {
@@ -419,6 +421,20 @@ describe('work item detail screen theme classes', () => {
         before: '—',
         after: 'docs/plans/project-1-abcd1234-planner-draft.md',
       },
+    ])
+  })
+  it('documents work item detail clickability for launch preflight and recovery controls', () => {
+    expect(WORK_ITEM_DETAIL_CLICKABILITY_AUDIT).toEqual([
+      { surface: 'work-item-back-link', label: 'Back to Project', kind: 'link', target: '/projects/:projectId' },
+      { surface: 'operator-lifecycle-actions', label: WORK_ITEM_DETAIL_ACTION_GROUP_TITLES.operator, kind: 'button', target: 'apply lifecycle transition' },
+      { surface: 'execution-refresh', label: 'Refresh', kind: 'button', target: 'refetch work item and profile readiness' },
+      { surface: 'execution-sync', label: 'Sync Execution', kind: 'button', target: 'sync work item execution evidence' },
+      { surface: 'execution-launch', label: 'Launch/Relaunch phase', kind: 'button', target: 'launch selected work item phase' },
+      { surface: 'profile-preflight-card', label: WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE, kind: 'static', target: null },
+      { surface: 'open-conductor', label: WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL, kind: 'link', target: '/conductor?mode=work-item&id=:workItemId' },
+      { surface: 'recovery-actions', label: WORK_ITEM_RECOVERY_PANEL_TITLE, kind: 'button', target: 'execute selected recovery action' },
+      { surface: 'approvals-attention-card', label: 'Approvals Attention', kind: 'static', target: null },
+      { surface: 'mission-control-summary', label: 'Mission Control Summary', kind: 'static', target: null },
     ])
   })
 })

@@ -64,6 +64,24 @@ import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 
 type WorkspaceStats = Record<string, unknown>
 
+type ClickabilityAuditDescriptor = {
+  surface: string
+  label: string
+  kind: 'button' | 'link' | 'static'
+  target: string | null
+}
+
+export const CHAT_SIDEBAR_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescriptor> = [
+  { surface: 'new-chat', label: 'New chat', kind: 'button', target: 'create session' },
+  { surface: 'collapse-sidebar', label: 'Collapse sidebar', kind: 'button', target: 'toggle sidebar collapsed state' },
+  { surface: 'session-search', label: 'Search conversations', kind: 'button', target: 'open search modal' },
+  { surface: 'session-row', label: 'Open session', kind: 'link', target: '/chat/:sessionKey' },
+  { surface: 'session-menu', label: 'Session actions', kind: 'button', target: 'rename/delete session menu' },
+  { surface: 'session-refresh-retry', label: 'Retry', kind: 'button', target: 'refetch sessions after sidebar error' },
+  { surface: 'session-freshness-badge', label: 'Session refresh status', kind: 'static', target: null },
+  { surface: 'session-stale-indicator', label: 'Stale session indicator', kind: 'static', target: null },
+]
+
 function ThemeToggleMini() {
   const _theme = useSettingsStore((state) => state.settings.theme)
   const updateSettings = useSettingsStore((state) => state.updateSettings)

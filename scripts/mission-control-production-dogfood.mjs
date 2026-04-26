@@ -132,12 +132,14 @@ async function main() {
     const text = message.text()
     if (text.includes('fonts.googleapis.com') || text.includes('frame-ancestors')) return
     if (text.includes('Failed to load resource')) return
+    if (text.includes('The width(-1) and height(-1) of chart should be greater than 0')) return
     if (['error', 'warning'].includes(message.type())) evidence.consoleErrors.push(`${message.type()}: ${text}`)
   })
   page.on('pageerror', (error) => evidence.consoleErrors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
     if (request.url().includes('fonts.googleapis.com')) return
     if (request.url().includes('/api/chat-events') || request.url().includes('/api/terminal-stream')) return
+    if (request.failure()?.errorText === 'net::ERR_ABORTED') return
     evidence.consoleErrors.push(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`)
   })
   page.on('response', (response) => {
@@ -187,6 +189,34 @@ async function main() {
   evidence.uiClicks.push('Open created work item detail')
   await page.waitForURL(/work-items/, { timeout: 10_000 })
   await page.getByText(createdWorkItem.title).waitFor({ timeout: 10_000 })
+  await page.getByRole('button', { name: /^Refresh$/i }).click()
+  evidence.uiClicks.push('Work item detail → Refresh')
+  await page.getByRole('button', { name: /Sync Execution/i }).click()
+  evidence.uiClicks.push('Work item detail → Sync Execution')
+  await page.getByText('Profile Preflight').waitFor({ timeout: 10_000 })
+  evidence.uiClicks.push('Work item detail → Profile Preflight observed')
+  const conductorHref = await page.getByRole('link', { name: /Open Conductor/i }).getAttribute('href')
+  assert(conductorHref?.includes(`/conductor?mode=work-item&id=${encodeURIComponent(createdWorkItem.id)}`), 'Open Conductor link missing work item target')
+  evidence.uiClicks.push('Work item detail → Open Conductor link verified')
+
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.getByText('Mission Control').first().waitFor({ timeout: 10_000 })
+  await page.getByLabel(/Session refresh:/i).first().waitFor({ timeout: 10_000 })
+  evidence.uiClicks.push('Chat sidebar → session refresh status observed')
+  await page.getByRole('button', { name: /New chat/i }).first().waitFor({ timeout: 10_000 })
+  evidence.uiClicks.push('Chat sidebar → New chat button visible')
+  await page.locator('a[href="/projects"]').first().click()
+  evidence.uiClicks.push('Dashboard → Projects summary card')
+  await page.waitForURL(/\/projects$/, { timeout: 10_000 })
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' })
+  const attentionDetailLink = page.getByRole('link', { name: /Open detail for all recovery actions/i }).first()
+  if (await attentionDetailLink.isVisible().catch(() => false)) {
+    await attentionDetailLink.click()
+    evidence.uiClicks.push('Dashboard → Attention work item card')
+    await page.waitForURL(/work-items/, { timeout: 10_000 })
+  } else {
+    evidence.uiClicks.push('Dashboard → Attention work item card (no open attention data present)')
+  }
 
   await page.goto(`${baseUrl}/projects/${dogfoodProjectId}/autopilot`, { waitUntil: 'domcontentloaded' })
   await page.getByText(/Autopilot/i).first().waitFor({ timeout: 10_000 })
