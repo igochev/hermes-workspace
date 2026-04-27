@@ -36,6 +36,19 @@ export type ProjectRuntimeProfiles = {
   supervisorProfile?: string
 }
 
+export type ProjectAutonomyLanePolicy = {
+  enabled: boolean
+  mode: 'single_lane'
+  isolation: 'branch'
+  maxActiveWorkItems: 1
+  baseBranch?: string
+  branchPrefix?: string
+  plannerTiming: 'on_lane_entry'
+  blockedBehavior: 'park_and_continue_when_repo_clean'
+  mergeHealerEnabled: boolean
+  allowParallelWorktrees: false
+}
+
 export type ProjectRecord = {
   id: string
   name: string
@@ -48,6 +61,7 @@ export type ProjectRecord = {
   runtimeProfiles: ProjectRuntimeProfiles
   reviewAutoApproval: ReviewAutoApprovalPolicy
   autopilotPolicy: ProjectAutopilotPolicy
+  autonomyLanePolicy: ProjectAutonomyLanePolicy
   createdAt: string
   updatedAt: string
 }
@@ -67,9 +81,28 @@ type CreateProjectInput = {
   runtimeProfiles?: unknown
   reviewAutoApproval?: unknown
   autopilotPolicy?: unknown
+  autonomyLanePolicy?: unknown
 }
 
-type UpdateProjectInput = Partial<Omit<ProjectRecord, 'id' | 'createdAt' | 'updatedAt'>>
+type UpdateProjectInput = Partial<
+  Omit<
+    ProjectRecord,
+    | 'id'
+    | 'createdAt'
+    | 'updatedAt'
+    | 'phaseProfiles'
+    | 'runtimeProfiles'
+    | 'reviewAutoApproval'
+    | 'autopilotPolicy'
+    | 'autonomyLanePolicy'
+  >
+> & {
+  phaseProfiles?: unknown
+  runtimeProfiles?: unknown
+  reviewAutoApproval?: unknown
+  autopilotPolicy?: unknown
+  autonomyLanePolicy?: unknown
+}
 
 function getHermesHome(): string {
   return process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
@@ -185,6 +218,25 @@ function normalizeRuntimeProfiles(value: unknown): ProjectRuntimeProfiles {
   }
 }
 
+function normalizeAutonomyLanePolicy(
+  value: unknown,
+  projectDefaultBranch?: string,
+): ProjectAutonomyLanePolicy {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return {
+    enabled: candidate.enabled === true,
+    mode: 'single_lane',
+    isolation: 'branch',
+    maxActiveWorkItems: 1,
+    baseBranch: asOptionalString(candidate.baseBranch) ?? projectDefaultBranch ?? 'main',
+    branchPrefix: asOptionalString(candidate.branchPrefix) ?? 'mission',
+    plannerTiming: 'on_lane_entry',
+    blockedBehavior: 'park_and_continue_when_repo_clean',
+    mergeHealerEnabled: candidate.mergeHealerEnabled === false ? false : true,
+    allowParallelWorktrees: false,
+  }
+}
+
 function slugifyProjectName(name: string): string {
   const normalized = name
     .trim()
@@ -209,21 +261,26 @@ function uniqueSlug(baseSlug: string, projects: Array<ProjectRecord>, excludeId?
 }
 
 function normalizeProject(
-  project: (Omit<Partial<ProjectRecord>, 'phaseProfiles' | 'runtimeProfiles' | 'reviewAutoApproval' | 'autopilotPolicy'> & {
+  project: (Omit<
+    Partial<ProjectRecord>,
+    'phaseProfiles' | 'runtimeProfiles' | 'reviewAutoApproval' | 'autopilotPolicy' | 'autonomyLanePolicy'
+  > & {
     phaseProfiles?: unknown
     runtimeProfiles?: unknown
     reviewAutoApproval?: unknown
     autopilotPolicy?: unknown
+    autonomyLanePolicy?: unknown
   }) &
     Pick<ProjectRecord, 'id' | 'name' | 'slug' | 'repoPath' | 'createdAt' | 'updatedAt'>,
 ): ProjectRecord {
+  const defaultBranch = asOptionalString(project.defaultBranch)
   return {
     id: project.id,
     name: project.name.trim(),
     slug: project.slug.trim(),
     repoPath: project.repoPath.trim(),
     repoUrl: asOptionalString(project.repoUrl),
-    defaultBranch: asOptionalString(project.defaultBranch),
+    defaultBranch,
     description: asOptionalString(project.description),
     phaseProfiles: normalizePhaseProfiles((project as Partial<ProjectRecord>).phaseProfiles),
     runtimeProfiles: normalizeRuntimeProfiles((project as Partial<ProjectRecord>).runtimeProfiles),
@@ -231,6 +288,10 @@ function normalizeProject(
       (project as Partial<ProjectRecord>).reviewAutoApproval,
     ),
     autopilotPolicy: normalizeAutopilotPolicy((project as Partial<ProjectRecord>).autopilotPolicy),
+    autonomyLanePolicy: normalizeAutonomyLanePolicy(
+      (project as Partial<ProjectRecord>).autonomyLanePolicy,
+      defaultBranch,
+    ),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   }
@@ -260,6 +321,7 @@ export function createProject(input: CreateProjectInput): ProjectRecord {
     runtimeProfiles: input.runtimeProfiles,
     reviewAutoApproval: input.reviewAutoApproval,
     autopilotPolicy: input.autopilotPolicy,
+    autonomyLanePolicy: input.autonomyLanePolicy,
     createdAt: now,
     updatedAt: now,
   })
@@ -300,8 +362,22 @@ export function updateProject(projectId: string, updates: UpdateProjectInput): P
         : current.reviewAutoApproval,
     autopilotPolicy:
       updates.autopilotPolicy !== undefined
-        ? { ...current.autopilotPolicy, ...updates.autopilotPolicy }
+        ? {
+            ...current.autopilotPolicy,
+            ...(updates.autopilotPolicy && typeof updates.autopilotPolicy === 'object'
+              ? updates.autopilotPolicy
+              : {}),
+          }
         : current.autopilotPolicy,
+    autonomyLanePolicy:
+      updates.autonomyLanePolicy !== undefined
+        ? {
+            ...current.autonomyLanePolicy,
+            ...(updates.autonomyLanePolicy && typeof updates.autonomyLanePolicy === 'object'
+              ? updates.autonomyLanePolicy
+              : {}),
+          }
+        : current.autonomyLanePolicy,
     createdAt: current.createdAt,
     updatedAt: new Date().toISOString(),
   })

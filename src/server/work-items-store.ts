@@ -31,6 +31,15 @@ export type WorkItemMissionState = 'scheduled' | 'running' | 'succeeded' | 'fail
 export type WorkItemReviewState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 export type WorkItemReviewDecision = 'approved' | 'changes_requested' | 'manual_review'
 export type WorkItemAutopilotBuildIntent = 'build-after-accepted-plan'
+export type WorkItemLaneState =
+  | 'queued'
+  | 'preparing'
+  | 'building'
+  | 'reviewing'
+  | 'merge_healing'
+  | 'blocked'
+  | 'done'
+export type WorkItemMergeState = 'not_started' | 'running' | 'merged' | 'conflict' | 'failed'
 
 export type WorkItemStructuredReviewDecision = 'approved' | 'changes_requested' | 'manual_review'
 export type WorkItemReviewQualityGateStatus = 'pass' | 'fail' | 'manual_review'
@@ -77,7 +86,21 @@ export type WorkItemRecord = {
   reviewQualityGateReasons: Array<string>
   reviewMissingEvidence: Array<string>
   sessionKeys: Array<string>
+  laneState?: WorkItemLaneState
+  laneEnteredAt?: string
+  laneParkedAt?: string
+  laneBlockedReason?: string
+  baseBranch?: string
   branchName?: string
+  branchCreatedAt?: string
+  mergeState?: WorkItemMergeState
+  mergeCommit?: string
+  mergeBaseCommit?: string
+  mergeTargetBranch?: string
+  mergeConflictFiles?: Array<string>
+  mergeTestCommand?: string
+  mergeTestPassed?: boolean
+  mergeArtifactPaths?: Array<string>
   prUrl?: string
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
@@ -129,7 +152,21 @@ type CreateWorkItemInput = {
   missionLastRunAt?: string
   missionLastError?: string
   sessionKeys?: Array<string>
+  laneState?: WorkItemLaneState
+  laneEnteredAt?: string
+  laneParkedAt?: string
+  laneBlockedReason?: string
+  baseBranch?: string
   branchName?: string
+  branchCreatedAt?: string
+  mergeState?: WorkItemMergeState
+  mergeCommit?: string
+  mergeBaseCommit?: string
+  mergeTargetBranch?: string
+  mergeConflictFiles?: Array<string>
+  mergeTestCommand?: string
+  mergeTestPassed?: boolean
+  mergeArtifactPaths?: Array<string>
   prUrl?: string
   artifactPaths?: Array<string>
   acceptanceCriteria?: Array<string>
@@ -275,6 +312,28 @@ function normalizeBlockedReason(value: unknown): WorkItemBlockedReason | undefin
   return undefined
 }
 
+function normalizeLaneState(value: unknown): WorkItemLaneState | undefined {
+  return value === 'queued' ||
+    value === 'preparing' ||
+    value === 'building' ||
+    value === 'reviewing' ||
+    value === 'merge_healing' ||
+    value === 'blocked' ||
+    value === 'done'
+    ? value
+    : undefined
+}
+
+function normalizeMergeState(value: unknown): WorkItemMergeState | undefined {
+  return value === 'not_started' ||
+    value === 'running' ||
+    value === 'merged' ||
+    value === 'conflict' ||
+    value === 'failed'
+    ? value
+    : undefined
+}
+
 function asHistoryArray(value: unknown): Array<WorkItemHistoryEntry> {
   return Array.isArray(value)
     ? value
@@ -387,7 +446,24 @@ function normalizeWorkItem(
     missionLastRunAt: asOptionalString(workItem.missionLastRunAt),
     missionLastError: asOptionalString(workItem.missionLastError),
     sessionKeys: asStringArray(workItem.sessionKeys),
+    laneState: normalizeLaneState((workItem as Partial<WorkItemRecord>).laneState),
+    laneEnteredAt: asOptionalString((workItem as Partial<WorkItemRecord>).laneEnteredAt),
+    laneParkedAt: asOptionalString((workItem as Partial<WorkItemRecord>).laneParkedAt),
+    laneBlockedReason: asOptionalString((workItem as Partial<WorkItemRecord>).laneBlockedReason),
+    baseBranch: asOptionalString((workItem as Partial<WorkItemRecord>).baseBranch),
     branchName: asOptionalString(workItem.branchName),
+    branchCreatedAt: asOptionalString((workItem as Partial<WorkItemRecord>).branchCreatedAt),
+    mergeState: normalizeMergeState((workItem as Partial<WorkItemRecord>).mergeState),
+    mergeCommit: asOptionalString((workItem as Partial<WorkItemRecord>).mergeCommit),
+    mergeBaseCommit: asOptionalString((workItem as Partial<WorkItemRecord>).mergeBaseCommit),
+    mergeTargetBranch: asOptionalString((workItem as Partial<WorkItemRecord>).mergeTargetBranch),
+    mergeConflictFiles: asStringArray((workItem as Partial<WorkItemRecord>).mergeConflictFiles),
+    mergeTestCommand: asOptionalString((workItem as Partial<WorkItemRecord>).mergeTestCommand),
+    mergeTestPassed:
+      typeof (workItem as Partial<WorkItemRecord>).mergeTestPassed === 'boolean'
+        ? (workItem as Partial<WorkItemRecord>).mergeTestPassed
+        : undefined,
+    mergeArtifactPaths: asStringArray((workItem as Partial<WorkItemRecord>).mergeArtifactPaths),
     prUrl: asOptionalString(workItem.prUrl),
     artifactPaths: asStringArray(workItem.artifactPaths),
     acceptanceCriteria,
@@ -457,7 +533,21 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     missionLastRunAt: input.missionLastRunAt,
     missionLastError: input.missionLastError,
     sessionKeys: input.sessionKeys,
+    laneState: input.laneState,
+    laneEnteredAt: input.laneEnteredAt,
+    laneParkedAt: input.laneParkedAt,
+    laneBlockedReason: input.laneBlockedReason,
+    baseBranch: input.baseBranch,
     branchName: input.branchName,
+    branchCreatedAt: input.branchCreatedAt,
+    mergeState: input.mergeState,
+    mergeCommit: input.mergeCommit,
+    mergeBaseCommit: input.mergeBaseCommit,
+    mergeTargetBranch: input.mergeTargetBranch,
+    mergeConflictFiles: input.mergeConflictFiles,
+    mergeTestCommand: input.mergeTestCommand,
+    mergeTestPassed: input.mergeTestPassed,
+    mergeArtifactPaths: input.mergeArtifactPaths,
     prUrl: input.prUrl,
     artifactPaths: input.artifactPaths,
     acceptanceCriteria: input.acceptanceCriteria,

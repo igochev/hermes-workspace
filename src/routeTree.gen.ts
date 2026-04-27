@@ -115,6 +115,7 @@ import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs
 import { Route as ApiAutopilotSuggestionsSuggestionIdRouteImport } from './routes/api/autopilot-suggestions.$suggestionId'
 import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
 import { Route as ApiWorkItemsSupervisorReconcileRouteImport } from './routes/api/work-items.supervisor.reconcile'
+import { Route as ApiWorkItemsOrchestratorReconcileRouteImport } from './routes/api/work-items.orchestrator.reconcile'
 import { Route as ApiWorkItemsWorkItemIdRecoveryActionsRouteImport } from './routes/api/work-items.$workItemId.recovery-actions'
 import { Route as ApiWorkItemsWorkItemIdPrepareRouteImport } from './routes/api/work-items.$workItemId.prepare'
 import { Route as ApiWorkItemsWorkItemIdPlanningDraftsRouteImport } from './routes/api/work-items.$workItemId.planning-drafts'
@@ -668,6 +669,12 @@ const ApiWorkItemsSupervisorReconcileRoute =
     path: '/supervisor/reconcile',
     getParentRoute: () => ApiWorkItemsRoute,
   } as any)
+const ApiWorkItemsOrchestratorReconcileRoute =
+  ApiWorkItemsOrchestratorReconcileRouteImport.update({
+    id: '/orchestrator/reconcile',
+    path: '/orchestrator/reconcile',
+    getParentRoute: () => ApiWorkItemsRoute,
+  } as any)
 const ApiWorkItemsWorkItemIdRecoveryActionsRoute =
   ApiWorkItemsWorkItemIdRecoveryActionsRouteImport.update({
     id: '/recovery-actions',
@@ -879,6 +886,7 @@ export interface FileRoutesByFullPath {
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
   '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
   '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
+  '/api/work-items/orchestrator/reconcile': typeof ApiWorkItemsOrchestratorReconcileRoute
   '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -999,6 +1007,7 @@ export interface FileRoutesByTo {
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
   '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
   '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
+  '/api/work-items/orchestrator/reconcile': typeof ApiWorkItemsOrchestratorReconcileRoute
   '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -1123,6 +1132,7 @@ export interface FileRoutesById {
   '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
   '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
   '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
+  '/api/work-items/orchestrator/reconcile': typeof ApiWorkItemsOrchestratorReconcileRoute
   '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
   '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
@@ -1248,6 +1258,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId/planning-drafts'
     | '/api/work-items/$workItemId/prepare'
     | '/api/work-items/$workItemId/recovery-actions'
+    | '/api/work-items/orchestrator/reconcile'
     | '/api/work-items/supervisor/reconcile'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesByTo: FileRoutesByTo
@@ -1368,6 +1379,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId/planning-drafts'
     | '/api/work-items/$workItemId/prepare'
     | '/api/work-items/$workItemId/recovery-actions'
+    | '/api/work-items/orchestrator/reconcile'
     | '/api/work-items/supervisor/reconcile'
     | '/projects/$projectId/work-items/$workItemId'
   id:
@@ -1491,6 +1503,7 @@ export interface FileRouteTypes {
     | '/api/work-items/$workItemId/planning-drafts'
     | '/api/work-items/$workItemId/prepare'
     | '/api/work-items/$workItemId/recovery-actions'
+    | '/api/work-items/orchestrator/reconcile'
     | '/api/work-items/supervisor/reconcile'
     | '/projects/$projectId/work-items/$workItemId'
   fileRoutesById: FileRoutesById
@@ -2322,6 +2335,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkItemsSupervisorReconcileRouteImport
       parentRoute: typeof ApiWorkItemsRoute
     }
+    '/api/work-items/orchestrator/reconcile': {
+      id: '/api/work-items/orchestrator/reconcile'
+      path: '/orchestrator/reconcile'
+      fullPath: '/api/work-items/orchestrator/reconcile'
+      preLoaderRoute: typeof ApiWorkItemsOrchestratorReconcileRouteImport
+      parentRoute: typeof ApiWorkItemsRoute
+    }
     '/api/work-items/$workItemId/recovery-actions': {
       id: '/api/work-items/$workItemId/recovery-actions'
       path: '/recovery-actions'
@@ -2658,11 +2678,14 @@ const ApiWorkItemsWorkItemIdRouteWithChildren =
 
 interface ApiWorkItemsRouteChildren {
   ApiWorkItemsWorkItemIdRoute: typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  ApiWorkItemsOrchestratorReconcileRoute: typeof ApiWorkItemsOrchestratorReconcileRoute
   ApiWorkItemsSupervisorReconcileRoute: typeof ApiWorkItemsSupervisorReconcileRoute
 }
 
 const ApiWorkItemsRouteChildren: ApiWorkItemsRouteChildren = {
   ApiWorkItemsWorkItemIdRoute: ApiWorkItemsWorkItemIdRouteWithChildren,
+  ApiWorkItemsOrchestratorReconcileRoute:
+    ApiWorkItemsOrchestratorReconcileRoute,
   ApiWorkItemsSupervisorReconcileRoute: ApiWorkItemsSupervisorReconcileRoute,
 }
 

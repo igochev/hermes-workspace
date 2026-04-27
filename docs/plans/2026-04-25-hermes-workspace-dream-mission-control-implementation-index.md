@@ -2,11 +2,13 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active production-acceptance plan:** `docs/plans/2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md`
+> **Current active implementation plan:** `docs/plans/2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md`
 >
 > **Previous production-readiness plan:** `docs/plans/2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md`
 >
 > **Previous CEO/Architect gap analysis:** `docs/plans/2026-04-26-hermes-workspace-next-cycle-gap-analysis.md`
+>
+> **Roadmap correction, 2026-04-27:** Default execution model is **single-lane autonomy per repo/project**: one active work item, one dedicated feature branch, Planner → Builder → Reviewer → Merge-Healer, persistent evidence, visible recovery controls. Parallel worktrees are future opt-in optimization only after single-lane autonomy and merge healing are proven.
 >
 > **Repo:** `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
 
@@ -46,11 +48,17 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 |---:|---|---|---|
 | 1 | `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Real-project dogfood against `family_command_center-ABACUS`, Profile Readiness actionability, and UI clickability audit | Shipped |
 
-### Production Acceptance Cycle — active
+### Single-Lane Autonomy Roadmap — active
 
 | Order | Plan | Purpose | Why here |
 |---:|---|---|---|
-| 1 | `2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md` | Final real-project acceptance gauntlet: candidate repo baseline, all Hermes tests/build/lint, service/API smoke, live dogfood, browser spot-check, verdict report | All planned slices are shipped; product still needs owner-level production acceptance evidence before calling it functional |
+| 1 | `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Reframe Mission Control around one stable autonomous lane per repo/project: branch-based execution, Planner-on-lane-entry, Builder evidence, Merge-Healer, lane cockpit, branch-based E2E | Owner clarified reliability and low babysitting are more important than same-repo parallel worktrees; this is the new default before further autonomous E2E work |
+
+### Production Acceptance Cycle — superseded by single-lane correction
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| 1 | `2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md` | Final real-project acceptance gauntlet: candidate repo baseline, all Hermes tests/build/lint, service/API smoke, live dogfood, browser spot-check, verdict report | Historical / superseded until single-lane branch autonomy is implemented |
 
 ---
 
@@ -95,6 +103,10 @@ Core seams:
 8. **Every slice updates docs/handoff after verification.** Keep continuation accurate.
 9. **Preserve PATCH partial-update safety.** Do not include undefined fields that wipe arrays such as `acceptanceCriteria`.
 10. **Role routing must be visible.** If a work item launches through a profile, the operator should see which profile and why.
+11. **Single-lane autonomy is the default.** Each repo/project should process one active autonomous work item at a time on one dedicated feature branch. Queue additional work; do not silently spawn parallel worktrees.
+12. **Plan from current code.** Planner should normally prepare a work item when it is entering the lane, after previous successful work has been integrated, so plans account for the latest code/docs.
+13. **Blocked does not mean frozen.** A blocked item may be parked with explicit evidence and recovery controls so the lane can continue to the next queued item without hidden parallelism.
+14. **Merge-Healer before parallelism.** Autonomous merge/rebase/test/conflict healing must be first-class and visible before worktree-based parallel execution becomes a default option.
 
 ---
 
@@ -136,7 +148,8 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md` | Active detailed acceptance plan | Builder executes now; final owner-level production-functional verdict using real project |
+| `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Active implementation plan | Builder executes now: one stable autonomous lane per repo/project, branch-based work, Planner-on-lane-entry, Builder evidence, Merge-Healer, branch-based E2E |
+| `2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md` | Historical / superseded | Revisit after single-lane autonomy is functional |
 | `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Shipped production-readiness plan | Historical context; harness and clickability coverage created here |
 | `2026-04-26-hermes-workspace-next-cycle-gap-analysis.md` | Previous analysis | Strategy/context only; do not implement directly |
 | This index | Current implementation entrypoint | Builder reads after handoff |
@@ -188,10 +201,10 @@ A plan is not shipped until:
 
 Start with:
 
-`docs/plans/2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md`
+`docs/plans/2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md`
 
-Builder should execute PA-0 through PA-5 exactly: repo evidence, candidate repo baseline, Hermes focused/full tests/build/lint, service/API smoke, real-project dogfood, browser/manual spot-check, then update handoff with ACCEPTED / CONDITIONALLY ACCEPTED / REJECTED and report paths.
+Builder should execute Task 1 first: project single-lane policy normalization. The purpose is to make Hermes Workspace useful through reliable one-work-item-at-a-time branch autonomy per repo/project before revisiting parallel worktrees or production acceptance.
 
-## 10. After Production Acceptance ships
+## 10. After Single-Lane Autonomy ships
 
-When the acceptance plan is complete, Builder should update the handoff with the final verdict, exact command results, acceptance report path, dogfood report path, screenshot paths, and any remaining blockers. Main/CEO should then decide the next product cycle only after this acceptance verdict exists.
+When the single-lane plan is complete, Builder should update the handoff with the final branch-based E2E verdict, exact command results, report paths, screenshot paths, and any remaining blockers. Main/CEO should then create the next acceptance or hardening plan based on that evidence.

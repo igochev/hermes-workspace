@@ -39,6 +39,19 @@ export type ProjectRuntimeProfiles = {
   supervisorProfile?: string
 }
 
+export type ProjectAutonomyLanePolicy = {
+  enabled: boolean
+  mode: 'single_lane'
+  isolation: 'branch'
+  maxActiveWorkItems: 1
+  baseBranch?: string
+  branchPrefix?: string
+  plannerTiming: 'on_lane_entry'
+  blockedBehavior: 'park_and_continue_when_repo_clean'
+  mergeHealerEnabled: boolean
+  allowParallelWorktrees: false
+}
+
 export type ProjectRecord = {
   id: string
   name: string
@@ -51,6 +64,7 @@ export type ProjectRecord = {
   runtimeProfiles: ProjectRuntimeProfiles
   reviewAutoApproval: ReviewAutoApprovalPolicy
   autopilotPolicy: ProjectAutopilotPolicy
+  autonomyLanePolicy: ProjectAutonomyLanePolicy
   createdAt: string
   updatedAt: string
 }
@@ -66,6 +80,15 @@ export type WorkItemPhase = 'research' | 'build' | 'review' | 'deploy'
 export type WorkItemPriority = 'high' | 'medium' | 'low'
 export type WorkItemRiskLevel = 'low' | 'medium' | 'high'
 export type WorkItemAutopilotBuildIntent = 'build-after-accepted-plan'
+export type WorkItemLaneState =
+  | 'queued'
+  | 'preparing'
+  | 'building'
+  | 'reviewing'
+  | 'merge_healing'
+  | 'blocked'
+  | 'done'
+export type WorkItemMergeState = 'not_started' | 'running' | 'merged' | 'conflict' | 'failed'
 export type WorkItemBlockedReason =
   | 'mission_failed'
   | 'review_feedback'
@@ -122,6 +145,44 @@ export type PlanningDraftRecord = {
   revisionRequestedAt?: string
 }
 
+export type WorkItemRunTimelineState =
+  | 'not_started'
+  | 'scheduled'
+  | 'running'
+  | 'output_ready'
+  | 'succeeded'
+  | 'failed'
+  | 'stale'
+  | 'waiting'
+
+export type WorkItemRunTimelineRow = {
+  phase: WorkItemPhase
+  phaseLabel: string
+  profileRole: 'planner' | 'builder' | 'reviewer' | 'deployer'
+  profileName?: string
+  profileSource?: string
+  state: WorkItemRunTimelineState
+  summary: string
+  nextExpectedAction?: string
+  jobId?: string
+  jobName?: string
+  runId?: string
+  sessionKey?: string
+  sessionKeyPrefix?: string
+  link?: string
+  heartbeatLabel?: string
+  lastObservedAt?: string
+  startedAt?: string
+  finishedAt?: string
+  artifacts: Array<string>
+  error?: string
+}
+
+export type WorkItemRunTimeline = {
+  workItemId: string
+  rows: Array<WorkItemRunTimelineRow>
+}
+
 export type WorkItemRecord = {
   id: string
   projectId: string
@@ -159,7 +220,21 @@ export type WorkItemRecord = {
   reviewQualityGateReasons: Array<string>
   reviewMissingEvidence: Array<string>
   sessionKeys: Array<string>
+  laneState?: WorkItemLaneState
+  laneEnteredAt?: string
+  laneParkedAt?: string
+  laneBlockedReason?: string
+  baseBranch?: string
   branchName?: string
+  branchCreatedAt?: string
+  mergeState?: WorkItemMergeState
+  mergeCommit?: string
+  mergeBaseCommit?: string
+  mergeTargetBranch?: string
+  mergeConflictFiles?: Array<string>
+  mergeTestCommand?: string
+  mergeTestPassed?: boolean
+  mergeArtifactPaths?: Array<string>
   prUrl?: string
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
@@ -181,6 +256,7 @@ export type WorkItemRecord = {
     updatedAt: string
   }>
   latestPlanningDraft?: PlanningDraftRecord | null
+  runTimeline?: WorkItemRunTimeline
   history: Array<{
     id: string
     action: 'launch' | 'status-change' | 'note'
@@ -207,6 +283,7 @@ export type CreateProjectInput = {
   runtimeProfiles?: Partial<ProjectRuntimeProfiles>
   reviewAutoApproval?: Partial<ReviewAutoApprovalPolicy>
   autopilotPolicy?: Partial<ProjectAutopilotPolicy>
+  autonomyLanePolicy?: Partial<ProjectAutonomyLanePolicy>
 }
 
 export type UpdateProjectInput = Partial<CreateProjectInput>
@@ -230,7 +307,21 @@ export type CreateWorkItemInput = {
   missionId?: string
   missionLink?: string
   sessionKeys?: Array<string>
+  laneState?: WorkItemLaneState
+  laneEnteredAt?: string
+  laneParkedAt?: string
+  laneBlockedReason?: string
+  baseBranch?: string
   branchName?: string
+  branchCreatedAt?: string
+  mergeState?: WorkItemMergeState
+  mergeCommit?: string
+  mergeBaseCommit?: string
+  mergeTargetBranch?: string
+  mergeConflictFiles?: Array<string>
+  mergeTestCommand?: string
+  mergeTestPassed?: boolean
+  mergeArtifactPaths?: Array<string>
   prUrl?: string
   artifactPaths?: Array<string>
   acceptanceCriteria?: Array<string>

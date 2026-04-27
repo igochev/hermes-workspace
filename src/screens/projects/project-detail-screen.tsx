@@ -36,6 +36,7 @@ import {
   PROJECT_ACTIVE_WIP_WARNING_THRESHOLD,
   buildLabelAnalytics,
   buildProjectBoardUrgencySummary,
+  buildProjectLaneCockpit,
   buildProjectWipHint,
   buildWorkItemOperatorSignals,
   buildWorkItemRecoveryHint,
@@ -169,6 +170,11 @@ export const PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES: Record<ProfileReadin
   missing: 'border-amber-500/35 bg-amber-500/10 text-amber-200',
   unknown: 'border-slate-500/35 bg-slate-500/10 text-slate-200',
 }
+export const PROJECT_LANE_COCKPIT_PANEL_TITLE = 'Project Lane Cockpit'
+export const PROJECT_LANE_COCKPIT_MODE_LABEL = 'Single-lane branch autonomy'
+export const PROJECT_LANE_PARALLEL_WORKTREES_NOTE =
+  'Parallel worktrees disabled unless advanced mode is enabled.'
+export const PROJECT_LANE_RECOVERY_ACTIONS_HEADING = 'Recovery actions'
 
 const REVIEW_AUTO_APPROVAL_PRIORITY_LABELS: Record<ReviewAutoApprovalPolicy['maxPriority'], string> = {
   low: 'Low only',
@@ -366,6 +372,21 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
   const labelAnalytics = useMemo(
     () => buildLabelAnalytics(workItems),
     [workItems],
+  )
+  const laneCockpit = useMemo(
+    () => buildProjectLaneCockpit(project ?? {
+      autonomyLanePolicy: {
+        enabled: false,
+        mode: 'single_lane',
+        isolation: 'branch',
+        maxActiveWorkItems: 1,
+        plannerTiming: 'on_lane_entry',
+        blockedBehavior: 'park_and_continue_when_repo_clean',
+        mergeHealerEnabled: true,
+        allowParallelWorktrees: false,
+      },
+    }, workItems),
+    [project, workItems],
   )
   const [labelFilter, setLabelFilter] = useState<string | null>(null)
   const projectWipLaunchHint = useMemo(
@@ -605,6 +626,60 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
             profileDiscoveryError={profileReadinessQuery.data?.profileDiscoveryError}
             onConfigureProfileMappings={() => setShowProjectRouting(true)}
           />
+
+          <section className="mt-5 rounded-2xl border border-sky-500/25 bg-sky-500/8 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-200">
+                  {PROJECT_LANE_COCKPIT_PANEL_TITLE}
+                </p>
+                <h2 className="text-lg font-semibold text-ink">{laneCockpit.modeLabel}</h2>
+                <p className="text-xs text-[var(--theme-muted)]">{laneCockpit.parallelWorktreesNote}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Tag>{laneCockpit.currentPhaseLabel}</Tag>
+                <Tag>{laneCockpit.heartbeatLabel}</Tag>
+                <Tag>{laneCockpit.mergeStateLabel}</Tag>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="Active lane item" value={laneCockpit.activeWorkItem?.title ?? 'Idle'} />
+              <MetricCard label="Branch" value={laneCockpit.currentBranch ?? '—'} />
+              <MetricCard label="Base branch" value={laneCockpit.baseBranch} />
+              <MetricCard label="Next queued" value={laneCockpit.nextQueuedWorkItem?.title ?? '—'} />
+            </div>
+
+            {laneCockpit.parkedBlockedItems.length > 0 ? (
+              <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                <div className="font-semibold">Parked blocked items</div>
+                <ul className="mt-2 space-y-1 text-xs">
+                  {laneCockpit.parkedBlockedItems.map((item) => (
+                    <li key={item.id}>
+                      {item.title}: {item.laneBlockedReason ?? 'Blocked with lane evidence'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {laneCockpit.blockerLabel ? (
+              <p className="mt-3 text-xs font-medium text-amber-200">Blocker: {laneCockpit.blockerLabel}</p>
+            ) : null}
+
+            {laneCockpit.recoveryActions.length > 0 ? (
+              <div className="mt-3 text-xs text-[var(--theme-muted)]">
+                <div className="font-semibold text-[var(--theme-text)]">
+                  {PROJECT_LANE_RECOVERY_ACTIONS_HEADING}
+                </div>
+                <ul className="mt-1 list-disc space-y-1 pl-4">
+                  {laneCockpit.recoveryActions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
 
           {showProjectRouting ? (
             <ProjectProfileWorkflowPolicyEditor

@@ -8,6 +8,10 @@ import {
   getAvailableWorkItemLifecycleActions,
   getPlanningDraftGuidance,
   getPlanningDraftStatusLabel,
+  getRunTimelineStateLabel,
+  getWorkItemRunTimelineArtifactCopy,
+  getWorkItemRunTimelineIdCopy,
+  getWorkItemRunTimelineLinkLabel,
   getWorkItemAcceptanceCriteriaProgress,
   getWorkItemAcceptanceCriteriaProgressLabel,
   getWorkItemApprovalSummary,
@@ -40,6 +44,7 @@ import {
   WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE,
   WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE,
   WORK_ITEM_RECOVERY_PANEL_TITLE,
+  WORK_ITEM_RUNS_SECTION_TITLE,
 } from './work-item-detail-screen'
 
 describe('work item detail screen theme classes', () => {
@@ -423,6 +428,53 @@ describe('work item detail screen theme classes', () => {
       },
     ])
   })
+  it('exposes Runs / Agents cockpit labels for honest per-profile run states', () => {
+    expect(WORK_ITEM_RUNS_SECTION_TITLE).toBe('Runs / Agents')
+    expect(getRunTimelineStateLabel('not_started')).toBe('No job launched')
+    expect(getRunTimelineStateLabel('scheduled')).toBe('Job scheduled')
+    expect(getRunTimelineStateLabel('running')).toBe('Agent session running')
+    expect(getRunTimelineStateLabel('output_ready')).toBe('Output ready for ingestion')
+    expect(getRunTimelineStateLabel('succeeded')).toBe('Succeeded')
+    expect(getRunTimelineStateLabel('failed')).toBe('Failed')
+    expect(getRunTimelineStateLabel('stale')).toBe('Stuck / stale')
+    expect(getRunTimelineStateLabel('waiting')).toBe('Waiting for approval')
+  })
+
+  it('summarizes run timeline row ids, artifacts, and link labels', () => {
+    expect(
+      getWorkItemRunTimelineIdCopy({
+        phase: 'build',
+        phaseLabel: 'Build',
+        profileRole: 'builder',
+        profileName: 'builder',
+        profileSource: 'execution-run',
+        state: 'running',
+        summary: 'Builder is running.',
+        jobId: 'job-1234567890',
+        runId: 'run-abc987654',
+        sessionKeyPrefix: 'sess-deadbeef',
+        artifacts: [],
+      }),
+    ).toBe('job job-1234 · run run-abc · session sess-dea')
+    expect(
+      getWorkItemRunTimelineIdCopy({
+        phase: 'research',
+        phaseLabel: 'Research',
+        profileRole: 'planner',
+        state: 'not_started',
+        summary: 'No job launched',
+        artifacts: [],
+      }),
+    ).toBe('No job/session yet')
+    expect(getWorkItemRunTimelineArtifactCopy([])).toBe('No code evidence yet')
+    expect(getWorkItemRunTimelineArtifactCopy(['lib/quick-capture.ts', 'tests/quick-capture.test.ts'])).toBe(
+      'Builder changed files: lib/quick-capture.ts, tests/quick-capture.test.ts',
+    )
+    expect(getWorkItemRunTimelineLinkLabel({ link: 'http://localhost:3456/jobs/job-123' })).toBe('Open run')
+    expect(getWorkItemRunTimelineLinkLabel({ sessionKey: 'sess-123' })).toBe('Open session')
+    expect(getWorkItemRunTimelineLinkLabel({})).toBeNull()
+  })
+
   it('documents work item detail clickability for launch preflight and recovery controls', () => {
     expect(WORK_ITEM_DETAIL_CLICKABILITY_AUDIT).toEqual([
       { surface: 'work-item-back-link', label: 'Back to Project', kind: 'link', target: '/projects/:projectId' },
@@ -431,6 +483,7 @@ describe('work item detail screen theme classes', () => {
       { surface: 'execution-sync', label: 'Sync Execution', kind: 'button', target: 'sync work item execution evidence' },
       { surface: 'execution-launch', label: 'Launch/Relaunch phase', kind: 'button', target: 'launch selected work item phase' },
       { surface: 'profile-preflight-card', label: WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE, kind: 'static', target: null },
+      { surface: 'runs-agents-cockpit', label: WORK_ITEM_RUNS_SECTION_TITLE, kind: 'link', target: 'job/session deep links from run timeline' },
       { surface: 'open-conductor', label: WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL, kind: 'link', target: '/conductor?mode=work-item&id=:workItemId' },
       { surface: 'recovery-actions', label: WORK_ITEM_RECOVERY_PANEL_TITLE, kind: 'button', target: 'execute selected recovery action' },
       { surface: 'approvals-attention-card', label: 'Approvals Attention', kind: 'static', target: null },

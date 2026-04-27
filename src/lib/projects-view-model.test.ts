@@ -5,6 +5,7 @@ import {
   PROJECT_BOARD_FLOW_ORDER,
   buildLabelAnalytics,
   buildProjectBoardUrgencySummary,
+  buildProjectLaneCockpit,
   buildProjectStatsLine,
   buildProjectWipHint,
   buildWorkItemOperatorSignals,
@@ -238,6 +239,140 @@ describe('projects-view-model', () => {
     ).toEqual(
       expect.arrayContaining(['Mission failed', 'Recovery ready', 'Build phase']),
     )
+  })
+
+  it('surfaces autonomous run timeline signals on board cards', () => {
+    expect(
+      buildWorkItemOperatorSignals(
+        makeWorkItem({
+          id: 'no-job',
+          phase: 'research',
+          runTimeline: {
+            workItemId: 'no-job',
+            rows: [
+              {
+                phase: 'research',
+                phaseLabel: 'Research',
+                profileRole: 'planner',
+                state: 'not_started',
+                summary: 'No job launched',
+                artifacts: [],
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual(expect.arrayContaining(['No job launched']))
+
+    expect(
+      buildWorkItemOperatorSignals(
+        makeWorkItem({
+          id: 'planner-running',
+          phase: 'research',
+          runTimeline: {
+            workItemId: 'planner-running',
+            rows: [
+              {
+                phase: 'research',
+                phaseLabel: 'Research',
+                profileRole: 'planner',
+                state: 'running',
+                summary: 'Planner is producing a draft.',
+                artifacts: [],
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual(expect.arrayContaining(['Planner running']))
+
+    expect(
+      buildWorkItemOperatorSignals(
+        makeWorkItem({
+          id: 'builder-running',
+          phase: 'build',
+          runTimeline: {
+            workItemId: 'builder-running',
+            rows: [
+              {
+                phase: 'build',
+                phaseLabel: 'Build',
+                profileRole: 'builder',
+                state: 'running',
+                summary: 'Builder is writing code.',
+                artifacts: [],
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual(expect.arrayContaining(['Builder running']))
+
+    expect(
+      buildWorkItemOperatorSignals(
+        makeWorkItem({
+          id: 'output-ready',
+          phase: 'research',
+          runTimeline: {
+            workItemId: 'output-ready',
+            rows: [
+              {
+                phase: 'research',
+                phaseLabel: 'Research',
+                profileRole: 'planner',
+                state: 'output_ready',
+                summary: 'Planner output waiting for ingestion.',
+                artifacts: [],
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual(expect.arrayContaining(['Output ready']))
+
+    expect(
+      buildWorkItemOperatorSignals(
+        makeWorkItem({
+          id: 'stale-execution',
+          phase: 'build',
+          runTimeline: {
+            workItemId: 'stale-execution',
+            rows: [
+              {
+                phase: 'build',
+                phaseLabel: 'Build',
+                profileRole: 'builder',
+                state: 'stale',
+                summary: 'No heartbeat for 30m.',
+                artifacts: [],
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual(expect.arrayContaining(['Stale execution']))
+
+    expect(
+      buildWorkItemOperatorSignals(
+        makeWorkItem({
+          id: 'code-diff',
+          phase: 'build',
+          runTimeline: {
+            workItemId: 'code-diff',
+            rows: [
+              {
+                phase: 'build',
+                phaseLabel: 'Build',
+                profileRole: 'builder',
+                state: 'succeeded',
+                summary: 'Builder changed files.',
+                artifacts: ['lib/quick-capture.ts', 'tests/quick-capture.test.ts'],
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual(expect.arrayContaining(['Code diff detected']))
   })
 
   it('builds recovery hints for failed and rework-oriented cards', () => {
@@ -481,6 +616,101 @@ describe('projects-view-model', () => {
     expect(frontend.avgCycleTimeDays).toBeGreaterThan(0)
   })
 
+  it('builds a single-lane cockpit summary for active branch autonomy', () => {
+    const cockpit = buildProjectLaneCockpit(
+      makeProject(),
+      [
+        makeWorkItem({
+          id: 'active-build',
+          title: 'Implement checkout flow',
+          status: 'active',
+          phase: 'build',
+          laneState: 'building',
+          branchName: 'mission/active-build-checkout-flow',
+          baseBranch: 'main',
+          mergeState: 'not_started',
+          runTimeline: {
+            workItemId: 'active-build',
+            rows: [
+              {
+                phase: 'build',
+                phaseLabel: 'Build',
+                profileRole: 'builder',
+                state: 'running',
+                summary: 'Builder running',
+                artifacts: [],
+              },
+            ],
+          },
+        }),
+        makeWorkItem({
+          id: 'queued-high',
+          title: 'Next queued fix',
+          status: 'ready',
+          priority: 'high',
+          riskLevel: 'low',
+        }),
+      ],
+    )
+
+    expect(cockpit.modeLabel).toBe('Single-lane branch autonomy')
+    expect(cockpit.parallelWorktreesNote).toBe('Parallel worktrees disabled unless advanced mode is enabled.')
+    expect(cockpit.activeWorkItem?.id).toBe('active-build')
+    expect(cockpit.currentBranch).toBe('mission/active-build-checkout-flow')
+    expect(cockpit.baseBranch).toBe('main')
+    expect(cockpit.currentPhaseLabel).toBe('Builder')
+    expect(cockpit.heartbeatLabel).toBe('Builder running')
+    expect(cockpit.nextQueuedWorkItem?.id).toBe('queued-high')
+    expect(cockpit.mergeStateLabel).toBe('Merge not started')
+    expect(cockpit.recoveryActions).toEqual([])
+  })
+
+  it('summarizes queued, parked blocked, stale, and merge conflict lane states', () => {
+    const cockpit = buildProjectLaneCockpit(
+      makeProject(),
+      [
+        makeWorkItem({
+          id: 'blocked-merge',
+          title: 'Blocked merge',
+          status: 'blocked',
+          phase: 'deploy',
+          laneState: 'blocked',
+          laneParkedAt: '2026-04-27T00:00:00.000Z',
+          laneBlockedReason: 'Merge conflict in package.json',
+          branchName: 'mission/blocked-merge',
+          baseBranch: 'main',
+          mergeState: 'conflict',
+          mergeConflictFiles: ['package.json'],
+          runTimeline: {
+            workItemId: 'blocked-merge',
+            rows: [
+              {
+                phase: 'build',
+                phaseLabel: 'Build',
+                profileRole: 'builder',
+                state: 'stale',
+                summary: 'Builder heartbeat stale',
+                artifacts: [],
+              },
+            ],
+          },
+        }),
+        makeWorkItem({ id: 'queued-next', title: 'Queued next', status: 'inbox', priority: 'high' }),
+      ],
+    )
+
+    expect(cockpit.activeWorkItem).toBeNull()
+    expect(cockpit.nextQueuedWorkItem?.id).toBe('queued-next')
+    expect(cockpit.parkedBlockedItems.map((item) => item.id)).toEqual(['blocked-merge'])
+    expect(cockpit.blockerLabel).toBe('Merge conflict in package.json')
+    expect(cockpit.heartbeatLabel).toBe('Stale Builder heartbeat')
+    expect(cockpit.mergeStateLabel).toBe('Merge conflict: package.json')
+    expect(cockpit.recoveryActions).toEqual([
+      'Resolve or reset the branch, confirm repo is clean, then retry Merge-Healer.',
+      'Review stale Builder output before relaunching the build.',
+    ])
+  })
+
   it('returns empty analytics when no labels exist', () => {
     const workItems = [
       makeWorkItem({ id: 'w1', labels: [] }),
@@ -508,6 +738,49 @@ describe('projects-view-model', () => {
   })
 })
 
+function makeProject(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
+  return {
+    id: overrides.id ?? 'project-1',
+    name: overrides.name ?? 'Mission Control',
+    slug: overrides.slug ?? 'mission-control',
+    repoPath: overrides.repoPath ?? '/repos/mission-control',
+    repoUrl: overrides.repoUrl,
+    defaultBranch: overrides.defaultBranch ?? 'main',
+    description: overrides.description,
+    phaseProfiles: overrides.phaseProfiles ?? {
+      research: 'planner',
+      build: 'builder',
+      review: 'reviewer',
+      deploy: 'deployer',
+    },
+    runtimeProfiles: overrides.runtimeProfiles ?? {},
+    reviewAutoApproval: overrides.reviewAutoApproval ?? { enabled: false, maxPriority: 'low' },
+    autopilotPolicy: overrides.autopilotPolicy ?? {
+      enabled: false,
+      schedulePreset: 'manual',
+      suggestionLimit: 5,
+      scoutSources: [],
+    },
+    autonomyLanePolicy: overrides.autonomyLanePolicy ?? {
+      enabled: true,
+      mode: 'single_lane',
+      isolation: 'branch',
+      maxActiveWorkItems: 1,
+      baseBranch: 'main',
+      branchPrefix: 'mission',
+      plannerTiming: 'on_lane_entry',
+      blockedBehavior: 'park_and_continue_when_repo_clean',
+      mergeHealerEnabled: true,
+      allowParallelWorktrees: false,
+    },
+    workItemCount: overrides.workItemCount ?? 0,
+    activeWorkItemCount: overrides.activeWorkItemCount ?? 0,
+    doneWorkItemCount: overrides.doneWorkItemCount ?? 0,
+    createdAt: overrides.createdAt ?? '2026-04-21T00:00:00.000Z',
+    updatedAt: overrides.updatedAt ?? '2026-04-21T00:00:00.000Z',
+  }
+}
+
 function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
   return {
     id: overrides.id ?? 'work-item',
@@ -529,13 +802,29 @@ function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
     missionLastRunAt: overrides.missionLastRunAt,
     missionLastError: overrides.missionLastError,
     sessionKeys: overrides.sessionKeys ?? [],
+    laneState: overrides.laneState,
+    laneEnteredAt: overrides.laneEnteredAt,
+    laneParkedAt: overrides.laneParkedAt,
+    laneBlockedReason: overrides.laneBlockedReason,
+    baseBranch: overrides.baseBranch,
     branchName: overrides.branchName,
+    branchCreatedAt: overrides.branchCreatedAt,
+    mergeState: overrides.mergeState,
+    mergeCommit: overrides.mergeCommit,
+    mergeBaseCommit: overrides.mergeBaseCommit,
+    mergeTargetBranch: overrides.mergeTargetBranch,
+    mergeConflictFiles: overrides.mergeConflictFiles,
+    mergeTestCommand: overrides.mergeTestCommand,
+    mergeTestPassed: overrides.mergeTestPassed,
+    mergeArtifactPaths: overrides.mergeArtifactPaths,
     prUrl: overrides.prUrl,
     artifactPaths: overrides.artifactPaths ?? [],
     acceptanceCriteria: overrides.acceptanceCriteria ?? [],
     notes: overrides.notes ?? [],
     approvals: overrides.approvals ?? [],
     labels: overrides.labels ?? [],
+    latestPlanningDraft: overrides.latestPlanningDraft,
+    runTimeline: overrides.runTimeline,
     history: overrides.history ?? [],
     createdAt: overrides.createdAt ?? '2026-04-21T00:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2026-04-21T00:00:00.000Z',

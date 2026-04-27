@@ -77,6 +77,14 @@ export const Route = createFileRoute('/api/projects/$projectId')({
                 : body.autopilotPolicy && typeof body.autopilotPolicy === 'object' && !Array.isArray(body.autopilotPolicy)
                   ? body.autopilotPolicy
                   : undefined,
+            autonomyLanePolicy:
+              body.autonomyLanePolicy === null
+                ? {}
+                : body.autonomyLanePolicy &&
+                    typeof body.autonomyLanePolicy === 'object' &&
+                    !Array.isArray(body.autonomyLanePolicy)
+                  ? body.autonomyLanePolicy
+                  : undefined,
           })
 
           if (!project) return jsonResponse({ error: 'Project not found' }, 404)

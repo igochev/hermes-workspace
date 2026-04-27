@@ -22,6 +22,8 @@ import {
   type WorkItemBlockedReason,
   type WorkItemCriterionStatus,
   type WorkItemRiskLevel,
+  type WorkItemRunTimelineRow,
+  type WorkItemRunTimelineState,
   type WorkItemStatus,
   WORK_ITEM_BLOCKED_REASON_LABELS,
   WORK_ITEM_PHASE_LABELS,
@@ -74,6 +76,7 @@ export const WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL = 'Open Conductor'
 export const WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE = 'Execution sync warning'
 export const WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE = 'Profile Preflight'
 export const WORK_ITEM_RECOVERY_PANEL_TITLE = 'Recovery Actions'
+export const WORK_ITEM_RUNS_SECTION_TITLE = 'Runs / Agents'
 export const WORK_ITEM_DETAIL_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescriptor> = [
   { surface: 'work-item-back-link', label: 'Back to Project', kind: 'link', target: '/projects/:projectId' },
   {
@@ -86,6 +89,7 @@ export const WORK_ITEM_DETAIL_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescrip
   { surface: 'execution-sync', label: 'Sync Execution', kind: 'button', target: 'sync work item execution evidence' },
   { surface: 'execution-launch', label: 'Launch/Relaunch phase', kind: 'button', target: 'launch selected work item phase' },
   { surface: 'profile-preflight-card', label: WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE, kind: 'static', target: null },
+  { surface: 'runs-agents-cockpit', label: WORK_ITEM_RUNS_SECTION_TITLE, kind: 'link', target: 'job/session deep links from run timeline' },
   {
     surface: 'open-conductor',
     label: WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL,
@@ -359,6 +363,43 @@ export type ClickabilityAuditDescriptor = {
   label: string
   kind: 'button' | 'link' | 'static'
   target: string | null
+}
+
+export function getRunTimelineStateLabel(state: WorkItemRunTimelineState): string {
+  if (state === 'not_started') return 'No job launched'
+  if (state === 'scheduled') return 'Job scheduled'
+  if (state === 'running') return 'Agent session running'
+  if (state === 'output_ready') return 'Output ready for ingestion'
+  if (state === 'succeeded') return 'Succeeded'
+  if (state === 'failed') return 'Failed'
+  if (state === 'stale') return 'Stuck / stale'
+  return 'Waiting for approval'
+}
+
+function shortId(value: string, length = 8): string {
+  return value.length > length ? value.slice(0, length) : value
+}
+
+export function getWorkItemRunTimelineIdCopy(
+  row: Pick<WorkItemRunTimelineRow, 'jobId' | 'runId' | 'sessionKey' | 'sessionKeyPrefix'>,
+): string {
+  const ids = [
+    row.jobId ? `job ${shortId(row.jobId)}` : null,
+    row.runId ? `run ${shortId(row.runId, 7)}` : null,
+    row.sessionKey || row.sessionKeyPrefix ? `session ${shortId(row.sessionKeyPrefix ?? row.sessionKey ?? '')}` : null,
+  ].filter((item): item is string => Boolean(item))
+
+  return ids.length > 0 ? ids.join(' · ') : 'No job/session yet'
+}
+
+export function getWorkItemRunTimelineArtifactCopy(artifacts: Array<string>): string {
+  return artifacts.length > 0 ? `Builder changed files: ${artifacts.join(', ')}` : 'No code evidence yet'
+}
+
+export function getWorkItemRunTimelineLinkLabel(row: Pick<WorkItemRunTimelineRow, 'link' | 'sessionKey'>): string | null {
+  if (row.link) return 'Open run'
+  if (row.sessionKey) return 'Open session'
+  return null
 }
 
 export const WORK_ITEM_DETAIL_ACTION_GROUP_TITLES = {
@@ -835,6 +876,7 @@ export function WorkItemDetailScreen({
   const workItem = payload?.workItem ?? null
   const project = payload?.project ?? null
   const execution = payload?.execution ?? syncMutation.data?.execution ?? null
+  const runTimelineRows = workItem?.runTimeline?.rows ?? []
   const executionSyncWarning = getWorkItemExecutionSyncWarningMessage(
     payload?.executionSyncWarning ?? syncMutation.data?.executionSyncWarning,
   )
@@ -1282,6 +1324,70 @@ export function WorkItemDetailScreen({
             </div>
           </div>
         </header>
+
+        <Panel title={WORK_ITEM_RUNS_SECTION_TITLE}>
+          <div className="grid gap-3 md:grid-cols-2">
+            {runTimelineRows.map((row) => {
+              const linkLabel = getWorkItemRunTimelineLinkLabel(row)
+              const linkHref = row.link ?? (row.sessionKey ? `/conductor?session=${encodeURIComponent(row.sessionKey)}` : null)
+              return (
+                <div
+                  key={row.phase}
+                  className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3 text-sm text-[var(--theme-text)]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                        {row.phaseLabel} / {row.profileName ?? row.profileRole}
+                      </div>
+                      {row.profileSource ? (
+                        <div className="mt-1 text-[11px] text-[var(--theme-muted)]">
+                          Source: {row.profileSource}
+                        </div>
+                      ) : null}
+                    </div>
+                    <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--theme-text)]">
+                      {getRunTimelineStateLabel(row.state)}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm text-[var(--theme-text)]">{row.summary}</p>
+                    <p className="text-xs text-[var(--theme-muted)]">
+                      {row.heartbeatLabel ?? 'No heartbeat observed'}
+                    </p>
+                    <p className="text-xs text-[var(--theme-muted)]">
+                      {getWorkItemRunTimelineIdCopy(row)}
+                    </p>
+                    <p className="text-xs text-[var(--theme-muted)]">
+                      {getWorkItemRunTimelineArtifactCopy(row.artifacts)}
+                    </p>
+                    {row.nextExpectedAction ? (
+                      <p className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-xs text-[var(--theme-text)]">
+                        Next: {row.nextExpectedAction}
+                      </p>
+                    ) : null}
+                    {row.error ? (
+                      <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                        {row.error}
+                      </p>
+                    ) : null}
+                    {linkLabel && linkHref ? (
+                      <a
+                        href={linkHref}
+                        className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]/80"
+                      >
+                        {linkLabel}
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
+            {runTimelineRows.length === 0 ? (
+              <EmptyCopy>Run timeline is unavailable for this work item.</EmptyCopy>
+            ) : null}
+          </div>
+        </Panel>
 
         <section className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="space-y-4">

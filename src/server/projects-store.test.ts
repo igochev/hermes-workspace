@@ -115,10 +115,11 @@ describe('projects-store', () => {
     expect(listProjects().map((project) => project.id)).toEqual([second.id])
   })
 
-  it('applies default autopilot policy for new projects', () => {
+  it('applies default autopilot and disabled single-lane autonomy policy for new projects', () => {
     const project = createProject({
       name: 'Autopilot defaults',
       repoPath: '/repos/autopilot-defaults',
+      defaultBranch: 'develop',
     })
 
     expect(project.autopilotPolicy).toEqual({
@@ -126,6 +127,18 @@ describe('projects-store', () => {
       schedulePreset: 'manual',
       suggestionLimit: 5,
       scoutSources: ['repo-health-scout', 'stale-docs-scout', 'architecture-debt-scout'],
+    })
+    expect(project.autonomyLanePolicy).toEqual({
+      enabled: false,
+      mode: 'single_lane',
+      isolation: 'branch',
+      maxActiveWorkItems: 1,
+      baseBranch: 'develop',
+      branchPrefix: 'mission',
+      plannerTiming: 'on_lane_entry',
+      blockedBehavior: 'park_and_continue_when_repo_clean',
+      mergeHealerEnabled: true,
+      allowParallelWorktrees: false,
     })
   })
 
@@ -149,6 +162,71 @@ describe('projects-store', () => {
       schedulePreset: 'manual',
       suggestionLimit: 1,
       scoutSources: ['failing-tests-scout'],
+    })
+  })
+
+  it('preserves autonomy lane policy during unrelated partial project updates', () => {
+    const project = createProject({
+      name: 'Lane partial update',
+      repoPath: '/repos/lane-partial',
+      defaultBranch: 'main',
+      autonomyLanePolicy: {
+        enabled: true,
+        baseBranch: 'release',
+        branchPrefix: 'feature',
+      },
+    })
+
+    const updated = updateProject(project.id, { description: 'Only copy changed' })
+
+    expect(updated?.description).toBe('Only copy changed')
+    expect(updated?.autonomyLanePolicy).toEqual({
+      enabled: true,
+      mode: 'single_lane',
+      isolation: 'branch',
+      maxActiveWorkItems: 1,
+      baseBranch: 'release',
+      branchPrefix: 'feature',
+      plannerTiming: 'on_lane_entry',
+      blockedBehavior: 'park_and_continue_when_repo_clean',
+      mergeHealerEnabled: true,
+      allowParallelWorktrees: false,
+    })
+  })
+
+  it('normalizes enabled autonomy lane policy to max one active branch lane and rejects parallel worktrees', () => {
+    const project = createProject({
+      name: 'Lane normalize',
+      repoPath: '/repos/lane-normalize',
+      defaultBranch: 'trunk',
+    })
+
+    const updated = updateProject(project.id, {
+      autonomyLanePolicy: {
+        enabled: true,
+        mode: 'parallel' as unknown as 'single_lane',
+        isolation: 'worktree' as unknown as 'branch',
+        maxActiveWorkItems: 5,
+        baseBranch: 'develop',
+        branchPrefix: '',
+        plannerTiming: 'batch' as unknown as 'on_lane_entry',
+        blockedBehavior: 'freeze' as unknown as 'park_and_continue_when_repo_clean',
+        mergeHealerEnabled: false,
+        allowParallelWorktrees: true,
+      },
+    })
+
+    expect(updated?.autonomyLanePolicy).toEqual({
+      enabled: true,
+      mode: 'single_lane',
+      isolation: 'branch',
+      maxActiveWorkItems: 1,
+      baseBranch: 'develop',
+      branchPrefix: 'mission',
+      plannerTiming: 'on_lane_entry',
+      blockedBehavior: 'park_and_continue_when_repo_clean',
+      mergeHealerEnabled: false,
+      allowParallelWorktrees: false,
     })
   })
 
@@ -185,6 +263,18 @@ describe('projects-store', () => {
       schedulePreset: 'manual',
       suggestionLimit: 5,
       scoutSources: ['repo-health-scout', 'stale-docs-scout', 'architecture-debt-scout'],
+    })
+    expect(legacy.autonomyLanePolicy).toEqual({
+      enabled: false,
+      mode: 'single_lane',
+      isolation: 'branch',
+      maxActiveWorkItems: 1,
+      baseBranch: 'main',
+      branchPrefix: 'mission',
+      plannerTiming: 'on_lane_entry',
+      blockedBehavior: 'park_and_continue_when_repo_clean',
+      mergeHealerEnabled: true,
+      allowParallelWorktrees: false,
     })
   })
 })

@@ -105,6 +105,43 @@ describe('work-item-planning', () => {
     expect(goal).toContain('openQuestions')
   })
 
+  it('planner goal includes lane-entry branch and current HEAD context when provided', () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Prepare lane item',
+      description: 'Need a fresh plan against current code.',
+      status: 'inbox',
+      phase: 'research',
+      repoPathSnapshot: project.repoPath,
+    })
+
+    const goal = buildPlannerEnrichmentGoal({
+      project,
+      workItem,
+      plannerProfile: 'planner',
+      planFilePath: `docs/plans/${project.slug}-${workItem.id.slice(0, 8)}-planner-draft.md`,
+      laneContext: {
+        currentBranch: 'mission/abc12345-prepare-lane-item',
+        baseBranch: 'main',
+        headCommit: 'abcdef1234567890',
+        previousCompletedSummary: 'Previous item merged API cleanup.',
+      },
+    })
+
+    expect(goal).toContain('Lane-entry current code context:')
+    expect(goal).toContain('Current branch: mission/abc12345-prepare-lane-item')
+    expect(goal).toContain('Base branch: main')
+    expect(goal).toContain('Current HEAD commit: abcdef1234567890')
+    expect(goal).toContain(
+      'Previous completed work item summary: Previous item merged API cleanup.',
+    )
+    expect(goal).toContain('Plan against the current code/docs at the HEAD commit above')
+  })
+
   it('prepare does not mutate work-item planning fields', async () => {
     const project = createProject({
       name: 'Mission Control Demo',

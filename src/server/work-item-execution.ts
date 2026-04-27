@@ -13,6 +13,7 @@ import { getHermesJobById, getHermesJobRuns, listHermesJobs, type HermesJobInfo 
 import { buildMissionLink, launchConductorMission } from './conductor-launch'
 import { launchPlannerReview } from './work-item-launch'
 import { upsertExecutionRun, type ExecutionRunState } from './execution-runs-store'
+import { parseBuilderEvidenceOutput, type BuilderStructuredEvidence } from './hermes-job-output'
 import {
   parsePlannerReviewDecision,
   evaluateReviewQualityGate,
@@ -20,7 +21,7 @@ import {
   type ReviewQualityGateResult,
 } from './work-item-review-decision'
 
-export type SyncedExecutionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
+export type SyncedExecutionState = 'scheduled' | 'running' | 'stale' | 'succeeded' | 'failed' | 'unknown'
 
 export type WorkItemExecutionSyncResult = {
   workItem: WorkItemRecord
@@ -100,6 +101,61 @@ function extractRunEvidence(run: CronRun | null): {
   }
 }
 
+function extractRunOutputText(run: CronRun | null): string {
+  const output = (run as (CronRun & { output?: unknown }) | null)?.output
+  if (typeof output === 'string') return output
+  const outputRecord = asRecord(output)
+  if (!outputRecord) return ''
+  return Object.values(outputRecord)
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .join('\n')
+}
+
+function isStaleHeartbeat(job: HermesJobInfo | null, latestRun: CronRun | null): boolean {
+  if (!job) return false
+  const observedAt =
+    readOptionalString(latestRun?.finishedAt) ||
+    readOptionalString(latestRun?.startedAt) ||
+    readOptionalString(job.last_run_at)
+  if (!observedAt) return false
+  const observedMs = Date.parse(observedAt)
+  if (!Number.isFinite(observedMs)) return false
+  return Date.now() - observedMs > 30 * 60 * 1000
+}
+
+function evaluateBuilderEvidence(params: {
+  project: ProjectRecord
+  workItem: WorkItemRecord
+  state: SyncedExecutionState
+  latestRun: CronRun | null
+}): { state: SyncedExecutionState; evidence?: BuilderStructuredEvidence; error?: string } {
+  if (!params.project.autonomyLanePolicy.enabled) return { state: params.state }
+  if (params.workItem.phase !== 'build') return { state: params.state }
+  if (params.state !== 'succeeded' && params.state !== 'failed') return { state: params.state }
+
+  const outputText = extractRunOutputText(params.latestRun)
+  if (!outputText.trim()) {
+    return params.state === 'succeeded'
+      ? { state: 'failed', error: 'Builder completed without structured build evidence.' }
+      : { state: params.state }
+  }
+
+  const parsed = parseBuilderEvidenceOutput(outputText)
+  if (!parsed.ok) {
+    return {
+      state: 'failed',
+      error: 'error' in parsed ? parsed.error : 'Builder evidence failed validation.',
+    }
+  }
+  if (parsed.evidence.workItemId !== params.workItem.id) {
+    return { state: 'failed', error: 'Builder evidence workItemId did not match this work item.' }
+  }
+  if (parsed.evidence.status === 'failed') {
+    return { state: 'failed', evidence: parsed.evidence, error: parsed.evidence.testSummary }
+  }
+  return { state: 'succeeded', evidence: parsed.evidence }
+}
+
 function deriveExecutionState(job: HermesJobInfo | null): SyncedExecutionState {
   if (!job) return 'unknown'
   if (job.last_status === 'ok') return 'succeeded'
@@ -110,6 +166,7 @@ function deriveExecutionState(job: HermesJobInfo | null): SyncedExecutionState {
 }
 
 function deriveRunState(jobState: SyncedExecutionState, run: CronRun | null): ExecutionRunState {
+  if (jobState === 'stale') return 'stale'
   if (!run) return jobState
   const status = readOptionalString(run.status)
   if (status === 'success' || status === 'ok') return 'succeeded'
@@ -197,7 +254,7 @@ function applyMissionFields(workItem: WorkItemRecord, job: HermesJobInfo | null,
     missionJobName: resolvedJobName,
     missionSessionKeyPrefix,
     missionLink: resolvedJobId ? buildMissionLink(resolvedJobId) : workItem.missionLink,
-    missionState: (state === 'unknown' ? 'unknown' : state) as WorkItemMissionState,
+    missionState: (state === 'unknown' ? 'unknown' : state === 'stale' ? 'running' : state) as WorkItemMissionState,
     missionLastRunAt: job?.last_run_at ?? workItem.missionLastRunAt,
     missionLastError: state === 'failed' ? asOptionalString(lastError) ?? workItem.missionLastError : undefined,
   }
@@ -239,8 +296,8 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
   } catch {
     job = null
   }
-  const state = deriveExecutionState(job)
-  const missionFields = applyMissionFields(workItem, job, state)
+  let state = deriveExecutionState(job)
+  let missionFields = applyMissionFields(workItem, job, state)
   let updated = updateWorkItem(workItem.id, missionFields)
   if (!updated) throw new Error('Failed to persist mission sync state')
 
@@ -253,6 +310,31 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       ?.chatSessionKey ??
       null)
   const runEvidence = extractRunEvidence(latestRun)
+  const builderEvidence = evaluateBuilderEvidence({
+    project,
+    workItem: updated,
+    state,
+    latestRun,
+  })
+  if (builderEvidence.state !== state) {
+    state = builderEvidence.state
+    missionFields = applyMissionFields(updated, job, state)
+    updated = updateWorkItem(updated.id, missionFields)
+    if (!updated) throw new Error('Failed to persist Builder evidence sync state')
+  } else if (state === 'running' && project.autonomyLanePolicy.enabled && isStaleHeartbeat(job, latestRun)) {
+    state = 'stale'
+    missionFields = applyMissionFields(updated, job, state)
+    updated = updateWorkItem(updated.id, missionFields)
+    if (!updated) throw new Error('Failed to persist stale Builder heartbeat state')
+  }
+  const structuredEvidence = builderEvidence.evidence
+  const evidenceForRun = {
+    branchName: structuredEvidence?.branchName ?? runEvidence.branchName,
+    prUrl: runEvidence.prUrl,
+    artifactPaths: structuredEvidence?.artifactPaths.length
+      ? structuredEvidence.artifactPaths
+      : runEvidence.artifactPaths,
+  }
 
   if (job) {
     recordExecutionRun({
@@ -263,7 +345,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       job,
       run: latestRun,
       sessionKeyPrefix: missionFields.missionSessionKeyPrefix,
-      evidence: runEvidence,
+      evidence: evidenceForRun,
     })
   }
 
@@ -276,16 +358,16 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
   }
 
   if (
-    runEvidence.branchName ||
-    runEvidence.prUrl ||
-    (runEvidence.artifactPaths && runEvidence.artifactPaths.length > 0)
+    evidenceForRun.branchName ||
+    evidenceForRun.prUrl ||
+    (evidenceForRun.artifactPaths && evidenceForRun.artifactPaths.length > 0)
   ) {
     updated = updateWorkItem(updated.id, {
-      branchName: runEvidence.branchName ?? updated.branchName,
-      prUrl: runEvidence.prUrl ?? updated.prUrl,
+      branchName: evidenceForRun.branchName ?? updated.branchName,
+      prUrl: evidenceForRun.prUrl ?? updated.prUrl,
       artifactPaths:
-        runEvidence.artifactPaths && runEvidence.artifactPaths.length > 0
-          ? Array.from(new Set([...updated.artifactPaths, ...runEvidence.artifactPaths]))
+        evidenceForRun.artifactPaths && evidenceForRun.artifactPaths.length > 0
+          ? Array.from(new Set([...updated.artifactPaths, ...evidenceForRun.artifactPaths]))
           : updated.artifactPaths,
       ...missionFields,
     })
@@ -300,6 +382,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       updated = updateWorkItem(updated.id, {
         status: transition.status,
         phase: transition.phase,
+        laneState: project.autonomyLanePolicy.enabled ? 'reviewing' : updated.laneState,
         ...missionFields,
       })
       if (!updated) throw new Error('Failed to update work item after success transition')
@@ -344,12 +427,17 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       }
     }
   } else if (state === 'failed') {
-    const transition = transitionForFailure(updated, readOptionalString(job?.last_error))
+    const transition = transitionForFailure(updated, builderEvidence.error ?? readOptionalString(job?.last_error))
     if (transition) {
       updated = updateWorkItem(updated.id, {
         status: transition.status,
         phase: transition.phase,
         blockedReason: 'mission_failed',
+        laneState: project.autonomyLanePolicy.enabled ? 'blocked' : updated.laneState,
+        laneParkedAt: project.autonomyLanePolicy.enabled ? new Date().toISOString() : updated.laneParkedAt,
+        laneBlockedReason: project.autonomyLanePolicy.enabled
+          ? builderEvidence.error ?? readOptionalString(job?.last_error) ?? 'Builder failed.'
+          : updated.laneBlockedReason,
         ...missionFields,
       })
       if (!updated) throw new Error('Failed to update work item after failure transition')

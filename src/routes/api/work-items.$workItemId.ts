@@ -4,6 +4,7 @@ import { getProject } from '../../server/projects-store'
 import { listWorkItemApprovals } from '../../server/work-item-approvals'
 import { getLatestPlanningDraftForWorkItem } from '../../server/planning-drafts-store'
 import { syncWorkItemExecutionState } from '../../server/work-item-execution'
+import { buildWorkItemRunTimeline } from '../../server/work-item-run-timeline'
 import {
   deleteWorkItem,
   getWorkItem,
@@ -68,6 +69,7 @@ function buildWorkItemPayload(workItemId: string) {
       ...workItem,
       approvals: listWorkItemApprovals(workItem.id).slice().reverse(),
       latestPlanningDraft: getLatestPlanningDraftForWorkItem(workItem.id),
+      runTimeline: buildWorkItemRunTimeline(workItem),
     },
     project: getProject(workItem.projectId),
   }
@@ -90,6 +92,7 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
                 ...result.workItem,
                 approvals: listWorkItemApprovals(result.workItem.id).slice().reverse(),
                 latestPlanningDraft: getLatestPlanningDraftForWorkItem(result.workItem.id),
+                runTimeline: buildWorkItemRunTimeline(result.workItem),
               },
               project: result.project,
               execution: result.execution,

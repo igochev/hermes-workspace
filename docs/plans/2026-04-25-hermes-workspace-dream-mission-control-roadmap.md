@@ -5,6 +5,8 @@
 > **Source state inspected:** `my-hermes-workspace-dev` at `866b83d`; existing roadmap, continuation handoff, workflow-quality analysis, profiles/workflow re-architecture, and current source files under `src/server`, `src/screens/projects`, `src/screens/jobs`, and `src/lib`.
 >
 > **Relationship to existing docs:** This document supersedes the older “what is missing?” slice queue as the new north-star roadmap. Keep existing detailed slice plans as implementation history and convert this roadmap into executable slice plans incrementally.
+>
+> **Roadmap correction, 2026-04-27:** Mission Control is not a parallel worktree swarm by default. The product north star is: **A single-user Mission Control console where each project/repo has a stable autonomous lane. The lane processes one work item at a time on a dedicated feature branch, with Planner/Builder/Reviewer/Merge-Healer phases, persistent evidence, UI visibility, and operator recovery controls. Parallel worktrees are an optional future optimization after single-lane autonomy and merge healing are proven.**
 
 ---
 
@@ -34,21 +36,26 @@ But it is still **not yet the dreamed autonomous coding Mission Control** becaus
 
 **Strategic conclusion:**
 
-Do not add random features. Build the next era around a single loop:
+Do not add random features, and do not optimize for parallel worktrees before the single-lane loop is reliable. Build the next era around a stable per-repo autonomous lane:
 
 ```text
 Idea / Autopilot suggestion
-  → Planner enrichment
+  → queued work item for the project/repo
+  → Planner enrichment after the previous lane item finishes or after a blocked item is intentionally bypassed
   → CEO approval / policy auto-approval
+  → dedicated feature branch in the canonical repo path
   → Builder implementation
-  → Planner/Oracle structured review
+  → Planner/Reviewer structured review
+  → Merge-Healer integration into the configured base branch
   → deploy gate
   → evidence archive
   → retrospective learning
-  → future suggestions
+  → next queued work item
 ```
 
-The product must feel like: “I add rough ideas and approve important gates; Mission Control handles planning, execution, review, evidence, and escalation.”
+The product must feel like: “I add rough ideas and approve important gates; Mission Control handles one high-quality autonomous lane per repo, with planning, execution, review, merge healing, evidence, and escalation.” Overnight reliability and low babysitting are more important than multi-worktree throughput.
+
+Default policy: one active autonomous work item per repo/project. If one item is blocked, Mission Control may park it with explicit blocked evidence and continue the next queued item, but it must not silently create a parallel merge burden. Parallel worktrees are a later opt-in advanced mode after single-lane autonomy and merge healing are proven.
 
 ---
 
@@ -108,6 +115,17 @@ The dashboard should answer in seconds:
 - What did agents change?
 - What is safe to auto-approve?
 - What should I delegate next?
+
+### 2.3 For stable day/night autonomous operation
+
+The Developer should be able to trust one repo/project lane to work for hours without babysitting:
+
+1. Each project has a visible **Autonomous Lane** with capacity `1` by default.
+2. The lane works on one active work item at a time on one dedicated feature branch.
+3. Planner should normally run when the item is about to enter the lane, after the previous item has finished and the current codebase/docs include that previous work. This keeps plans up-to-date instead of planning a whole stale batch ahead of time.
+4. If the current item becomes blocked, Mission Control parks it with explicit blocked evidence and recovery controls, then may continue with the next queued item without starting hidden parallel work on the same branch.
+5. Merge-Healer owns integration into the configured base branch before the lane is considered free for the next item.
+6. Parallel worktrees are visible, opt-in, advanced mode only after the branch-based lane and merge healing are stable.
 
 ---
 

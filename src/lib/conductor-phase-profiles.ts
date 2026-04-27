@@ -59,8 +59,9 @@ export function buildPhaseProfileRoutingInstructions(
     ...mappedEntries.map(([phase, profile]) => `- ${phase} tasks → Hermes profile \"${profile}\"`),
     '',
     'When a phase has a mapped profile, spawn that worker with delegate_task using ACP subprocess transport so it actually runs under that Hermes profile:',
-    '- acp_command: "hermes"',
-    '- acp_args: ["-p", "<profile>", "--acp", "--stdio"]',
+    '- Ensure a matching Hermes profile alias exists first if the command is missing, e.g. `hermes profile alias <profile> --name <profile>`.',
+    '- acp_command: "<profile>"',
+    '- acp_args: ["--acp", "--stdio"]',
     '- Keep the worker prompt self-contained and mention which phase/profile was selected.',
     '- If a phase has no mapped profile, use your normal worker spawning path.',
   ]

@@ -21,6 +21,14 @@ export type PrepareWorkItemRequest = {
   projectsDir?: unknown
   maxParallel?: unknown
   supervised?: unknown
+  laneContext?: PlannerLaneContext
+}
+
+export type PlannerLaneContext = {
+  currentBranch?: string
+  baseBranch?: string
+  headCommit?: string
+  previousCompletedSummary?: string
 }
 
 export type PrepareWorkItemResponse = {
@@ -56,9 +64,27 @@ export function buildPlannerEnrichmentGoal(params: {
   workItem: WorkItemRecord
   plannerProfile: string
   planFilePath: string
+  laneContext?: PlannerLaneContext
 }): string {
-  const { project, workItem, plannerProfile, planFilePath } = params
+  const { project, workItem, plannerProfile, planFilePath, laneContext } = params
   const repoPath = readOptionalString(workItem.repoPathSnapshot) || project.repoPath
+  const laneContextLines = laneContext
+    ? [
+        '',
+        'Lane-entry current code context:',
+        laneContext.currentBranch
+          ? `- Current branch: ${laneContext.currentBranch}`
+          : null,
+        laneContext.baseBranch ? `- Base branch: ${laneContext.baseBranch}` : null,
+        laneContext.headCommit
+          ? `- Current HEAD commit: ${laneContext.headCommit}`
+          : null,
+        laneContext.previousCompletedSummary
+          ? `- Previous completed work item summary: ${laneContext.previousCompletedSummary}`
+          : null,
+        '- Plan against the current code/docs at the HEAD commit above; do not assume stale pre-lane repository state.',
+      ].filter((line): line is string => Boolean(line))
+    : []
 
   return [
     `Prepare work item \"${workItem.title}\" for Mission Control project \"${project.name}\" using Planner enrichment.`,
@@ -98,6 +124,7 @@ export function buildPlannerEnrichmentGoal(params: {
     '',
     'Description:',
     workItem.description || 'No additional description provided.',
+    ...laneContextLines,
     '',
     `Reference work item ID ${workItem.id} and repo path ${repoPath} in your plan narrative.`,
   ].join('\n')
@@ -128,6 +155,7 @@ export async function prepareWorkItemWithPlanner(
     workItem,
     plannerProfile,
     planFilePath,
+    laneContext: request.laneContext,
   })
 
   const launch = await launchConductorMission({

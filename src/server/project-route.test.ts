@@ -68,4 +68,43 @@ describe('project detail route PATCH profile mappings', () => {
       jobName: 'Daily scout',
     })
   })
+
+  it('updates autonomy lane policy without enabling parallel worktrees or wiping defaults', async () => {
+    const project = createProject({
+      name: 'Mission Control Lane',
+      repoPath: '/repos/mission-control-lane',
+      defaultBranch: 'main',
+    })
+
+    const response = await ProjectRoute.options.server.handlers.PATCH({
+      request: new Request(`http://127.0.0.1:3456/api/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          autonomyLanePolicy: {
+            enabled: true,
+            maxActiveWorkItems: 9,
+            baseBranch: 'develop',
+            allowParallelWorktrees: true,
+          },
+        }),
+      }),
+      params: { projectId: project.id },
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as Record<string, any>
+    expect(body.project.autonomyLanePolicy).toEqual({
+      enabled: true,
+      mode: 'single_lane',
+      isolation: 'branch',
+      maxActiveWorkItems: 1,
+      baseBranch: 'develop',
+      branchPrefix: 'mission',
+      plannerTiming: 'on_lane_entry',
+      blockedBehavior: 'park_and_continue_when_repo_clean',
+      mergeHealerEnabled: true,
+      allowParallelWorktrees: false,
+    })
+  })
 })

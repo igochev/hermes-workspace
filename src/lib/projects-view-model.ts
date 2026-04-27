@@ -1,4 +1,5 @@
 import type {
+  ProjectRecord,
   ProjectSummary,
   WorkItemPriority,
   WorkItemRecord,
@@ -62,6 +63,135 @@ const RISK_LEVEL_RANK: Record<WorkItemRiskLevel, number> = {
 
 export function buildProjectStatsLine(project: ProjectSummary): string {
   return `${project.workItemCount} work items · ${project.activeWorkItemCount} active · ${project.doneWorkItemCount} done`
+}
+
+export type ProjectLaneCockpitSummary = {
+  modeLabel: string
+  parallelWorktreesNote: string
+  activeWorkItem: WorkItemRecord | null
+  currentBranch: string | null
+  baseBranch: string
+  currentPhaseLabel: string
+  heartbeatLabel: string
+  parkedBlockedItems: Array<WorkItemRecord>
+  nextQueuedWorkItem: WorkItemRecord | null
+  mergeStateLabel: string
+  blockerLabel: string | null
+  recoveryActions: Array<string>
+}
+
+const LANE_ACTIVE_STATES = new Set(['preparing', 'building', 'reviewing', 'merge_healing'])
+const PHASE_LANE_LABELS = {
+  research: 'Planner',
+  build: 'Builder',
+  review: 'Reviewer',
+  deploy: 'Merge-Healer',
+} satisfies Record<NonNullable<WorkItemRecord['phase']>, string>
+
+export function buildProjectLaneCockpit(
+  project: Pick<ProjectRecord, 'autonomyLanePolicy' | 'defaultBranch'>,
+  workItems: Array<WorkItemRecord>,
+): ProjectLaneCockpitSummary {
+  const activeWorkItem = workItems.find(isLaneActiveWorkItem) ?? null
+  const parkedBlockedItems = sortLaneCandidates(workItems.filter(isParkedBlockedLaneWorkItem))
+  const nextQueuedWorkItem = sortLaneCandidates(workItems.filter(isLaneQueuedWorkItem))[0] ?? null
+  const evidenceWorkItem = activeWorkItem ?? parkedBlockedItems[0] ?? nextQueuedWorkItem ?? null
+  const currentBranch = evidenceWorkItem?.branchName ?? null
+  const baseBranch = evidenceWorkItem?.baseBranch ?? project.autonomyLanePolicy.baseBranch ?? project.defaultBranch ?? 'main'
+  const heartbeatLabel = buildLaneHeartbeatLabel(activeWorkItem ?? parkedBlockedItems[0])
+  const mergeStateLabel = buildLaneMergeStateLabel(activeWorkItem ?? parkedBlockedItems[0])
+  const recoveryActions = buildLaneRecoveryActions(activeWorkItem ?? parkedBlockedItems[0])
+
+  return {
+    modeLabel: 'Single-lane branch autonomy',
+    parallelWorktreesNote: project.autonomyLanePolicy.allowParallelWorktrees
+      ? 'Parallel worktrees advanced mode is enabled.'
+      : 'Parallel worktrees disabled unless advanced mode is enabled.',
+    activeWorkItem,
+    currentBranch,
+    baseBranch,
+    currentPhaseLabel: activeWorkItem?.phase ? PHASE_LANE_LABELS[activeWorkItem.phase] : 'Idle',
+    heartbeatLabel,
+    parkedBlockedItems,
+    nextQueuedWorkItem,
+    mergeStateLabel,
+    blockerLabel: parkedBlockedItems[0]?.laneBlockedReason ?? parkedBlockedItems[0]?.missionLastError ?? null,
+    recoveryActions,
+  }
+}
+
+function isLaneActiveWorkItem(workItem: WorkItemRecord): boolean {
+  return (
+    workItem.status === 'active' ||
+    (workItem.laneState !== undefined && LANE_ACTIVE_STATES.has(workItem.laneState))
+  )
+}
+
+function isParkedBlockedLaneWorkItem(workItem: WorkItemRecord): boolean {
+  return Boolean(
+    workItem.status === 'blocked' &&
+      workItem.laneState === 'blocked' &&
+      workItem.laneParkedAt &&
+      workItem.laneBlockedReason,
+  )
+}
+
+function isLaneQueuedWorkItem(workItem: WorkItemRecord): boolean {
+  if (workItem.status === 'blocked' || workItem.status === 'done' || workItem.status === 'cancelled') return false
+  return workItem.status === 'inbox' || workItem.status === 'ready' || workItem.laneState === 'queued'
+}
+
+function sortLaneCandidates(workItems: Array<WorkItemRecord>): Array<WorkItemRecord> {
+  return [...workItems].sort((left, right) => {
+    const priorityDelta = PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority]
+    if (priorityDelta !== 0) return priorityDelta
+    const riskDelta = RISK_LEVEL_RANK[left.riskLevel] - RISK_LEVEL_RANK[right.riskLevel]
+    if (riskDelta !== 0) return riskDelta
+    const createdDelta = Date.parse(left.createdAt) - Date.parse(right.createdAt)
+    if (createdDelta !== 0) return createdDelta
+    return left.id.localeCompare(right.id)
+  })
+}
+
+function buildLaneHeartbeatLabel(workItem: WorkItemRecord | undefined): string {
+  if (!workItem) return 'No active lane heartbeat'
+  const staleRow = workItem.runTimeline?.rows.find((row) => row.state === 'stale')
+  if (staleRow) {
+    return `${staleRow.profileRole === 'builder' ? 'Stale Builder' : 'Stale execution'} heartbeat`
+  }
+  const runningRow = workItem.runTimeline?.rows.find((row) => row.state === 'running')
+  if (runningRow) return runningRow.summary || `${runningRow.phaseLabel} running`
+  if (workItem.missionState === 'running') return 'Builder running'
+  if (workItem.reviewState === 'running') return 'Reviewer running'
+  return 'No active lane heartbeat'
+}
+
+function buildLaneMergeStateLabel(workItem: WorkItemRecord | undefined): string {
+  if (!workItem?.mergeState || workItem.mergeState === 'not_started') return 'Merge not started'
+  if (workItem.mergeState === 'running') return 'Merge-Healer running'
+  if (workItem.mergeState === 'merged') {
+    const shortCommit = workItem.mergeCommit ? workItem.mergeCommit.slice(0, 7) : 'recorded commit'
+    return `Merged into ${workItem.mergeTargetBranch ?? workItem.baseBranch ?? 'base'} at ${shortCommit}`
+  }
+  if (workItem.mergeState === 'conflict') {
+    const files = workItem.mergeConflictFiles?.length ? workItem.mergeConflictFiles.join(', ') : 'conflict files unknown'
+    return `Merge conflict: ${files}`
+  }
+  return 'Merge-Healer failed'
+}
+
+function buildLaneRecoveryActions(workItem: WorkItemRecord | undefined): Array<string> {
+  if (!workItem) return []
+  const actions: Array<string> = []
+  if (workItem.mergeState === 'conflict' || workItem.mergeState === 'failed') {
+    actions.push('Resolve or reset the branch, confirm repo is clean, then retry Merge-Healer.')
+  } else if (workItem.status === 'blocked') {
+    actions.push('Review blocker evidence, recover the branch/repo state, then unpark or retry the work item.')
+  }
+  if (workItem.runTimeline?.rows.some((row) => row.state === 'stale' && row.profileRole === 'builder')) {
+    actions.push('Review stale Builder output before relaunching the build.')
+  }
+  return actions
 }
 
 export function groupWorkItemsByStatus(workItems: Array<WorkItemRecord>): Record<WorkItemStatus, Array<WorkItemRecord>> {
@@ -403,6 +533,8 @@ export function sortWorkItemsForProjectBoard(workItems: Array<WorkItemRecord>): 
 export function buildWorkItemOperatorSignals(workItem: WorkItemRecord): Array<string> {
   const signals: Array<string> = []
 
+  appendRunTimelineSignals(workItem, signals)
+
   const latestApproval = workItem.approvals?.[0]
   if (latestApproval?.status === 'pending') {
     signals.push('Approval pending')
@@ -445,6 +577,40 @@ export function buildWorkItemOperatorSignals(workItem: WorkItemRecord): Array<st
   }
 
   return signals
+}
+
+function appendRunTimelineSignals(workItem: WorkItemRecord, signals: Array<string>): void {
+  const timelineRows = workItem.runTimeline?.rows ?? []
+  if (timelineRows.length === 0) return
+
+  const currentPhaseRow = workItem.phase
+    ? timelineRows.find((row) => row.phase === workItem.phase)
+    : undefined
+  const activeRow = currentPhaseRow ?? timelineRows.find((row) => row.state !== 'not_started')
+
+  if (activeRow?.state === 'not_started') {
+    signals.push('No job launched')
+  }
+
+  if (timelineRows.some((row) => row.profileRole === 'planner' && row.state === 'running')) {
+    signals.push('Planner running')
+  }
+
+  if (timelineRows.some((row) => row.profileRole === 'builder' && row.state === 'running')) {
+    signals.push('Builder running')
+  }
+
+  if (timelineRows.some((row) => row.state === 'output_ready')) {
+    signals.push('Output ready')
+  }
+
+  if (timelineRows.some((row) => row.state === 'stale')) {
+    signals.push('Stale execution')
+  }
+
+  if (timelineRows.some((row) => row.profileRole === 'builder' && row.artifacts.length > 0)) {
+    signals.push('Code diff detected')
+  }
 }
 
 export function buildWorkItemRecoveryHint(workItem: WorkItemRecord): string | null {

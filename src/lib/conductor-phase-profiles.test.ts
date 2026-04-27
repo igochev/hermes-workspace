@@ -44,7 +44,8 @@ describe('buildPhaseProfileRoutingInstructions', () => {
 
     expect(lines.join('\n')).toContain('research tasks → Hermes profile "planner"')
     expect(lines.join('\n')).toContain('build tasks → Hermes profile "builder"')
-    expect(lines.join('\n')).toContain('acp_command: "hermes"')
-    expect(lines.join('\n')).toContain('acp_args: ["-p", "<profile>", "--acp", "--stdio"]')
+    expect(lines.join('\n')).toContain('acp_command: "<profile>"')
+    expect(lines.join('\n')).toContain('acp_args: ["--acp", "--stdio"]')
+    expect(lines.join('\n')).not.toContain('"-p"')
   })
 })

@@ -255,6 +255,181 @@ describe('work-item-execution', () => {
     ])
   })
 
+  it('keeps enabled lane build active when succeeded Builder output lacks product/test evidence', async () => {
+    const project = createProject({
+      name: 'Single Lane Evidence Demo',
+      repoPath: '/repos/single-lane-evidence-demo',
+      defaultBranch: 'main',
+      autonomyLanePolicy: { enabled: true },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Require product evidence',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      riskLevel: 'low',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'job-docs-only',
+      missionState: 'running',
+      laneState: 'building',
+    })
+
+    getHermesJobById.mockResolvedValue({
+      id: 'job-docs-only',
+      name: 'builder-docs-only',
+      state: 'scheduled',
+      last_status: 'ok',
+      last_run_at: '2026-04-27T20:00:00Z',
+      last_error: null,
+      next_run_at: null,
+    })
+    listHermesJobs.mockResolvedValue([])
+    getHermesJobRuns.mockResolvedValue([
+      {
+        id: 'run-docs-only',
+        status: 'success',
+        startedAt: '2026-04-27T20:00:00Z',
+        finishedAt: '2026-04-27T20:01:00Z',
+        output: {
+          finalResponse: JSON.stringify({
+            workItemId: workItem.id,
+            phase: 'build',
+            status: 'succeeded',
+            changedFiles: ['docs/notes.md'],
+            testPassed: true,
+          }),
+        },
+      },
+    ])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.state).toBe('failed')
+    expect(result.execution.transitionApplied).toBe('active->blocked')
+    expect(result.workItem.status).toBe('blocked')
+    expect(result.workItem.phase).toBe('build')
+    expect(result.workItem.laneState).toBe('blocked')
+    expect(result.workItem.laneBlockedReason).toContain('product or test')
+  })
+
+  it('advances enabled lane build only after matching structured Builder evidence', async () => {
+    const project = createProject({
+      name: 'Single Lane Success Demo',
+      repoPath: '/repos/single-lane-success-demo',
+      defaultBranch: 'main',
+      autonomyLanePolicy: { enabled: true },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Ingest Builder evidence',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      riskLevel: 'low',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'job-structured-success',
+      missionState: 'running',
+      laneState: 'building',
+      branchName: 'mission/structured-success',
+      baseBranch: 'main',
+    })
+
+    getHermesJobById.mockResolvedValue({
+      id: 'job-structured-success',
+      name: 'builder-structured-success',
+      state: 'scheduled',
+      last_status: 'ok',
+      last_run_at: '2026-04-27T20:05:00Z',
+      last_error: null,
+      next_run_at: null,
+    })
+    listHermesJobs.mockResolvedValue([])
+    getHermesJobRuns.mockResolvedValue([
+      {
+        id: 'run-structured-success',
+        status: 'success',
+        startedAt: '2026-04-27T20:05:00Z',
+        finishedAt: '2026-04-27T20:06:00Z',
+        chatSessionKey: 'cron_job-structured-success_run',
+        output: {
+          finalResponse: JSON.stringify({
+            workItemId: workItem.id,
+            phase: 'build',
+            status: 'succeeded',
+            repoPath: project.repoPath,
+            branchName: 'mission/structured-success',
+            baseBranch: 'main',
+            headCommit: 'abc1234',
+            changedFiles: ['src/app.ts', 'src/app.test.ts'],
+            testCommand: 'pnpm test src/app.test.ts',
+            testPassed: true,
+            testSummary: '2 passed',
+            artifactPaths: ['/tmp/builder-report.md'],
+          }),
+        },
+      },
+    ])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.state).toBe('succeeded')
+    expect(result.execution.transitionApplied).toBe('build->review')
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('review')
+    expect(result.workItem.laneState).toBe('reviewing')
+    expect(result.workItem.branchName).toBe('mission/structured-success')
+    expect(result.workItem.artifactPaths).toContain('/tmp/builder-report.md')
+    expect(listExecutionRuns({ workItemId: workItem.id, role: 'mission' })[0]).toMatchObject({
+      state: 'succeeded',
+      branchName: 'mission/structured-success',
+      artifactPaths: ['/tmp/builder-report.md'],
+    })
+  })
+
+  it('marks enabled lane running Builder jobs as stale when heartbeat is old and no output exists', async () => {
+    const project = createProject({
+      name: 'Single Lane Stale Demo',
+      repoPath: '/repos/single-lane-stale-demo',
+      defaultBranch: 'main',
+      autonomyLanePolicy: { enabled: true },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Detect stale Builder',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      riskLevel: 'low',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'job-stale-builder',
+      missionState: 'running',
+      laneState: 'building',
+    })
+
+    getHermesJobById.mockResolvedValue({
+      id: 'job-stale-builder',
+      name: 'builder-stale',
+      state: 'running',
+      last_status: null,
+      last_run_at: '2000-01-01T00:00:00Z',
+      last_error: null,
+      next_run_at: null,
+    })
+    listHermesJobs.mockResolvedValue([])
+    getHermesJobRuns.mockResolvedValue([])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.state).toBe('stale')
+    expect(result.execution.transitionApplied).toBeNull()
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('build')
+    expect(listExecutionRuns({ workItemId: workItem.id, role: 'mission' })[0]).toMatchObject({
+      state: 'stale',
+    })
+  })
+
   it('degrades to unknown execution state when Hermes dashboard index lookup fails', async () => {
     const project = createProject({
       name: 'Mission Control Demo',

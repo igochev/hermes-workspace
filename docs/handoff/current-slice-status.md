@@ -1,57 +1,70 @@
 # Current Slice Execution Status
 
-> Canonical continuation handoff for Builder sessions.
+> Canonical continuation handoff for Builder sessions. Updated after owner-level roadmap correction: default is stable single-lane autonomy per repo/project, not parallel worktrees.
 
 ## Active Plan
 
-- **Project:** Hermes Workspace — Production Acceptance Real-Project Check
-- **Slice:** PA-0 through PA-5 — acceptance gauntlet after all planned Mission Control slices shipped
-- **Plan file:** `docs/plans/2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md`
+- **Project:** Hermes Workspace — Single-Lane Autonomous Project Lane
+- **Active implementation plan:** `docs/plans/2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md`
 - **Plan index:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
+- **North-star roadmap:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-roadmap.md`
+- **Superseded current E2E/worktree plan:** `docs/plans/2026-04-27-hermes-workspace-autonomous-orchestrator-implementation-plan.md`
 - **Real dogfood repo:** `/home/d3ni3/.Hermes/workspace/projects/family_command_center-ABACUS`
 - **Real dogfood branch:** `test-hermes-workspace`
 
-## Completed Tasks
+## Product Direction Cleared With Owner
 
-- Cycle 1 complete: slices N/O, P/Q, T/U, R/S shipped and verified ✅
-- Cycle 2 complete: slices V/W, X/Y, Z/AA, AB/AC shipped and verified ✅
-- Production Readiness PR cycle complete: PR-1 Profile Readiness actionability, PR-2 real-project dogfood harness, PR-3 UI clickability audit shipped and verified ✅
-- PA-0 repo evidence: Workspace `my-hermes-workspace-dev` @ `c589734`; candidate `test-hermes-workspace` @ `62ff902` ✅
-- PA-1 candidate baseline recorded ⚠️ — `npm test` failed 21/22 due missing `@prisma/client/runtime/library`; `npm run build`/`npm run lint` failed `next: not found`.
-- PA-2 Hermes regression gauntlet ✅ — focused tests 14 files/83 tests passed; final `pnpm vitest run` 62 files/339 tests passed; `pnpm build` passed.
-- PA-2 lint classification ⚠️ — `pnpm lint` still fails known broad legacy debt (`parserOptions.project` JS exclusions, import/order/sort-imports, no-unnecessary-condition, array-type, missing react-hooks rule); no acceptance-change lint blocker identified.
-- PA-3 service/API smoke ✅ — service restarted active; `/api/projects` parsed as projects array with count 10 after transient first post-restart connection refusal.
-- PA-4 real-project dogfood ✅ — hardened harness passed and wrote report/latest/screenshot evidence.
-- PA-5 browser/manual spot-check ✅ — dashboard, projects/detail/profile policy, work item detail/preflight/conductor target, autopilot suggestions, and approvals surfaces checked; no console errors or blocking findings.
+- Mission Control must first deliver **stable useful help**, not same-repo multi-worktree parallelism.
+- Default execution model: **one active autonomous work item per repo/project** on a dedicated feature branch in the canonical repo path.
+- Parallelism still exists by running stable lanes across multiple projects/repos; parallel worktrees within one repo are future opt-in only.
+- Planner should normally run when the work item enters the project lane, after prior successful work has integrated, so the plan sees current code/docs.
+- If a work item is blocked, park it with explicit evidence/recovery controls; the lane may continue the next queued item only when repo/branch state is safe.
+- Merge-Healer must be first-class before claiming autonomous done: merge/rebase/test/conflict evidence is part of the lane.
 
-## Current State
+## Current State / Evidence
 
-- **Verdict:** CONDITIONALLY ACCEPTED — production-functional for single-user Mission Control dogfood; condition is only pre-existing candidate repo dependency baseline failures plus known broad Workspace lint debt.
-- Acceptance report: `dogfood-output/production-acceptance-2026-04-27T13-49-00.md`
-- Dogfood report: `dogfood-output/production-dogfood-2026-04-27T13-48-24-769Z.md`
-- Latest dogfood report copy: `dogfood-output/production-acceptance-latest.md`
-- Dogfood screenshot: `dogfood-output/production-dogfood-project-detail.png`
-- Manual screenshots: `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_c04aacc85af647f69de2617ddf563ae8.png`, `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_7017a8d927dc495ebb84e4b9b63c4e08.png`, `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_e956ca3b82c44f748af6e415703f20b2.png`, `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_0409c40ca9c84bd09b89b6646d76aceb.png`.
-- Acceptance hardening changed `scripts/mission-control-production-dogfood.mjs` and `src/server/production-dogfood-script.test.ts` so reports include Workspace branch/commit, auth mode, deterministic latest copy, screenshot paths, and required click-evidence assertions.
+- Prior autonomous orchestrator Tasks 1–14 shipped: Planner launch, Planner output ingestion/fallback, draft auto-accept, Builder auto-launch, run timeline/cockpit, project card signals, reconcile route, optional loop.
+- Task 15 real autonomous E2E reached Planner ingestion + Builder launch but failed: work item `84bfe2c2-e899-437a-8a6c-a6fa9884886d` stayed `active/build`; report `dogfood-output/autonomous-work-item-e2e-2026-04-27T18-32-28-399Z-FAIL-details.md`.
+- The worktree path confusion is resolved: git worktrees do not copy `node_modules`/`.next`; installs/builds inside a worktree created the bloat. Default path now avoids worktrees.
+- `hermes -p builder` works for normal profile commands. Do not repeat the false claim that top-level `-p` is unsupported; only ACP subprocess shape needs focused verification if touched.
+- Existing manual lifecycle report remains invalid as autonomous proof; it simulated phase movement.
+- Single-Lane Task 1 complete: project records now normalize `autonomyLanePolicy` to disabled single-lane branch autonomy (`maxActiveWorkItems=1`, `allowParallelWorktrees=false`), preserve policy on partial PATCH/store updates, and expose client/server types ✅
+- Verification for Task 1: `pnpm test src/server/projects-store.test.ts src/server/project-route.test.ts src/server/project-detail.test.ts -- --runInBand` ✅; `pnpm build` ✅ (existing Vite dynamic-import/chunk warnings only).
+- Single-Lane Task 2 complete: added `selectNextLaneWorkItem` lane selector with one active/runnable item per project, parked-blocked/unsafe-blocked handling, priority/risk/createdAt ordering, work-item lane/merge fields, and `reconcileAllWorkItemAutonomy` filtering for enabled project lanes ✅
+- Verification for Task 2: RED confirmed with missing `project-autonomy-lane` module and then failing orchestrator checked-count assertion; `pnpm test src/server/project-autonomy-lane.test.ts src/server/work-item-orchestrator.test.ts -- --runInBand` ✅; adjacent `pnpm test src/server/projects-store.test.ts src/server/project-route.test.ts src/server/project-detail.test.ts src/server/project-autonomy-lane.test.ts src/server/work-item-orchestrator.test.ts -- --runInBand` ✅; `pnpm build` ✅ (existing Vite dynamic-import/chunk warnings only).
+- Single-Lane Task 3 complete: added `project-branch-manager` for canonical repo feature branches (deterministic `mission/<short-id>-<slug>` names, repo state inspection, clean-repo safety, idempotent branch reuse, no `git worktree` default path) and wired enabled project lanes to create/record branch evidence before Builder launch ✅
+- Verification for Task 3: RED confirmed with missing `project-branch-manager` module and missing branch evidence before Builder launch; `pnpm test src/server/project-branch-manager.test.ts src/server/work-item-orchestrator.test.ts -- --runInBand` ✅; adjacent `pnpm test src/server/projects-store.test.ts src/server/project-route.test.ts src/server/project-detail.test.ts src/server/project-autonomy-lane.test.ts src/server/project-branch-manager.test.ts src/server/work-item-orchestrator.test.ts -- --runInBand` ✅; `pnpm build` ✅ (existing Vite sourcemap/dynamic-import/chunk warnings only).
+- Single-Lane Task 4 complete: enabled project lanes now prepare the canonical feature branch before Planner launch, persist `laneState: preparing` plus branch/base/HEAD evidence, pass lane-entry branch/HEAD/previous-completed summary into the Planner prompt, avoid planning a second queued item while another is building, and allow the next queued item after prior work is done/merged ✅
+- Verification for Task 4: RED confirmed for missing lane-entry prompt/context and missing Planner branch evidence; `pnpm test src/server/work-item-planning.test.ts src/server/work-item-orchestrator.test.ts -- --runInBand` ✅; adjacent `pnpm test src/server/projects-store.test.ts src/server/project-route.test.ts src/server/project-detail.test.ts src/server/project-autonomy-lane.test.ts src/server/project-branch-manager.test.ts src/server/work-item-planning.test.ts src/server/work-item-orchestrator.test.ts -- --runInBand` ✅; `pnpm build` ✅ (existing Vite sourcemap/dynamic-import/chunk warnings only).
+- Single-Lane Task 5 complete: Builder output now has a structured evidence parser for build JSON/fenced JSON, enabled project lanes reject missing/mismatched/docs-only successful Builder evidence, persist Builder branch/artifact evidence, mark successful builds `laneState: reviewing`, park invalid/failed Builder evidence as blocked with lane evidence, and classify old no-output Builder heartbeats as stale instead of failed ✅
+- Verification for Task 5: RED confirmed for missing `parseBuilderEvidenceOutput`, missing structured-evidence enforcement, missing lane review transition, and missing stale heartbeat classification; `pnpm test src/server/hermes-job-output.test.ts src/server/work-item-execution.test.ts src/server/work-item-orchestrator.test.ts src/server/work-item-run-timeline.test.ts -- --runInBand` ✅; adjacent `pnpm test src/server/projects-store.test.ts src/server/project-route.test.ts src/server/project-detail.test.ts src/server/project-autonomy-lane.test.ts src/server/project-branch-manager.test.ts src/server/work-item-planning.test.ts src/server/hermes-job-output.test.ts src/server/work-item-execution.test.ts src/server/work-item-orchestrator.test.ts src/server/work-item-run-timeline.test.ts -- --runInBand` ✅; `pnpm build` ✅ (existing Vite sourcemap/dynamic-import/chunk warnings only).
+- Single-Lane Task 6 complete: added `work-item-merge-healer` to integrate reviewed feature branches into the lane base branch, record merge/test/conflict evidence, mark successful reviewed lane items `done`, park merge conflicts/test failures as blocked with lane evidence, expose merge fields through server/client work-item types, and show Merge-Healer merge/conflict status on the run timeline ✅
+- Verification for Task 6: RED confirmed with missing `work-item-merge-healer` module plus orchestrator/timeline expectations for Merge-Healer; `pnpm test src/server/work-item-merge-healer.test.ts src/server/work-item-orchestrator.test.ts src/server/work-item-run-timeline.test.ts -- --runInBand` ✅; adjacent `pnpm test src/server/projects-store.test.ts src/server/project-route.test.ts src/server/project-detail.test.ts src/server/project-autonomy-lane.test.ts src/server/project-branch-manager.test.ts src/server/work-item-planning.test.ts src/server/hermes-job-output.test.ts src/server/work-item-execution.test.ts src/server/work-item-orchestrator.test.ts src/server/work-item-run-timeline.test.ts src/server/work-item-merge-healer.test.ts -- --runInBand` ✅; `pnpm build` ✅ (existing Vite sourcemap/dynamic-import/chunk warnings only).
+- Single-Lane Task 7 complete: added a project lane cockpit summary model and Project Detail UI panel showing single-lane branch autonomy mode, active item, branch/base, Planner/Builder/Reviewer/Merge-Healer phase, heartbeat/stale state, parked blocked items, next queued item, merge state, recovery actions, and explicit parallel-worktrees-disabled copy ✅
+- Verification for Task 7: RED confirmed with missing `buildProjectLaneCockpit`; `pnpm test src/screens/projects/project-detail-screen.test.ts src/lib/projects-view-model.test.ts -- --runInBand` ✅; adjacent `pnpm test src/screens/projects/project-detail-screen.test.ts src/lib/projects-view-model.test.ts src/server/project-autonomy-lane.test.ts src/server/work-item-run-timeline.test.ts -- --runInBand` ✅; `pnpm build` ✅ (existing Vite sourcemap/dynamic-import/chunk warnings only).
+- Single-Lane Task 8 harness complete: added `scripts/mission-control-single-lane-autonomy-e2e.mjs` plus contract tests requiring canonical repo branch execution, enabled `autonomyLanePolicy`, exactly one created work item, no manual lifecycle/PATCH phase movement, no git worktree default path, deterministic feature-branch proof, Planner-after-lane-entry evidence, Builder product+test diff evidence, passing tests, Merge-Healer merged evidence, and same item `done/laneState=done` for PASS ✅
+- Verification for Task 8 harness: RED confirmed with missing `mission-control-single-lane-autonomy-e2e.mjs`; `pnpm test src/server/production-e2e-work-item-workflow-script.test.ts -- --runInBand` ✅; adjacent `pnpm test src/server/production-e2e-work-item-workflow-script.test.ts src/server/project-autonomy-lane.test.ts src/server/project-branch-manager.test.ts src/server/work-item-orchestrator.test.ts src/server/work-item-run-timeline.test.ts src/server/work-item-merge-healer.test.ts -- --runInBand` ✅; full single-lane regression `pnpm test src/server/projects-store.test.ts src/server/project-route.test.ts src/server/project-detail.test.ts src/server/project-autonomy-lane.test.ts src/server/project-branch-manager.test.ts src/server/work-item-planning.test.ts src/server/hermes-job-output.test.ts src/server/work-item-execution.test.ts src/server/work-item-orchestrator.test.ts src/server/work-item-run-timeline.test.ts src/server/work-item-merge-healer.test.ts src/server/production-e2e-work-item-workflow-script.test.ts -- --runInBand` ✅; `pnpm build` ✅ (existing Vite sourcemap/dynamic-import/chunk warnings only); `systemctl --user restart hermes-workspace.service` ✅.
+- Live Task 8 E2E run attempted: `node scripts/mission-control-single-lane-autonomy-e2e.mjs` produced honest FAIL report `dogfood-output/single-lane-autonomy-e2e-2026-04-27T21-11-02-787Z-FAIL.md` because real dogfood repo `/home/d3ni3/.Hermes/workspace/projects/family_command_center-ABACUS` is not clean (`M lib/quick-capture.ts`, `M tests/quick-capture.test.ts`, `?? docs/plans/`). No branch switch or manual lifecycle mutation occurred. ⚠️
 
-## Next Steps
+## Next Builder Task
 
-**Next:** Production acceptance is complete and CONDITIONALLY ACCEPTED. Ask Main/CEO for the next product cycle, or create a follow-up hardening slice for candidate repo dependency baseline and/or repo-wide Workspace lint debt if those should become release gates.
+Clean or checkpoint the real dogfood repo, then rerun **Task 8 — Branch-based single-lane live E2E** with `node scripts/mission-control-single-lane-autonomy-e2e.mjs`. PASS still requires same work item reaches `done` with feature branch, product/test diff, tests-passed, Merge-Healer merged evidence, and `manualPhaseMutationCalls=[]`.
 
-## Required Verification Before Acceptance
+Implementation order:
 
-- Candidate repo baseline commands were run and recorded ⚠️ (candidate has pre-existing dependency failures).
-- Hermes focused test command passed ✅.
-- `pnpm vitest run` passed ✅.
-- `pnpm build` passed ✅.
-- `pnpm lint` was run and classified as known legacy debt ⚠️.
-- `systemctl --user restart hermes-workspace.service` and `systemctl --user is-active hermes-workspace.service` passed ✅.
-- `/api/projects` smoke passed ✅.
-- `node scripts/mission-control-production-dogfood.mjs` passed and wrote report/screenshot evidence ✅.
-- Browser/manual spot-check evidence recorded ✅.
+1. Project lane policy normalization. ✅
+2. Lane selector: one runnable item per project. ✅
+3. Branch manager for canonical repo path; no worktree default. ✅
+4. Planner-on-lane-entry using current code/docs. ✅
+5. Builder heartbeat + structured evidence ingestion. ✅
+6. Merge-Healer phase. ✅
+7. Project lane cockpit UI. ✅
+8. Branch-based single-lane live E2E harness ✅; live PASS blocked by dirty dogfood repo ⚠️
 
-## Notes
+## Verification Rules
 
-- Preserve PATCH partial-update safety: do not include undefined fields that wipe arrays or nested policies.
-- Do not fake UI success with constants-only tests. Clickable-looking UI must be clicked in tests or live dogfood.
-- Do not mutate the real candidate repo destructively during acceptance.
+- TDD for each task.
+- Preserve PATCH partial-update safety: never send undefined fields that wipe arrays like `acceptanceCriteria`.
+- Do not implement parallel worktrees now.
+- Do not claim PASS unless the same work item reaches `done` with branch/product-test/merge evidence.
+- Update this handoff after each completed task.

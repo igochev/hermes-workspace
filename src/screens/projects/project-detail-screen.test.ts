@@ -12,6 +12,10 @@ import {
   PROJECT_DETAIL_BOARD_ORDER,
   PROJECT_FORM_NATIVE_SELECT_STYLE,
   PROJECT_FORM_SELECT_CLASS,
+  PROJECT_LANE_COCKPIT_MODE_LABEL,
+  PROJECT_LANE_COCKPIT_PANEL_TITLE,
+  PROJECT_LANE_PARALLEL_WORKTREES_NOTE,
+  PROJECT_LANE_RECOVERY_ACTIONS_HEADING,
   PROJECT_PHASE_ROUTING_POLICY_LABELS,
   PROJECT_PROFILE_READINESS_COPY,
   PROJECT_PROFILE_READINESS_PANEL_TITLE,
@@ -149,6 +153,15 @@ describe('project detail screen board constants', () => {
     expect(PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES.unmapped).toContain('sky')
     expect(PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES.missing).toContain('amber')
     expect(PROJECT_PROFILE_READINESS_STATUS_TONE_CLASSES.unknown).toContain('slate')
+  })
+
+  it('surfaces project lane cockpit copy for single-lane branch autonomy', () => {
+    expect(PROJECT_LANE_COCKPIT_PANEL_TITLE).toBe('Project Lane Cockpit')
+    expect(PROJECT_LANE_COCKPIT_MODE_LABEL).toBe('Single-lane branch autonomy')
+    expect(PROJECT_LANE_PARALLEL_WORKTREES_NOTE).toBe(
+      'Parallel worktrees disabled unless advanced mode is enabled.',
+    )
+    expect(PROJECT_LANE_RECOVERY_ACTIONS_HEADING).toBe('Recovery actions')
   })
 
   it('surfaces project workflow policy copy and helper summaries for routing governance', () => {
