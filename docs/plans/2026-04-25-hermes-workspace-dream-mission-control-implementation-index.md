@@ -2,7 +2,9 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active production-readiness plan:** `docs/plans/2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md`
+> **Current active production-acceptance plan:** `docs/plans/2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md`
+>
+> **Previous production-readiness plan:** `docs/plans/2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md`
 >
 > **Previous CEO/Architect gap analysis:** `docs/plans/2026-04-26-hermes-workspace-next-cycle-gap-analysis.md`
 >
@@ -38,11 +40,17 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 | 3 | `2026-04-26-hermes-workspace-slice-z-aa-autopilot-delegation-policies-plan.md` | Developer-grade Autopilot delegation policies and Convert+Plan actions | Shipped |
 | 4 | `2026-04-26-hermes-workspace-slice-ab-ac-recovery-actions-supervisor-controls-plan.md` | Recovery actions and supervisor controls for failed/stale runs | Shipped |
 
-### Production Readiness Cycle — active
+### Production Readiness Cycle — shipped
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| 1 | `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Real-project dogfood against `family_command_center-ABACUS`, Profile Readiness actionability, and UI clickability audit | Shipped |
+
+### Production Acceptance Cycle — active
 
 | Order | Plan | Purpose | Why here |
 |---:|---|---|---|
-| 1 | `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Real-project dogfood against `family_command_center-ABACUS`, Profile Readiness actionability, and UI clickability audit | Cycle 1/2 cannot be called production-ready until live UI click tests catch no-op / non-actionable UX |
+| 1 | `2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md` | Final real-project acceptance gauntlet: candidate repo baseline, all Hermes tests/build/lint, service/API smoke, live dogfood, browser spot-check, verdict report | All planned slices are shipped; product still needs owner-level production acceptance evidence before calling it functional |
 
 ---
 
@@ -128,7 +136,8 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Active detailed plan | Builder implements now; starts with PR-1 Profile Readiness actionability |
+| `2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md` | Active detailed acceptance plan | Builder executes now; final owner-level production-functional verdict using real project |
+| `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Shipped production-readiness plan | Historical context; harness and clickability coverage created here |
 | `2026-04-26-hermes-workspace-next-cycle-gap-analysis.md` | Previous analysis | Strategy/context only; do not implement directly |
 | This index | Current implementation entrypoint | Builder reads after handoff |
 | `2026-04-26-hermes-workspace-slice-v-w-telemetry-realtime-truth-plan.md` | Shipped | Historical context/regression expectations |
@@ -179,10 +188,10 @@ A plan is not shipped until:
 
 Start with:
 
-`docs/plans/2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md`
+`docs/plans/2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md`
 
-The first implementation task should be **Slice PR-1 / Task 1: add RED tests proving Profile Readiness cannot currently configure every role it reports**, then implement profile mapping actionability before writing the dogfood harness.
+Builder should execute PA-0 through PA-5 exactly: repo evidence, candidate repo baseline, Hermes focused/full tests/build/lint, service/API smoke, real-project dogfood, browser/manual spot-check, then update handoff with ACCEPTED / CONDITIONALLY ACCEPTED / REJECTED and report paths.
 
-## 10. After Production Readiness ships
+## 10. After Production Acceptance ships
 
-When PR-1, PR-2, and PR-3 are complete, Builder should update the handoff with the production dogfood report path, exact commands/results, and any remaining blockers. Main/Architect should then decide whether Hermes Workspace is production-usable or needs another hardening cycle.
+When the acceptance plan is complete, Builder should update the handoff with the final verdict, exact command results, acceptance report path, dogfood report path, screenshot paths, and any remaining blockers. Main/CEO should then decide the next product cycle only after this acceptance verdict exists.

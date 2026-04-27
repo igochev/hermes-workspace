@@ -26,4 +26,12 @@ describe('production dogfood clickability script coverage', () => {
     expect(script).toContain("request.failure()?.errorText === 'net::ERR_ABORTED'")
     expect(script).toContain("The width(-1) and height(-1) of chart should be greater than 0")
   })
+
+  it('writes production acceptance metadata and deterministic latest report copy', () => {
+    expect(script).toContain("Workspace branch: ${workspaceBranch}")
+    expect(script).toContain("Workspace commit: ${workspaceCommit}")
+    expect(script).toContain("Auth mode: ${evidence.authMode}")
+    expect(script).toContain("production-acceptance-latest.md")
+    expect(script).toContain("Missing required UI click evidence")
+  })
 })

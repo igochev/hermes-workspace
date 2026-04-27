@@ -12,12 +12,14 @@ const dogfoodProjectId = 'production-dogfood-family-command-center-abacus'
 const dogfoodProjectName = 'Production Dogfood — Family Command Center ABACUS'
 const reportDir = path.join(process.cwd(), 'dogfood-output')
 const reportPath = path.join(reportDir, `production-dogfood-${new Date().toISOString().replace(/[:.]/g, '-')}.md`)
+const latestReportPath = path.join(reportDir, 'production-acceptance-latest.md')
 const screenshotPath = path.join(reportDir, 'production-dogfood-project-detail.png')
 
 const evidence = {
   baseUrl,
   targetRepo,
   targetBranch,
+  authMode: process.env.HERMES_PASSWORD ? 'password-cookie' : 'none',
   apiCalls: [],
   uiClicks: [],
   consoleErrors: [],
@@ -34,6 +36,15 @@ function assert(condition, message) {
 
 function git(args) {
   return execFileSync('git', ['-C', targetRepo, ...args], { encoding: 'utf8' }).trim()
+}
+
+function workspaceGit(args) {
+  return execFileSync('git', ['-C', process.cwd(), ...args], { encoding: 'utf8' }).trim()
+}
+
+function writeReport(report) {
+  fs.writeFileSync(reportPath, report, 'utf8')
+  fs.writeFileSync(latestReportPath, report, 'utf8')
 }
 
 function chooseProfile(profiles, fallback) {
@@ -80,6 +91,8 @@ async function main() {
   assert(fs.existsSync(targetRepo), `Target repo missing: ${targetRepo}`)
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'])
   const commit = git(['rev-parse', '--short', 'HEAD'])
+  const workspaceBranch = workspaceGit(['rev-parse', '--abbrev-ref', 'HEAD'])
+  const workspaceCommit = workspaceGit(['rev-parse', '--short', 'HEAD'])
   assert(branch === targetBranch, `Target repo branch mismatch: expected ${targetBranch}, got ${branch}`)
 
   fs.mkdirSync(reportDir, { recursive: true })
@@ -254,18 +267,46 @@ async function main() {
   const blockedRoles = readiness.body.report?.roles?.filter((role) =>
     ['missing'].includes(role.status) || (role.status === 'unmapped' && role.role !== 'deploy'),
   ) || []
+  const requiredClickEvidence = [
+    'Refresh',
+    'Profile Readiness → Configure profile mappings',
+    'Save Profile & Workflow Policy',
+    'Capture rough idea',
+    'Create rough idea empty-title validation',
+    'Create rough idea with title',
+    'Open created work item detail',
+    'Work item detail → Refresh',
+    'Work item detail → Sync Execution',
+    'Work item detail → Profile Preflight observed',
+    'Work item detail → Open Conductor link verified',
+    'Chat sidebar → session refresh status observed',
+    'Chat sidebar → New chat button visible',
+    'Dashboard → Projects summary card',
+    'Open Project Autopilot',
+    'Project Autopilot → Save Autopilot Schedule',
+    'Project Autopilot → Disable schedule',
+    'Projects list → Refresh',
+    'Projects list → Approvals Inbox',
+    'Approvals Inbox → Refresh',
+    'Projects list → Autopilot Inbox',
+    'Autopilot Suggestions → Refresh',
+    'Autopilot Suggestions → Status filter New',
+    'Autopilot Suggestions → Risk filter Low',
+  ]
+  const missingClickEvidence = requiredClickEvidence.filter((label) => !evidence.uiClicks.includes(label))
+  assert(missingClickEvidence.length === 0, `Missing required UI click evidence: ${missingClickEvidence.join(', ')}`)
   assert(blockedRoles.length === 0, `Readiness still has blocked roles: ${blockedRoles.map((role) => `${role.role}:${role.status}`).join(', ')}`)
   assert(evidence.consoleErrors.length === 0, `Browser console/network errors detected: ${evidence.consoleErrors.join('\n')}`)
 
-  const report = `# Hermes Workspace Production Dogfood Report\n\n- Verdict: PASS\n- Workspace base URL: ${baseUrl}\n- Workspace cwd: ${process.cwd()}\n- Target repo: ${targetRepo}\n- Target branch: ${branch}\n- Target commit: ${commit}\n- Dogfood project id: ${dogfoodProjectId}\n- Screenshot: ${screenshotPath}\n\n## API calls\n${evidence.apiCalls.map((line) => `- ${line}`).join('\n')}\n\n## UI clicks\n${evidence.uiClicks.map((line) => `- ${line}`).join('\n')}\n\n## Console / network errors\nNone\n`
-  fs.writeFileSync(reportPath, report, 'utf8')
+  const report = `# Hermes Workspace Production Dogfood Report\n\n- Verdict: PASS\n- Workspace base URL: ${baseUrl}\n- Workspace cwd: ${process.cwd()}\n- Workspace branch: ${workspaceBranch}\n- Workspace commit: ${workspaceCommit}\n- Auth mode: ${evidence.authMode}\n- Target repo: ${targetRepo}\n- Target branch: ${branch}\n- Target commit: ${commit}\n- Dogfood project id: ${dogfoodProjectId}\n- Screenshot: ${screenshotPath}\n- Latest report copy: ${latestReportPath}\n\n## API calls\n${evidence.apiCalls.map((line) => `- ${line}`).join('\n')}\n\n## UI clicks\n${evidence.uiClicks.map((line) => `- ${line}`).join('\n')}\n\n## Console / network errors\nNone\n\n## Screenshots\n${evidence.screenshots.map((line) => `- ${line}`).join('\n') || `- ${screenshotPath}`}\n`
+  writeReport(report)
   console.log(`PASS production dogfood. Report: ${reportPath}`)
 }
 
 main().catch((error) => {
   fs.mkdirSync(reportDir, { recursive: true })
-  const report = `# Hermes Workspace Production Dogfood Report\n\n- Verdict: FAIL\n- Workspace base URL: ${baseUrl}\n- Error: ${error.message}\n\n## API calls\n${evidence.apiCalls.map((line) => `- ${line}`).join('\n') || '- none'}\n\n## UI clicks\n${evidence.uiClicks.map((line) => `- ${line}`).join('\n') || '- none'}\n\n## Console / network errors\n${evidence.consoleErrors.map((line) => `- ${line}`).join('\n') || '- none'}\n\n## Screenshots\n${evidence.screenshots.map((line) => `- ${line}`).join('\n') || '- none'}\n`
-  fs.writeFileSync(reportPath, report, 'utf8')
+  const report = `# Hermes Workspace Production Dogfood Report\n\n- Verdict: FAIL\n- Workspace base URL: ${baseUrl}\n- Workspace cwd: ${process.cwd()}\n- Auth mode: ${evidence.authMode}\n- Screenshot path: ${screenshotPath}\n- Latest report copy: ${latestReportPath}\n- Error: ${error.message}\n\n## API calls\n${evidence.apiCalls.map((line) => `- ${line}`).join('\n') || '- none'}\n\n## UI clicks\n${evidence.uiClicks.map((line) => `- ${line}`).join('\n') || '- none'}\n\n## Console / network errors\n${evidence.consoleErrors.map((line) => `- ${line}`).join('\n') || '- none'}\n\n## Screenshots\n${evidence.screenshots.map((line) => `- ${line}`).join('\n') || `- ${screenshotPath}`}\n`
+  writeReport(report)
   console.error(`FAIL production dogfood. Report: ${reportPath}`)
   console.error(error)
   process.exit(1)
