@@ -8,6 +8,8 @@ const autonomousScriptPath = join(process.cwd(), 'scripts/mission-control-autono
 const autonomousScriptUrl = pathToFileURL(autonomousScriptPath).href
 const singleLaneScriptPath = join(process.cwd(), 'scripts/mission-control-single-lane-autonomy-e2e.mjs')
 const singleLaneScriptUrl = pathToFileURL(singleLaneScriptPath).href
+const sequentialGauntletScriptPath = join(process.cwd(), 'scripts/mission-control-single-lane-sequential-gauntlet.mjs')
+const sequentialGauntletScriptUrl = pathToFileURL(sequentialGauntletScriptPath).href
 
 type WorkItemE2eReport = {
   e2eRunId: string
@@ -31,6 +33,7 @@ type AutonomousWorkItemE2eReport = {
 
 type SingleLaneAutonomyE2eReport = {
   e2eRunId: string
+  mode: 'fresh' | 'resume'
   createdWorkItemIds: Array<string>
   workItemId: string
   manualPhaseMutationCalls: Array<string>
@@ -49,8 +52,65 @@ type SingleLaneAutonomyE2eReport = {
     changedFiles: Array<string>
     testsPassed: boolean
   }
+  repoHygiene: {
+    beforeBranch: string
+    afterBranch: string
+    beforeDirtyStatus: string
+    afterDirtyStatus: string
+    checkoutAttempted: boolean
+    checkoutResult: string
+    currentBranch?: string
+    baseBranch?: string
+    featureBranch?: string
+    untrackedFiles?: Array<string>
+    localBranchesCreatedByLane?: Array<string>
+    stashIdsCreatedByLane?: Array<string>
+    aheadBehind?: string
+    prUrl?: string
+    cleanupBranchDeletionEnabled?: boolean
+    findings: Array<string>
+  }
   mergeHealer: { ran: boolean; mergeState: string; mergeCommit?: string }
   finalWorkItem: { status: string; phase?: string; laneState?: string }
+}
+
+type SequentialGauntletReport = {
+  gauntletRunId: string
+  createdWorkItemIds: Array<string>
+  manualPhaseMutationCalls: Array<string>
+  maxConcurrentActiveLaneItems: number
+  itemProofs: Array<{
+    workItemId: string
+    branchName: string
+    laneEnteredAt: string
+    plannerLaunchedAt: string
+    builderLaunchedAt: string
+    mergeCompletedAt: string
+    finalStatus: string
+    finalLaneState: string
+    mergeState: string
+    mergeCommit?: string
+  }>
+  sequencingProof: Array<{ previousWorkItemId: string; nextWorkItemId: string; previousDoneOrParkedAt: string; nextBuildStartedAt: string }>
+  finalWorkItems: Array<{ id: string; status: string; laneState?: string; mergeState?: string }>
+  repoHygiene?: {
+    beforeBranch: string
+    afterBranch: string
+    beforeDirtyStatus: string
+    afterDirtyStatus: string
+    checkoutAttempted?: boolean
+    checkoutResult?: string
+    currentBranch?: string
+    baseBranch?: string
+    featureBranch?: string
+    untrackedFiles?: Array<string>
+    localBranchesCreatedByLane?: Array<string>
+    stashIdsCreatedByLane?: Array<string>
+    aheadBehind?: string
+    prUrl?: string
+    cleanupBranchDeletionEnabled?: boolean
+    findings?: Array<string>
+  }
 }
 
 function validReport(overrides: Partial<WorkItemE2eReport> = {}): WorkItemE2eReport {
@@ -105,6 +165,7 @@ function validSingleLaneReport(overrides: Partial<SingleLaneAutonomyE2eReport> =
   const expectedBranchName = `mission/${workItemId.slice(0, 8)}-single-lane-e2e-code-delivery`
   return {
     e2eRunId: 'single-lane-autonomy-e2e-2026-04-28T00-00-00-000Z',
+    mode: 'fresh',
     createdWorkItemIds: [workItemId],
     workItemId,
     manualPhaseMutationCalls: [],
@@ -129,11 +190,144 @@ function validSingleLaneReport(overrides: Partial<SingleLaneAutonomyE2eReport> =
       changedFiles: ['lib/quick-capture.ts', 'tests/quick-capture.test.ts'],
       testsPassed: true,
     },
+    repoHygiene: {
+      beforeBranch: 'test-hermes-workspace',
+      afterBranch: 'test-hermes-workspace',
+      beforeDirtyStatus: '',
+      afterDirtyStatus: '',
+      checkoutAttempted: true,
+      checkoutResult: 'Already on target base branch test-hermes-workspace.',
+      currentBranch: 'test-hermes-workspace',
+      baseBranch: 'test-hermes-workspace',
+      featureBranch: expectedBranchName,
+      untrackedFiles: [],
+      localBranchesCreatedByLane: [expectedBranchName],
+      stashIdsCreatedByLane: [],
+      aheadBehind: 'ahead 1',
+      prUrl: null as unknown as string,
+      cleanupBranchDeletionEnabled: false,
+      findings: [],
+    },
     mergeHealer: { ran: true, mergeState: 'merged', mergeCommit: 'abc1234' },
     finalWorkItem: { status: 'done', phase: 'deploy', laneState: 'done' },
     ...overrides,
   }
 }
+
+function validSequentialGauntletReport(overrides: Partial<SequentialGauntletReport> = {}): SequentialGauntletReport {
+  const ids = overrides.createdWorkItemIds ?? ['gauntlet-1', 'gauntlet-2', 'gauntlet-3']
+  const itemProofs = ids.map((workItemId, index) => ({
+    workItemId,
+    branchName: `mission/${workItemId.slice(0, 8)}-sequential-lane-gauntlet-${index + 1}`,
+    laneEnteredAt: `2026-04-28T00:0${index}:00.000Z`,
+    plannerLaunchedAt: `2026-04-28T00:0${index}:05.000Z`,
+    builderLaunchedAt: `2026-04-28T00:0${index}:10.000Z`,
+    mergeCompletedAt: `2026-04-28T00:0${index}:50.000Z`,
+    finalStatus: 'done',
+    finalLaneState: 'done',
+    mergeState: 'merged',
+    mergeCommit: `merge-${index + 1}`,
+  }))
+  return {
+    gauntletRunId: 'single-lane-sequential-gauntlet-2026-04-28T00-00-00-000Z',
+    createdWorkItemIds: ids,
+    manualPhaseMutationCalls: [],
+    maxConcurrentActiveLaneItems: 1,
+    itemProofs,
+    sequencingProof: [
+      { previousWorkItemId: ids[0], nextWorkItemId: ids[1], previousDoneOrParkedAt: itemProofs[0].mergeCompletedAt, nextBuildStartedAt: itemProofs[1].builderLaunchedAt },
+      { previousWorkItemId: ids[1], nextWorkItemId: ids[2], previousDoneOrParkedAt: itemProofs[1].mergeCompletedAt, nextBuildStartedAt: itemProofs[2].builderLaunchedAt },
+    ],
+    finalWorkItems: ids.map((id) => ({ id, status: 'done', laneState: 'done', mergeState: 'merged' })),
+    repoHygiene: {
+      beforeBranch: 'test-hermes-workspace',
+      afterBranch: 'test-hermes-workspace',
+      beforeDirtyStatus: '',
+      afterDirtyStatus: '',
+      checkoutResult: 'Already on target base branch test-hermes-workspace.',
+      currentBranch: 'test-hermes-workspace',
+      baseBranch: 'test-hermes-workspace',
+      untrackedFiles: [],
+      localBranchesCreatedByLane: itemProofs.map((item) => item.branchName),
+      stashIdsCreatedByLane: [],
+      aheadBehind: 'ahead 3',
+      prUrl: '',
+      cleanupBranchDeletionEnabled: false,
+      findings: [],
+    },
+    ...overrides,
+  }
+}
+
+describe('single-lane sequential gauntlet script contract', () => {
+  it('uses three queued work items, orchestrator polling, and forbids manual lifecycle/PATCH phase movement', () => {
+    const source = readFileSync(sequentialGauntletScriptPath, 'utf8')
+
+    expect(source).toContain('single-lane-sequential-gauntlet')
+    expect(source).toContain('createdWorkItemIds.length === 3')
+    expect(source).toContain('maxConcurrentActiveLaneItems')
+    expect(source).toContain('/api/work-items/orchestrator/reconcile')
+    expect(source).toContain('syncExecution=true')
+    expect(source).toContain('autonomyLanePolicy')
+    expect(source).toContain('checkpointCandidateRepoDirt')
+    expect(source).toContain('HERMES_SINGLE_LANE_GAUNTLET_RUN_ID')
+    expect(source).toContain('resumeGauntletItems')
+    expect(source).toContain('mode')
+    expect(source).toContain('laneEnteredAt')
+    expect(source).toContain('plannerLaunchedAt')
+    expect(source).toContain('builderLaunchedAt')
+    expect(source).toContain('mergeCompletedAt')
+    expect(source).toContain('localBranchesCreatedByLane')
+    expect(source).toContain('stashIdsCreatedByLane')
+    expect(source).toContain('aheadBehind')
+    expect(source).toContain('untrackedFiles')
+    expect(source).toContain('HERMES_SINGLE_LANE_GAUNTLET_CLEANUP_BRANCHES')
+    expect(source).toContain('ahead of origin')
+
+    expect(source).not.toMatch(/\/lifecycle/)
+    expect(source).not.toMatch(/method:\s*['"]PATCH['"][\s\S]{0,240}status/)
+    expect(source).not.toMatch(/git\([^\)]*['"]worktree['"]/) 
+  })
+
+  it('validates exactly three sequential done lane items without hidden parallelism', async () => {
+    const { validateSingleLaneSequentialGauntletReport } = await import(`${sequentialGauntletScriptUrl}?contract-validator`)
+    const report = validSequentialGauntletReport()
+
+    expect(validateSingleLaneSequentialGauntletReport(report)).toBe(report)
+    expect(report.createdWorkItemIds).toHaveLength(3)
+    expect(report.maxConcurrentActiveLaneItems).toBe(1)
+  })
+
+  it('rejects non-sequential, parallel, incomplete, or manually mutated reports', async () => {
+    const { validateSingleLaneSequentialGauntletReport } = await import(`${sequentialGauntletScriptUrl}?contract-rejections`)
+    const report = validSequentialGauntletReport()
+
+    expect(() => validateSingleLaneSequentialGauntletReport({ ...report, createdWorkItemIds: report.createdWorkItemIds.slice(0, 2) })).toThrow(/three/i)
+    expect(() => validateSingleLaneSequentialGauntletReport({ ...report, createdWorkItemIds: ['gauntlet-1', 'gauntlet-1', 'gauntlet-3'] })).toThrow(/distinct/i)
+    expect(() => validateSingleLaneSequentialGauntletReport({ ...report, maxConcurrentActiveLaneItems: 2 })).toThrow(/parallel/i)
+    expect(() => validateSingleLaneSequentialGauntletReport({ ...report, manualPhaseMutationCalls: ['PATCH /api/work-items/gauntlet-1'] })).toThrow(/manual phase/i)
+    expect(() => validateSingleLaneSequentialGauntletReport({ ...report, blockers: ['work item blocked'] })).toThrow(/blockers/i)
+    expect(() => validateSingleLaneSequentialGauntletReport({ ...report, finalWorkItems: report.finalWorkItems.map((item, index) => (index === 0 ? { ...item, status: 'blocked', laneState: 'blocked' } : item)) })).toThrow(/done/i)
+    expect(() => validateSingleLaneSequentialGauntletReport({ ...report, sequencingProof: [] })).toThrow(/sequential/i)
+    expect(() => validateSingleLaneSequentialGauntletReport({ ...report, sequencingProof: [...report.sequencingProof].reverse() })).toThrow(/ordered/i)
+  })
+
+  it('builds sequential gauntlet markdown with item and ordering evidence', async () => {
+    const { buildSingleLaneSequentialGauntletMarkdown } = await import(`${sequentialGauntletScriptUrl}?contract-markdown`)
+    const report = validSequentialGauntletReport()
+    const markdown = buildSingleLaneSequentialGauntletMarkdown(report)
+
+    expect(markdown).toContain('# Single-Lane Sequential Gauntlet Report')
+    expect(markdown).toContain('Verdict: PASS')
+    expect(markdown).toContain('Created work item ids: ["gauntlet-1","gauntlet-2","gauntlet-3"]')
+    expect(markdown).toContain('Max concurrent active lane items: 1')
+    expect(markdown).toContain('Local lane branches: mission/gauntlet-sequential-lane-gauntlet-1')
+    expect(markdown).toContain('Stash backups: none')
+    expect(markdown).toContain('Ahead/behind: ahead 3')
+    expect(markdown).toContain('| gauntlet-1 |')
+    expect(markdown).toContain('| gauntlet-1 | gauntlet-2 |')
+  })
+})
 
 describe('branch-based single-lane autonomy E2E script contract', () => {
   it('uses canonical repo branch lane APIs and never manual lifecycle/PATCH phase movement or worktrees', () => {
@@ -141,12 +335,27 @@ describe('branch-based single-lane autonomy E2E script contract', () => {
 
     expect(source).toContain('process.env.HERMES_SINGLE_LANE_E2E_TARGET_REPO')
     expect(source).toContain('process.env.HERMES_SINGLE_LANE_E2E_TARGET_BRANCH')
+    expect(source).toContain('process.env.HERMES_SINGLE_LANE_E2E_WORK_ITEM_ID')
+    expect(source).toContain('historyEventsForReport')
+    expect(source).toContain('gitChangedFilesForCommit')
     expect(source).toContain('autonomyLanePolicy')
     expect(source).toContain('/api/work-items/orchestrator/reconcile')
     expect(source).toContain('syncExecution=true')
     expect(source).toContain('expectedBranchName')
     expect(source).toContain('gitChangedFilesSince')
     expect(source).toContain('createdWorkItemIds.length === 1')
+    expect(source).toContain('mode')
+    expect(source).toContain('repoHygiene')
+    expect(source).toContain('active non-terminal')
+    expect(source).toContain('checkout')
+    expect(source).toContain('HERMES_SINGLE_LANE_E2E_ALLOW_NON_E2E_RESUME')
+    expect(source).toContain('HERMES_SINGLE_LANE_E2E_CLEANUP_BRANCHES')
+    expect(source).toContain('localBranchesCreatedByLane')
+    expect(source).toContain('stashIdsCreatedByLane')
+    expect(source).toContain('aheadBehind')
+    expect(source).toContain('untrackedFiles')
+    expect(source).toContain('PR URL')
+    expect(source).toContain('ahead of origin')
 
     expect(source).not.toMatch(/\/api\/work-items\/\$\{workItemId\}\/lifecycle/)
     expect(source).not.toMatch(/method:\s*['"]PATCH['"][\s\S]{0,240}\/api\/work-items\/[\s\S]{0,240}(status|phase)/)
@@ -158,6 +367,7 @@ describe('branch-based single-lane autonomy E2E script contract', () => {
     const report = validSingleLaneReport()
 
     expect(validateSingleLaneAutonomyE2eReport(report)).toBe(report)
+    expect(report.mode).toBe('fresh')
     expect(report.createdWorkItemIds).toHaveLength(1)
     expect(report.manualPhaseMutationCalls).toEqual([])
     expect(report.lane.branchName).toBe(report.lane.expectedBranchName)
@@ -182,9 +392,17 @@ describe('branch-based single-lane autonomy E2E script contract', () => {
 
     expect(markdown).toContain('# Branch-Based Single-Lane Autonomy E2E Report')
     expect(markdown).toContain('Verdict: PASS')
+    expect(markdown).toContain('Mode: fresh')
     expect(markdown).toContain('Manual phase mutation calls: []')
     expect(markdown).toContain(`Feature branch: ${report.lane.branchName}`)
     expect(markdown).toContain('Merge-Healer: merged')
+    expect(markdown).toContain('Checkout result: Already on target base branch test-hermes-workspace.')
+    expect(markdown).toContain('Local lane branches: mission/84bfe2c2-single-lane-e2e-code-delivery')
+    expect(markdown).toContain('Stash backups: none')
+    expect(markdown).toContain('Ahead/behind: ahead 1')
+    expect(markdown).toContain('PR URL: none')
+    expect(markdown).toContain('Branch cleanup deletion enabled: no')
+    expect(markdown).toContain('Repo hygiene findings: none')
     expect(markdown).toContain('- lib/quick-capture.ts')
     expect(markdown).toContain('- tests/quick-capture.test.ts')
   })

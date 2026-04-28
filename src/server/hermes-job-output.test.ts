@@ -122,6 +122,44 @@ describe('hermes-job-output', () => {
     })
   })
 
+  it('parses structured Builder evidence from a referenced evidence.json artifact', () => {
+    const evidencePath = join(tempHome, 'dispatch-build', 'evidence.json')
+    mkdirSync(join(tempHome, 'dispatch-build'), { recursive: true })
+    writeFileSync(
+      evidencePath,
+      JSON.stringify({
+        workItemId: 'wi-artifact',
+        phase: 'build',
+        repository: '/repo',
+        baseBranch: 'main',
+        branch: 'mission/wi-artifact-demo',
+        commit: 'abc1234',
+        productFilesChanged: ['lib/feature.ts'],
+        testFilesChanged: ['tests/feature.test.ts'],
+        testsPassed: true,
+        testLog: '/tmp/test.log',
+        commands: [{ command: 'npm test', exitCode: 0, summary: '28 pass / 0 fail' }],
+      }),
+    )
+
+    const parsed = parseBuilderEvidenceOutput(`Builder complete. Evidence: ${evidencePath}`)
+
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) throw new Error(parsed.error)
+    expect(parsed.evidence).toMatchObject({
+      workItemId: 'wi-artifact',
+      repoPath: '/repo',
+      branchName: 'mission/wi-artifact-demo',
+      headCommit: 'abc1234',
+      changedFiles: ['lib/feature.ts', 'tests/feature.test.ts'],
+      testCommand: 'npm test',
+      testPassed: true,
+      testSummary: '28 pass / 0 fail',
+    })
+    expect(parsed.evidence.artifactPaths).toContain(evidencePath)
+    expect(parsed.evidence.artifactPaths).toContain('/tmp/test.log')
+  })
+
   it('rejects Builder evidence without a matching work item id', () => {
     const parsed = parseBuilderEvidenceOutput(
       JSON.stringify({ phase: 'build', status: 'succeeded', changedFiles: ['src/app.ts'], testPassed: true }),

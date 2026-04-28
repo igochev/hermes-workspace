@@ -5,7 +5,9 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  assertCleanOrStashedLaneEntry,
   buildWorkItemBranchName,
+  collectProjectRepoHygiene,
   ensureWorkItemBranch,
   inspectProjectRepoState,
 } from './project-branch-manager'
@@ -140,6 +142,51 @@ describe('project-branch-manager', () => {
     expect(state.currentBranch).toBe('main')
     expect(state.isClean).toBe(false)
     expect(state.changedFiles).toEqual(['README.md', 'new.txt'])
+  })
+
+  it('requires clean or explicitly checkpointed repo state before lane entry', async () => {
+    writeFileSync(join(repoPath, 'scratch.txt'), 'operator work\n', 'utf8')
+
+    await expect(assertCleanOrStashedLaneEntry({ repoPath })).rejects.toThrow(
+      /clean or checkpointed/i,
+    )
+
+    const checkpointed = await assertCleanOrStashedLaneEntry({
+      repoPath,
+      checkpointStashId: 'stash@{0}',
+    })
+
+    expect(checkpointed.isClean).toBe(false)
+    expect(checkpointed.checkpointStashId).toBe('stash@{0}')
+    expect(checkpointed.hygiene.dirtyStatus).toContain('scratch.txt')
+  })
+
+  it('reports repo hygiene with untracked files, lane branches, stash ids, and ahead-of-origin warnings', async () => {
+    const remotePath = join(tempDir, 'origin.git')
+    execFileSync('git', ['init', '--bare', remotePath])
+    git(repoPath, ['remote', 'add', 'origin', remotePath])
+    git(repoPath, ['push', '-u', 'origin', 'main'])
+    writeFileSync(join(repoPath, 'local-only.txt'), 'local\n', 'utf8')
+    git(repoPath, ['add', 'local-only.txt'])
+    git(repoPath, ['commit', '-m', 'local only'])
+    git(repoPath, ['checkout', '-b', 'mission/84bfe2c2-hygiene'])
+    git(repoPath, ['checkout', 'main'])
+    writeFileSync(join(repoPath, 'untracked.txt'), 'untracked\n', 'utf8')
+    git(repoPath, ['stash', 'push', '-u', '-m', 'single-lane-test-stash'])
+
+    const hygiene = await collectProjectRepoHygiene({
+      repoPath,
+      baseBranch: 'main',
+      featureBranch: 'mission/84bfe2c2-hygiene',
+    })
+
+    expect(hygiene.currentBranch).toBe('main')
+    expect(hygiene.baseBranch).toBe('main')
+    expect(hygiene.featureBranch).toBe('mission/84bfe2c2-hygiene')
+    expect(hygiene.localBranchesCreatedByLane).toContain('mission/84bfe2c2-hygiene')
+    expect(hygiene.stashIdsCreatedByLane.join('\n')).toContain('single-lane-test-stash')
+    expect(hygiene.aheadBehind).toMatch(/ahead 1/i)
+    expect(hygiene.warnings.join('\n')).toMatch(/ahead of origin/i)
   })
 
   it('does not use git worktree commands in the default branch path', () => {

@@ -158,4 +158,46 @@ describe('work-item-merge-healer', () => {
       mergeArtifactPaths: [],
     })
   })
+
+  it('refuses to merge when the candidate repo starts dirty and records hygiene evidence', async () => {
+    git(repoPath, ['checkout', '-b', 'mission/84bfe2c2-autonomous-merge-healing'])
+    writeFileSync(join(repoPath, 'feature.txt'), 'feature\n', 'utf8')
+    git(repoPath, ['add', 'feature.txt'])
+    git(repoPath, ['commit', '-m', 'feature'])
+    git(repoPath, ['checkout', 'main'])
+    writeFileSync(join(repoPath, 'operator-notes.txt'), 'do not lose me\n', 'utf8')
+
+    const result = await runWorkItemMergeHealer({
+      repoPath,
+      workItem: workItem(),
+      testCommand: 'node -e "process.exit(0)"',
+    })
+
+    expect(result).toMatchObject({
+      mergeState: 'failed',
+      mergeTargetBranch: 'main',
+      mergeTestPassed: false,
+    })
+    expect(result.mergeBlockedReason).toMatch(/dirty/i)
+    expect(result.repoHygiene?.dirtyStatus).toContain('operator-notes.txt')
+    expect(git(repoPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('main')
+  })
+
+  it('returns repo hygiene evidence after a successful merge on the base branch', async () => {
+    git(repoPath, ['checkout', '-b', 'mission/84bfe2c2-autonomous-merge-healing'])
+    writeFileSync(join(repoPath, 'src.ts'), 'export const value = 2\n', 'utf8')
+    git(repoPath, ['add', 'src.ts'])
+    git(repoPath, ['commit', '-m', 'feature'])
+
+    const result = await runWorkItemMergeHealer({ repoPath, workItem: workItem() })
+
+    expect(result.mergeState).toBe('merged')
+    expect(result.repoHygiene).toMatchObject({
+      currentBranch: 'main',
+      baseBranch: 'main',
+      featureBranch: 'mission/84bfe2c2-autonomous-merge-healing',
+      dirtyStatus: '',
+      untrackedFiles: [],
+    })
+  })
 })

@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
+import { collectProjectRepoHygiene, type ProjectRepoHygiene } from './project-branch-manager'
 import type { WorkItemRecord, WorkItemMergeState } from './work-items-store'
 
 const execFileAsync = promisify(execFile)
@@ -20,6 +21,7 @@ export type WorkItemMergeHealerResult = {
   mergeTestPassed: boolean
   mergeArtifactPaths: Array<string>
   mergeBlockedReason?: string
+  repoHygiene?: ProjectRepoHygiene
 }
 
 async function git(repoPath: string, args: string[]): Promise<string> {
@@ -104,6 +106,11 @@ export async function runWorkItemMergeHealer(params: {
     params.workItem.mergeTargetBranch || params.workItem.baseBranch || 'main'
   const featureBranch = params.workItem.branchName
   const testCommand = params.testCommand?.trim()
+  const initialHygiene = await collectProjectRepoHygiene({
+    repoPath: params.repoPath,
+    baseBranch: targetBranch,
+    featureBranch,
+  })
 
   if (params.workItem.mergeState === 'merged' && params.workItem.mergeCommit) {
     return {
@@ -115,6 +122,7 @@ export async function runWorkItemMergeHealer(params: {
       mergeTestCommand: testCommand,
       mergeTestPassed: true,
       mergeArtifactPaths: [],
+      repoHygiene: initialHygiene,
     }
   }
 
@@ -128,6 +136,21 @@ export async function runWorkItemMergeHealer(params: {
       mergeTestPassed: false,
       mergeArtifactPaths: [],
       mergeBlockedReason: 'Merge-Healer blocked: work item has no feature branch evidence.',
+      repoHygiene: initialHygiene,
+    }
+  }
+
+  if (initialHygiene.dirtyStatus) {
+    return {
+      mergeState: 'failed',
+      mergeTargetBranch: targetBranch,
+      mergeBaseCommit: params.workItem.mergeBaseCommit,
+      mergeConflictFiles: [],
+      mergeTestCommand: testCommand,
+      mergeTestPassed: false,
+      mergeArtifactPaths: [],
+      mergeBlockedReason: `Merge-Healer blocked: candidate repo is dirty before merge (${initialHygiene.dirtyStatus}).`,
+      repoHygiene: initialHygiene,
     }
   }
 
@@ -154,6 +177,11 @@ export async function runWorkItemMergeHealer(params: {
         mergeTestPassed: false,
         mergeArtifactPaths: [],
         mergeBlockedReason: `Merge-Healer blocked by merge conflicts: ${conflicts.join(', ')}`,
+        repoHygiene: await collectProjectRepoHygiene({
+          repoPath: params.repoPath,
+          baseBranch: targetBranch,
+          featureBranch,
+        }),
       }
     }
     if (merge.stderr && /conflict|failed/i.test(merge.stderr)) {
@@ -167,6 +195,11 @@ export async function runWorkItemMergeHealer(params: {
         mergeTestPassed: false,
         mergeArtifactPaths: [],
         mergeBlockedReason: `Merge-Healer failed to merge ${featureBranch}: ${merge.stderr.trim()}`,
+        repoHygiene: await collectProjectRepoHygiene({
+          repoPath: params.repoPath,
+          baseBranch: targetBranch,
+          featureBranch,
+        }),
       }
     }
   }
@@ -177,6 +210,11 @@ export async function runWorkItemMergeHealer(params: {
     : { passed: true as const }
 
   if (!testResult.passed) {
+    const repoHygiene = await collectProjectRepoHygiene({
+      repoPath: params.repoPath,
+      baseBranch: targetBranch,
+      featureBranch,
+    })
     return {
       mergeState: 'failed',
       mergeTargetBranch: targetBranch,
@@ -187,9 +225,15 @@ export async function runWorkItemMergeHealer(params: {
       mergeTestPassed: false,
       mergeArtifactPaths: [testResult.artifactPath].filter((item): item is string => Boolean(item)),
       mergeBlockedReason: `Merge-Healer post-merge test command failed: ${testCommand}`,
+      repoHygiene,
     }
   }
 
+  const repoHygiene = await collectProjectRepoHygiene({
+    repoPath: params.repoPath,
+    baseBranch: targetBranch,
+    featureBranch,
+  })
   return {
     mergeState: 'merged',
     mergeTargetBranch: targetBranch,
@@ -199,5 +243,6 @@ export async function runWorkItemMergeHealer(params: {
     mergeTestCommand: testCommand,
     mergeTestPassed: true,
     mergeArtifactPaths: [],
+    repoHygiene,
   }
 }

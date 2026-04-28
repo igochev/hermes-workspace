@@ -45,6 +45,8 @@ import {
   WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE,
   WORK_ITEM_RECOVERY_PANEL_TITLE,
   WORK_ITEM_RUNS_SECTION_TITLE,
+  WORK_ITEM_OPERATOR_EVIDENCE_LABELS,
+  getWorkItemMergeEvidenceSummary,
 } from './work-item-detail-screen'
 
 describe('work item detail screen theme classes', () => {
@@ -473,6 +475,35 @@ describe('work item detail screen theme classes', () => {
     expect(getWorkItemRunTimelineLinkLabel({ link: 'http://localhost:3456/jobs/job-123' })).toBe('Open run')
     expect(getWorkItemRunTimelineLinkLabel({ sessionKey: 'sess-123' })).toBe('Open session')
     expect(getWorkItemRunTimelineLinkLabel({})).toBeNull()
+  })
+
+  it('summarizes work-item merge evidence for operator-visible truth', () => {
+    expect(WORK_ITEM_OPERATOR_EVIDENCE_LABELS).toEqual({
+      baseBranch: 'Base branch',
+      featureBranch: 'Feature branch',
+      mergeTarget: 'Merge target',
+      mergeCommit: 'Merge commit',
+      mergeTest: 'Merge test',
+      mergeArtifacts: 'Merge artifacts',
+    })
+    expect(
+      getWorkItemMergeEvidenceSummary({
+        baseBranch: 'main',
+        branchName: 'mission/abc-work',
+        mergeTargetBranch: 'main',
+        mergeCommit: 'abcdef1234567890',
+        mergeTestCommand: 'npm test',
+        mergeTestPassed: true,
+        mergeArtifactPaths: ['.hermes/merge-healer/abc-test.log'],
+      }),
+    ).toEqual({
+      baseBranch: 'main',
+      featureBranch: 'mission/abc-work',
+      mergeTarget: 'main',
+      mergeCommit: 'abcdef1',
+      mergeTest: 'passed: npm test',
+      mergeArtifacts: '.hermes/merge-healer/abc-test.log',
+    })
   })
 
   it('documents work item detail clickability for launch preflight and recovery controls', () => {

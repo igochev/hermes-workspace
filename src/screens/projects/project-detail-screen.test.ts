@@ -14,6 +14,8 @@ import {
   PROJECT_FORM_SELECT_CLASS,
   PROJECT_LANE_COCKPIT_MODE_LABEL,
   PROJECT_LANE_COCKPIT_PANEL_TITLE,
+  PROJECT_LANE_EVIDENCE_HEADING,
+  PROJECT_LANE_EVIDENCE_LABELS,
   PROJECT_LANE_PARALLEL_WORKTREES_NOTE,
   PROJECT_LANE_RECOVERY_ACTIONS_HEADING,
   PROJECT_PHASE_ROUTING_POLICY_LABELS,
@@ -162,6 +164,18 @@ describe('project detail screen board constants', () => {
       'Parallel worktrees disabled unless advanced mode is enabled.',
     )
     expect(PROJECT_LANE_RECOVERY_ACTIONS_HEADING).toBe('Recovery actions')
+    expect(PROJECT_LANE_EVIDENCE_HEADING).toBe('Operator evidence truth')
+    expect(PROJECT_LANE_EVIDENCE_LABELS).toEqual({
+      planner: 'Planner artifact',
+      builderJob: 'Builder job',
+      builderState: 'Builder state',
+      builderArtifacts: 'Builder evidence artifacts',
+      changedFiles: 'Product/test changed files',
+      review: 'Review decision/source',
+      merge: 'Merge-Healer result',
+      mergeTest: 'Merge test result',
+      repoHygiene: 'Repo hygiene',
+    })
   })
 
   it('surfaces project workflow policy copy and helper summaries for routing governance', () => {

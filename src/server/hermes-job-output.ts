@@ -105,6 +105,16 @@ function stringArray(value: unknown): Array<string> {
   )
 }
 
+function extractReferencedEvidenceJson(text: string): unknown | null {
+  const evidencePath = text.match(/(?:^|[\s`'\"])(\/[^\s`'\")]+evidence\.json)(?:\s|$|[`'\")])/m)?.[1]
+  if (!evidencePath || !existsSync(evidencePath)) return null
+  try {
+    return JSON.parse(readFileSync(evidencePath, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
 function extractJsonCandidate(text: string): unknown | null {
   const trimmed = text.trim()
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
@@ -117,7 +127,7 @@ function extractJsonCandidate(text: string): unknown | null {
       continue
     }
   }
-  return null
+  return extractReferencedEvidenceJson(text)
 }
 
 function isIgnoredChange(filePath: string): boolean {
@@ -142,16 +152,29 @@ export function parseBuilderEvidenceOutput(text: string): BuilderEvidenceParseRe
   const workItemId = optionalString(record.workItemId)
   if (!workItemId) return { ok: false, error: 'Builder evidence is missing workItemId.' }
   if (record.phase !== 'build') return { ok: false, error: 'Builder evidence phase must be build.' }
-  if (record.status !== 'succeeded' && record.status !== 'failed') {
-    return { ok: false, error: 'Builder evidence status must be succeeded or failed.' }
-  }
+  const status = record.status === 'failed' ? 'failed' : 'succeeded'
 
+  const artifactPath = extractReferencedEvidenceJson(text) ? text.match(/(?:^|[\s`'\"])(\/[^\s`'\")]+evidence\.json)(?:\s|$|[`'\")])/m)?.[1] : undefined
+  const commandRecords = Array.isArray(record.commands) ? record.commands.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object' && !Array.isArray(entry))) : []
+  const passedCommand = commandRecords.find((entry) => entry.exitCode === 0) ?? commandRecords[0]
   const changedFiles = stringArray(record.changedFiles).filter((filePath) => !isIgnoredChange(filePath))
-  if (record.status === 'succeeded') {
-    if (!hasProductOrTestChange(changedFiles)) {
+  const alternateChangedFiles = [
+    ...stringArray(record.productFilesChanged),
+    ...stringArray(record.testFilesChanged),
+    ...stringArray(record.docFilesChanged),
+  ].filter((filePath) => !isIgnoredChange(filePath))
+  const normalizedChangedFiles = changedFiles.length > 0 ? changedFiles : Array.from(new Set(alternateChangedFiles))
+  const testPassed = typeof record.testPassed === 'boolean'
+    ? record.testPassed
+    : typeof record.testsPassed === 'boolean'
+      ? record.testsPassed
+      : undefined
+
+  if (status === 'succeeded') {
+    if (!hasProductOrTestChange(normalizedChangedFiles)) {
       return { ok: false, error: 'Builder success evidence must include at least one product or test changed file.' }
     }
-    if (record.testPassed !== true) {
+    if (testPassed !== true) {
       return { ok: false, error: 'Builder success evidence must include testPassed=true.' }
     }
   }
@@ -161,16 +184,20 @@ export function parseBuilderEvidenceOutput(text: string): BuilderEvidenceParseRe
     evidence: {
       workItemId,
       phase: 'build',
-      status: record.status,
-      repoPath: optionalString(record.repoPath),
-      branchName: optionalString(record.branchName),
+      status,
+      repoPath: optionalString(record.repoPath) ?? optionalString(record.repository),
+      branchName: optionalString(record.branchName) ?? optionalString(record.branch),
       baseBranch: optionalString(record.baseBranch),
-      headCommit: optionalString(record.headCommit),
-      changedFiles,
-      testCommand: optionalString(record.testCommand),
-      testPassed: typeof record.testPassed === 'boolean' ? record.testPassed : undefined,
-      testSummary: optionalString(record.testSummary),
-      artifactPaths: stringArray(record.artifactPaths),
+      headCommit: optionalString(record.headCommit) ?? optionalString(record.commit),
+      changedFiles: normalizedChangedFiles,
+      testCommand: optionalString(record.testCommand) ?? optionalString(passedCommand?.command),
+      testPassed,
+      testSummary: optionalString(record.testSummary) ?? optionalString(passedCommand?.summary),
+      artifactPaths: Array.from(new Set([
+        ...stringArray(record.artifactPaths),
+        optionalString(record.testLog),
+        artifactPath,
+      ].filter((entry): entry is string => Boolean(entry)))),
     },
   }
 }

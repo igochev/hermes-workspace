@@ -41,6 +41,7 @@ describe('conductor-launch', () => {
     expect(prompt).toContain('research tasks → Hermes profile "planner"')
     expect(prompt).toContain('build tasks → Hermes profile "builder"')
     expect(prompt).toContain('delegate_task using ACP subprocess transport')
-    expect(prompt).toContain('acp_args: ["-p", "<profile>", "--acp", "--stdio"]')
+    expect(prompt).toContain('acp_command: "<profile>"')
+    expect(prompt).toContain('acp_args: ["--acp", "--stdio"]')
   })
 })

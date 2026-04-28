@@ -52,6 +52,8 @@ describe('work-item-run-timeline', () => {
       branchName: input.branchName,
       prUrl: input.prUrl,
       laneState: input.laneState,
+      laneParkedAt: input.laneParkedAt,
+      laneBlockedReason: input.laneBlockedReason,
       mergeState: input.mergeState,
       mergeCommit: input.mergeCommit,
       mergeBaseCommit: input.mergeBaseCommit,
@@ -222,6 +224,34 @@ describe('work-item-run-timeline', () => {
       state: 'scheduled',
       summary: 'Builder launch pending.',
       nextExpectedAction: 'Orchestrator should launch Builder for ready build.',
+    })
+  })
+
+  it('shows parked blocked Builder evidence with recovery guidance on the build row', () => {
+    const workItem = createDemoWorkItem({
+      status: 'blocked',
+      phase: 'build',
+      missionJobId: 'job-invalid-builder-evidence',
+      missionJobName: 'Builder: invalid evidence',
+      missionState: 'failed',
+      missionLastError: 'Builder evidence workItemId did not match this work item.',
+      laneState: 'blocked',
+      laneParkedAt: '2026-04-27T21:00:00.000Z',
+      laneBlockedReason: 'Builder evidence workItemId did not match this work item.',
+      artifactPaths: ['/tmp/invalid-builder-evidence.json'],
+    })
+
+    const timeline = buildWorkItemRunTimeline(workItem)
+
+    expect(timeline.rows[1]).toMatchObject({
+      phase: 'build',
+      profileRole: 'builder',
+      state: 'failed',
+      jobId: 'job-invalid-builder-evidence',
+      summary: 'Builder parked: Builder evidence workItemId did not match this work item.',
+      nextExpectedAction: 'Review Builder evidence, clean or stash the repo, then retry or unpark this work item.',
+      artifacts: ['/tmp/invalid-builder-evidence.json'],
+      error: 'Builder evidence workItemId did not match this work item.',
     })
   })
 

@@ -175,6 +175,18 @@ export const PROJECT_LANE_COCKPIT_MODE_LABEL = 'Single-lane branch autonomy'
 export const PROJECT_LANE_PARALLEL_WORKTREES_NOTE =
   'Parallel worktrees disabled unless advanced mode is enabled.'
 export const PROJECT_LANE_RECOVERY_ACTIONS_HEADING = 'Recovery actions'
+export const PROJECT_LANE_EVIDENCE_HEADING = 'Operator evidence truth'
+export const PROJECT_LANE_EVIDENCE_LABELS = {
+  planner: 'Planner artifact',
+  builderJob: 'Builder job',
+  builderState: 'Builder state',
+  builderArtifacts: 'Builder evidence artifacts',
+  changedFiles: 'Product/test changed files',
+  review: 'Review decision/source',
+  merge: 'Merge-Healer result',
+  mergeTest: 'Merge test result',
+  repoHygiene: 'Repo hygiene',
+} as const
 
 const REVIEW_AUTO_APPROVAL_PRIORITY_LABELS: Record<ReviewAutoApprovalPolicy['maxPriority'], string> = {
   low: 'Low only',
@@ -666,6 +678,50 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
             {laneCockpit.blockerLabel ? (
               <p className="mt-3 text-xs font-medium text-amber-200">Blocker: {laneCockpit.blockerLabel}</p>
             ) : null}
+
+            <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                {PROJECT_LANE_EVIDENCE_HEADING}
+              </div>
+              <dl className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.planner}
+                  value={laneCockpit.evidence.plannerArtifactPath ?? '—'}
+                />
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.builderJob}
+                  value={laneCockpit.evidence.builderJobId ?? '—'}
+                />
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.builderState}
+                  value={laneCockpit.evidence.builderStateLabel}
+                />
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.builderArtifacts}
+                  value={laneCockpit.evidence.builderArtifactPaths.length > 0 ? laneCockpit.evidence.builderArtifactPaths.join(', ') : '—'}
+                />
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.changedFiles}
+                  value={laneCockpit.evidence.builderChangedFiles.length > 0 ? laneCockpit.evidence.builderChangedFiles.join(', ') : '—'}
+                />
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.review}
+                  value={`${laneCockpit.evidence.reviewDecisionLabel} · ${laneCockpit.evidence.reviewSourceLabel}`}
+                />
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.merge}
+                  value={laneCockpit.evidence.mergeHealerLabel}
+                />
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.mergeTest}
+                  value={laneCockpit.evidence.mergeTestLabel}
+                />
+                <EvidenceDetail
+                  label={PROJECT_LANE_EVIDENCE_LABELS.repoHygiene}
+                  value={laneCockpit.evidence.repoHygieneWarning ?? 'No repo hygiene warning recorded.'}
+                />
+              </dl>
+            </div>
 
             {laneCockpit.recoveryActions.length > 0 ? (
               <div className="mt-3 text-xs text-[var(--theme-muted)]">
@@ -1507,6 +1563,15 @@ function MetricCard({
       <div className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">{label}</div>
       <div className="mt-2 break-all text-sm font-medium text-ink">{value}</div>
       {hint ? <div className="mt-1 text-[11px] text-[var(--theme-muted)]">{hint}</div> : null}
+    </div>
+  )
+}
+
+function EvidenceDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
+      <dt className="text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)]">{label}</dt>
+      <dd className="mt-1 break-all text-xs font-medium text-[var(--theme-text)]">{value}</dd>
     </div>
   )
 }

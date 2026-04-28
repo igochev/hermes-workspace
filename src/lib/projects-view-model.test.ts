@@ -210,7 +210,7 @@ describe('projects-view-model', () => {
       }),
       makeWorkItem({ id: 'running', missionState: 'running', sessionKeys: ['s1'] }),
       makeWorkItem({ id: 'failed', missionState: 'failed' }),
-      makeWorkItem({ id: 'blocked', status: 'blocked' }),
+      makeWorkItem({ id: 'blocked', status: 'blocked', updatedAt: new Date().toISOString() }),
       makeWorkItem({ id: 'quiet', status: 'ready' }),
     ])
 
@@ -628,7 +628,18 @@ describe('projects-view-model', () => {
           laneState: 'building',
           branchName: 'mission/active-build-checkout-flow',
           baseBranch: 'main',
-          mergeState: 'not_started',
+          planFilePath: 'docs/plans/project-1-active-build-planner-draft.md',
+          missionJobId: 'builder-job-123456',
+          missionState: 'succeeded',
+          reviewDecision: 'approved',
+          reviewDecisionSource: 'json',
+          mergeState: 'merged',
+          mergeTargetBranch: 'main',
+          mergeCommit: 'abcdef1234567890',
+          mergeTestCommand: 'npm test',
+          mergeTestPassed: true,
+          artifactPaths: ['/tmp/builder-evidence.json'],
+          mergeArtifactPaths: ['.hermes/merge-healer/active-build-test.log'],
           runTimeline: {
             workItemId: 'active-build',
             rows: [
@@ -638,7 +649,7 @@ describe('projects-view-model', () => {
                 profileRole: 'builder',
                 state: 'running',
                 summary: 'Builder running',
-                artifacts: [],
+                artifacts: ['lib/checkout.ts', 'tests/checkout.test.ts'],
               },
             ],
           },
@@ -661,8 +672,22 @@ describe('projects-view-model', () => {
     expect(cockpit.currentPhaseLabel).toBe('Builder')
     expect(cockpit.heartbeatLabel).toBe('Builder running')
     expect(cockpit.nextQueuedWorkItem?.id).toBe('queued-high')
-    expect(cockpit.mergeStateLabel).toBe('Merge not started')
+    expect(cockpit.mergeStateLabel).toBe('Merged into main at abcdef1')
     expect(cockpit.recoveryActions).toEqual([])
+    expect(cockpit.evidence).toMatchObject({
+      plannerArtifactPath: 'docs/plans/project-1-active-build-planner-draft.md',
+      builderJobId: 'builder-job-123456',
+      builderStateLabel: 'Builder succeeded',
+      builderArtifactPaths: ['/tmp/builder-evidence.json'],
+      builderChangedFiles: ['lib/checkout.ts', 'tests/checkout.test.ts'],
+      reviewDecisionLabel: 'Review approved',
+      reviewSourceLabel: 'Review source: json',
+      mergeHealerLabel: 'Merge-Healer merged into main at abcdef1',
+      mergeTargetBranch: 'main',
+      mergeCommitShort: 'abcdef1',
+      mergeTestLabel: 'Merge test passed: npm test',
+      repoHygieneWarning: null,
+    })
   })
 
   it('summarizes queued, parked blocked, stale, and merge conflict lane states', () => {
@@ -793,6 +818,7 @@ function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
     riskLevel: overrides.riskLevel ?? 'medium',
     assignedProfile: overrides.assignedProfile,
     repoPathSnapshot: overrides.repoPathSnapshot ?? '/repos/mission-control',
+    planFilePath: overrides.planFilePath,
     missionId: overrides.missionId,
     missionJobId: overrides.missionJobId,
     missionJobName: overrides.missionJobName,
@@ -801,6 +827,14 @@ function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
     missionState: overrides.missionState,
     missionLastRunAt: overrides.missionLastRunAt,
     missionLastError: overrides.missionLastError,
+    reviewJobId: overrides.reviewJobId,
+    reviewState: overrides.reviewState,
+    reviewDecision: overrides.reviewDecision,
+    reviewDecisionSummary: overrides.reviewDecisionSummary,
+    reviewDecisionConfidence: overrides.reviewDecisionConfidence,
+    reviewDecisionSource: overrides.reviewDecisionSource,
+    reviewParserError: overrides.reviewParserError,
+    reviewQualityGateStatus: overrides.reviewQualityGateStatus,
     sessionKeys: overrides.sessionKeys ?? [],
     laneState: overrides.laneState,
     laneEnteredAt: overrides.laneEnteredAt,

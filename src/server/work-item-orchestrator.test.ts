@@ -42,8 +42,10 @@ import { upsertExecutionRun } from './execution-runs-store'
 import {
   createWorkItem,
   getWorkItem,
+  updateWorkItem,
   type WorkItemRecord,
 } from './work-items-store'
+import { requestWorkItemReviewApproval } from './work-item-approvals'
 import {
   reconcileAllWorkItemAutonomy,
   reconcileWorkItemAutonomy,
@@ -725,6 +727,56 @@ describe('work-item-orchestrator', () => {
       mergeConflictFiles: [],
     })
     expect(updated?.mergeCommit).toMatch(/^[a-f0-9]{40}$/)
+  })
+
+  it('runs Merge-Healer when review approval record is already approved by policy', async () => {
+    const repoPath = join(tempHome, 'merge-healer-approved-approval-repo')
+    mkdirSync(repoPath, { recursive: true })
+    execFileSync('git', ['init', '-b', 'main'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.email', 'hermes@example.test'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.name', 'Hermes Test'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'README.md'), '# Merge lane repo\n', 'utf8')
+    execFileSync('git', ['add', 'README.md'], { cwd: repoPath })
+    execFileSync('git', ['commit', '-m', 'initial'], { cwd: repoPath })
+    execFileSync('git', ['checkout', '-b', 'mission/approval-approved'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'feature.ts'), 'export const merged = true\n', 'utf8')
+    execFileSync('git', ['add', 'feature.ts'], { cwd: repoPath })
+    execFileSync('git', ['commit', '-m', 'feature'], { cwd: repoPath })
+    execFileSync('git', ['checkout', 'main'], { cwd: repoPath })
+    const project = createProject({
+      name: 'Merge Healer Approval Demo',
+      repoPath,
+      defaultBranch: 'main',
+      autonomyLanePolicy: { enabled: true },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Approved approval ready to merge',
+      status: 'active',
+      phase: 'review',
+      laneState: 'reviewing',
+      priority: 'medium',
+      riskLevel: 'low',
+      repoPathSnapshot: repoPath,
+      missionJobId: 'completed-builder-job',
+      branchName: 'mission/approval-approved',
+      baseBranch: 'main',
+      mergeTargetBranch: 'main',
+      mergeState: 'not_started',
+    })
+    requestWorkItemReviewApproval(workItem.id, { requestedBy: 'system' })
+    updateWorkItem(workItem.id, { phase: 'deploy' })
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id)
+
+    expect(result.changed).toBe(true)
+    expect(result.events[0]?.action).toBe('run_merge_healer')
+    expect(updated).toMatchObject({
+      status: 'done',
+      laneState: 'done',
+      mergeState: 'merged',
+    })
   })
 
   it('parks the lane when Merge-Healer hits a merge conflict', async () => {

@@ -13,7 +13,12 @@ import { getHermesJobById, getHermesJobRuns, listHermesJobs, type HermesJobInfo 
 import { buildMissionLink, launchConductorMission } from './conductor-launch'
 import { launchPlannerReview } from './work-item-launch'
 import { upsertExecutionRun, type ExecutionRunState } from './execution-runs-store'
-import { parseBuilderEvidenceOutput, type BuilderStructuredEvidence } from './hermes-job-output'
+import {
+  getLatestHermesJobOutput,
+  parseBuilderEvidenceOutput,
+  type BuilderStructuredEvidence,
+  type HermesJobOutputSnapshot,
+} from './hermes-job-output'
 import {
   parsePlannerReviewDecision,
   evaluateReviewQualityGate,
@@ -128,12 +133,13 @@ function evaluateBuilderEvidence(params: {
   workItem: WorkItemRecord
   state: SyncedExecutionState
   latestRun: CronRun | null
+  fallbackOutputText?: string
 }): { state: SyncedExecutionState; evidence?: BuilderStructuredEvidence; error?: string } {
   if (!params.project.autonomyLanePolicy.enabled) return { state: params.state }
   if (params.workItem.phase !== 'build') return { state: params.state }
   if (params.state !== 'succeeded' && params.state !== 'failed') return { state: params.state }
 
-  const outputText = extractRunOutputText(params.latestRun)
+  const outputText = params.fallbackOutputText?.trim() || extractRunOutputText(params.latestRun)
   if (!outputText.trim()) {
     return params.state === 'succeeded'
       ? { state: 'failed', error: 'Builder completed without structured build evidence.' }
@@ -239,6 +245,23 @@ async function resolveJobForWorkItem(workItem: WorkItemRecord): Promise<HermesJo
   )
 }
 
+function localOutputJobForWorkItem(
+  workItem: WorkItemRecord,
+  output: HermesJobOutputSnapshot | null,
+): HermesJobInfo | null {
+  const jobId = readOptionalString((workItem as WorkItemRecord & { missionJobId?: string }).missionJobId) || readOptionalString(workItem.missionId)
+  if (!jobId || !output?.latestOutputText?.trim()) return null
+  return {
+    id: jobId,
+    name: readOptionalString((workItem as WorkItemRecord & { missionJobName?: string }).missionJobName) || jobId,
+    state: 'scheduled',
+    last_run_at: output.lastObservedAt,
+    last_status: 'ok',
+    last_error: null,
+    next_run_at: null,
+  }
+}
+
 function applyMissionFields(workItem: WorkItemRecord, job: HermesJobInfo | null, state: SyncedExecutionState) {
   const fallbackMissionId = readOptionalString(workItem.missionId)
   const fallbackMissionJobId = readOptionalString((workItem as WorkItemRecord & { missionJobId?: string }).missionJobId)
@@ -261,11 +284,13 @@ function applyMissionFields(workItem: WorkItemRecord, job: HermesJobInfo | null,
 }
 
 function transitionForSuccess(workItem: WorkItemRecord): { status: WorkItemRecord['status']; phase: WorkItemPhase; note: string } | null {
-  if (workItem.status === 'active' && workItem.phase === 'build') {
+  if ((workItem.status === 'active' || workItem.status === 'blocked') && workItem.phase === 'build') {
     return {
       status: 'active',
       phase: 'review',
-      note: 'Execution succeeded; advanced work item into review.',
+      note: workItem.status === 'blocked'
+        ? 'Recovered valid Builder evidence; advanced work item into review.'
+        : 'Execution succeeded; advanced work item into review.',
     }
   }
   return null
@@ -296,6 +321,14 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
   } catch {
     job = null
   }
+  let localOutput: HermesJobOutputSnapshot | null = null
+  if (!job && project.autonomyLanePolicy.enabled && workItem.phase === 'build') {
+    const fallbackJobId = readOptionalString((workItem as WorkItemRecord & { missionJobId?: string }).missionJobId) || readOptionalString(workItem.missionId)
+    if (fallbackJobId) {
+      localOutput = await getLatestHermesJobOutput(fallbackJobId).catch(() => null)
+      job = localOutputJobForWorkItem(workItem, localOutput)
+    }
+  }
   let state = deriveExecutionState(job)
   let missionFields = applyMissionFields(workItem, job, state)
   let updated = updateWorkItem(workItem.id, missionFields)
@@ -315,6 +348,7 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
     workItem: updated,
     state,
     latestRun,
+    fallbackOutputText: localOutput?.latestOutputText,
   })
   if (builderEvidence.state !== state) {
     state = builderEvidence.state
@@ -382,7 +416,10 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       updated = updateWorkItem(updated.id, {
         status: transition.status,
         phase: transition.phase,
+        blockedReason: undefined,
         laneState: project.autonomyLanePolicy.enabled ? 'reviewing' : updated.laneState,
+        laneParkedAt: project.autonomyLanePolicy.enabled ? undefined : updated.laneParkedAt,
+        laneBlockedReason: project.autonomyLanePolicy.enabled ? undefined : updated.laneBlockedReason,
         ...missionFields,
       })
       if (!updated) throw new Error('Failed to update work item after success transition')

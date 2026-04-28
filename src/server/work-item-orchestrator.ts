@@ -25,6 +25,7 @@ import {
   prepareWorkItemWithPlanner,
   recordPlannerOutput,
 } from './work-item-planning'
+import { listWorkItemApprovals } from './work-item-approvals'
 import { getProject, listProjects } from './projects-store'
 import {
   appendWorkItemHistoryEntry,
@@ -345,6 +346,13 @@ async function reconcilePlannerOutput(
   })
 }
 
+function hasApprovedReviewEvidence(workItem: WorkItemRecord): boolean {
+  if (workItem.reviewDecision === 'approved') return true
+  return listWorkItemApprovals(workItem.id).some(
+    (approval) => approval.phase === 'review' && approval.status === 'approved',
+  )
+}
+
 export async function reconcileWorkItemAutonomy(
   workItemId: string,
 ): Promise<ReconcileWorkItemAutonomyResult> {
@@ -530,7 +538,11 @@ export async function reconcileWorkItemAutonomy(
     }
   }
 
-  if (workItem.status === 'active' && workItem.missionJobId) {
+  const project = getProject(workItem.projectId)
+  const reviewApproved = hasApprovedReviewEvidence(workItem)
+  const isReadyForMergeHealer = workItem.status === 'active' && (workItem.phase === 'deploy' || reviewApproved) && reviewApproved
+
+  if (workItem.status === 'active' && workItem.missionJobId && !isReadyForMergeHealer) {
     try {
       const synced = await syncWorkItemExecutionState(workItem.id)
       return {
@@ -570,13 +582,12 @@ export async function reconcileWorkItemAutonomy(
     }
   }
 
-  const project = getProject(workItem.projectId)
   const shouldRunMergeHealer =
     project?.autonomyLanePolicy.enabled === true &&
     project.autonomyLanePolicy.mergeHealerEnabled !== false &&
     workItem.status === 'active' &&
-    (workItem.phase === 'deploy' || workItem.reviewDecision === 'approved') &&
-    workItem.reviewDecision === 'approved' &&
+    (workItem.phase === 'deploy' || reviewApproved) &&
+    reviewApproved &&
     workItem.mergeState !== 'merged'
 
   if (project && shouldRunMergeHealer) {

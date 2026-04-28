@@ -65,6 +65,21 @@ export function buildProjectStatsLine(project: ProjectSummary): string {
   return `${project.workItemCount} work items · ${project.activeWorkItemCount} active · ${project.doneWorkItemCount} done`
 }
 
+export type ProjectLaneCockpitEvidenceSummary = {
+  plannerArtifactPath: string | null
+  builderJobId: string | null
+  builderStateLabel: string
+  builderArtifactPaths: Array<string>
+  builderChangedFiles: Array<string>
+  reviewDecisionLabel: string
+  reviewSourceLabel: string
+  mergeHealerLabel: string
+  mergeTargetBranch: string | null
+  mergeCommitShort: string | null
+  mergeTestLabel: string
+  repoHygieneWarning: string | null
+}
+
 export type ProjectLaneCockpitSummary = {
   modeLabel: string
   parallelWorktreesNote: string
@@ -78,6 +93,7 @@ export type ProjectLaneCockpitSummary = {
   mergeStateLabel: string
   blockerLabel: string | null
   recoveryActions: Array<string>
+  evidence: ProjectLaneCockpitEvidenceSummary
 }
 
 const LANE_ACTIVE_STATES = new Set(['preparing', 'building', 'reviewing', 'merge_healing'])
@@ -117,7 +133,89 @@ export function buildProjectLaneCockpit(
     mergeStateLabel,
     blockerLabel: parkedBlockedItems[0]?.laneBlockedReason ?? parkedBlockedItems[0]?.missionLastError ?? null,
     recoveryActions,
+    evidence: buildLaneEvidenceSummary(evidenceWorkItem),
   }
+}
+
+function buildLaneEvidenceSummary(workItem: WorkItemRecord | null): ProjectLaneCockpitEvidenceSummary {
+  const builderRow = workItem?.runTimeline?.rows.find((row) => row.profileRole === 'builder')
+  const builderArtifacts = dedupeStrings([...(workItem?.artifactPaths ?? [])])
+  const builderChangedFiles = dedupeStrings(builderRow?.artifacts ?? [])
+  const mergeTargetBranch = workItem?.mergeTargetBranch ?? workItem?.baseBranch ?? null
+  const mergeCommitShort = workItem?.mergeCommit ? workItem.mergeCommit.slice(0, 7) : null
+
+  return {
+    plannerArtifactPath: workItem?.planFilePath ?? workItem?.latestPlanningDraft?.planFilePath ?? null,
+    builderJobId: workItem?.missionJobId ?? builderRow?.jobId ?? null,
+    builderStateLabel: buildBuilderEvidenceStateLabel(workItem, builderRow?.state),
+    builderArtifactPaths: builderArtifacts,
+    builderChangedFiles,
+    reviewDecisionLabel: buildReviewDecisionEvidenceLabel(workItem),
+    reviewSourceLabel: workItem?.reviewDecisionSource
+      ? `Review source: ${workItem.reviewDecisionSource}`
+      : 'Review source: —',
+    mergeHealerLabel: buildMergeHealerEvidenceLabel(workItem),
+    mergeTargetBranch,
+    mergeCommitShort,
+    mergeTestLabel: buildMergeTestEvidenceLabel(workItem),
+    repoHygieneWarning: buildRepoHygieneWarning(workItem),
+  }
+}
+
+function dedupeStrings(values: Array<string>): Array<string> {
+  return Array.from(new Set(values.filter((value) => value.trim().length > 0)))
+}
+
+function buildBuilderEvidenceStateLabel(
+  workItem: WorkItemRecord | null,
+  rowState?: string,
+): string {
+  const state = workItem?.missionState ?? rowState
+  if (state === 'succeeded') return 'Builder succeeded'
+  if (state === 'running') return 'Builder running'
+  if (state === 'scheduled') return 'Builder scheduled'
+  if (state === 'failed') return 'Builder failed'
+  if (rowState === 'stale') return 'Builder stale'
+  return 'Builder evidence unavailable'
+}
+
+function buildReviewDecisionEvidenceLabel(workItem: WorkItemRecord | null): string {
+  if (workItem?.reviewDecision === 'approved') return 'Review approved'
+  if (workItem?.reviewDecision === 'changes_requested') return 'Review changes requested'
+  if (workItem?.reviewDecision === 'manual_review') return 'Review manual review required'
+  if (workItem?.reviewState === 'running') return 'Review running'
+  if (workItem?.reviewState === 'scheduled') return 'Review scheduled'
+  return 'Review decision pending'
+}
+
+function buildMergeHealerEvidenceLabel(workItem: WorkItemRecord | null): string {
+  if (!workItem?.mergeState || workItem.mergeState === 'not_started') return 'Merge-Healer not started'
+  if (workItem.mergeState === 'running') return 'Merge-Healer running'
+  if (workItem.mergeState === 'merged') {
+    const target = workItem.mergeTargetBranch ?? workItem.baseBranch ?? 'base'
+    const shortCommit = workItem.mergeCommit ? workItem.mergeCommit.slice(0, 7) : 'recorded commit'
+    return `Merge-Healer merged into ${target} at ${shortCommit}`
+  }
+  if (workItem.mergeState === 'conflict') return 'Merge-Healer conflict'
+  return 'Merge-Healer failed'
+}
+
+function buildMergeTestEvidenceLabel(workItem: WorkItemRecord | null): string {
+  if (!workItem?.mergeTestCommand) return 'Merge test not recorded'
+  if (workItem.mergeTestPassed === true) return `Merge test passed: ${workItem.mergeTestCommand}`
+  if (workItem.mergeTestPassed === false) return `Merge test failed: ${workItem.mergeTestCommand}`
+  return `Merge test pending: ${workItem.mergeTestCommand}`
+}
+
+function buildRepoHygieneWarning(workItem: WorkItemRecord | null): string | null {
+  if (!workItem) return null
+  if (workItem.status === 'blocked' || workItem.laneState === 'blocked') {
+    return 'Repo hygiene warning: confirm the canonical repo is clean before admitting the next lane item.'
+  }
+  if (workItem.mergeState === 'conflict' || workItem.mergeState === 'failed') {
+    return 'Repo hygiene warning: resolve merge state and verify the base branch is clean.'
+  }
+  return null
 }
 
 function isLaneActiveWorkItem(workItem: WorkItemRecord): boolean {

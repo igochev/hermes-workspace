@@ -2,7 +2,7 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md`
+> **Current active implementation plan:** `docs/plans/2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md`
 >
 > **Previous production-readiness plan:** `docs/plans/2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md`
 >
@@ -48,11 +48,17 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 |---:|---|---|---|
 | 1 | `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Real-project dogfood against `family_command_center-ABACUS`, Profile Readiness actionability, and UI clickability audit | Shipped |
 
-### Single-Lane Autonomy Roadmap — active
+### Single-Lane Autonomy Roadmap — shipped
 
-| Order | Plan | Purpose | Why here |
+| Order | Plan | Purpose | Status |
 |---:|---|---|---|
-| 1 | `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Reframe Mission Control around one stable autonomous lane per repo/project: branch-based execution, Planner-on-lane-entry, Builder evidence, Merge-Healer, lane cockpit, branch-based E2E | Owner clarified reliability and low babysitting are more important than same-repo parallel worktrees; this is the new default before further autonomous E2E work |
+| 1 | `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Reframe Mission Control around one stable autonomous lane per repo/project: branch-based execution, Planner-on-lane-entry, Builder evidence, Merge-Healer, lane cockpit, branch-based E2E | Shipped; live Task 8 PASS report `dogfood-output/single-lane-autonomy-e2e-2026-04-27T22-39-20-392Z.md` |
+
+### Single-Lane Production Hardening — active
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| 1 | `2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md` | Turn the one-item single-lane PASS into production reliability: repeatable harness, 3-item sequential gauntlet, blocked recovery, UI truth, repo hygiene, final ACCEPTED/CONDITIONALLY ACCEPTED/REJECTED verdict | Active |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -148,7 +154,8 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Active implementation plan | Builder executes now: one stable autonomous lane per repo/project, branch-based work, Planner-on-lane-entry, Builder evidence, Merge-Healer, branch-based E2E |
+| `2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md` | Active hardening plan | Builder executes now: repeatable/self-cleaning E2E harness, 3-item sequential gauntlet, blocked recovery, operator UI evidence truth, repo hygiene guardrails, final production hardening verdict |
+| `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Shipped | Single-lane autonomy implementation; live Task 8 PASS report exists |
 | `2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md` | Historical / superseded | Revisit after single-lane autonomy is functional |
 | `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Shipped production-readiness plan | Historical context; harness and clickability coverage created here |
 | `2026-04-26-hermes-workspace-next-cycle-gap-analysis.md` | Previous analysis | Strategy/context only; do not implement directly |
@@ -201,10 +208,10 @@ A plan is not shipped until:
 
 Start with:
 
-`docs/plans/2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md`
+`docs/plans/2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md`
 
-Builder should execute Task 1 first: project single-lane policy normalization. The purpose is to make Hermes Workspace useful through reliable one-work-item-at-a-time branch autonomy per repo/project before revisiting parallel worktrees or production acceptance.
+Builder should execute Task 1 first: make the single-lane E2E harness repeatable and self-cleaning. The purpose is to convert the one-item Task 8 PASS into a production-reliable operator workflow before any new feature cycle.
 
-## 10. After Single-Lane Autonomy ships
+## 10. After Single-Lane Production Hardening ships
 
-When the single-lane plan is complete, Builder should update the handoff with the final branch-based E2E verdict, exact command results, report paths, screenshot paths, and any remaining blockers. Main/CEO should then create the next acceptance or hardening plan based on that evidence.
+When the hardening plan is complete, Builder should update the handoff with the final ACCEPTED / CONDITIONALLY ACCEPTED / REJECTED verdict, exact command results, report paths, screenshot paths, repo hygiene state, and any remaining blockers. Main/CEO should then decide whether to start the next product feature cycle or require another reliability slice.

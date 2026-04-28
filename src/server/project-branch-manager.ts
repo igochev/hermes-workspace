@@ -14,6 +14,26 @@ export type ProjectBranchState = {
   changedFiles: string[]
 }
 
+export type ProjectRepoHygiene = {
+  repoPath: string
+  currentBranch: string
+  baseBranch: string
+  featureBranch?: string
+  dirtyStatus: string
+  untrackedFiles: string[]
+  localBranchesCreatedByLane: string[]
+  stashIdsCreatedByLane: string[]
+  aheadBehind: string
+  prUrl?: string
+  warnings: string[]
+}
+
+export type CleanOrStashedLaneEntry = {
+  isClean: boolean
+  checkpointStashId?: string
+  hygiene: ProjectRepoHygiene
+}
+
 type GitResult = {
   stdout: string
   stderr: string
@@ -72,6 +92,10 @@ async function changedFiles(repoPath: string): Promise<string[]> {
     encoding: 'utf8',
   })) as GitResult
   const porcelain = result.stdout
+  return porcelainFiles(porcelain)
+}
+
+function porcelainFiles(porcelain: string): string[] {
   return porcelain
     .split('\n')
     .filter((line) => line.trim().length > 0)
@@ -88,6 +112,95 @@ async function changedFiles(repoPath: string): Promise<string[]> {
     })
     .map((item) => item.file)
     .filter((file, index, files) => files.indexOf(file) === index)
+}
+
+async function gitLines(repoPath: string, args: string[]): Promise<string[]> {
+  const output = await git(repoPath, args).catch(() => '')
+  return output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+async function dirtyStatus(repoPath: string): Promise<string> {
+  const result = (await execFileAsync('git', ['status', '--short'], {
+    cwd: repoPath,
+    encoding: 'utf8',
+  })) as GitResult
+  return result.stdout.trim()
+}
+
+async function aheadBehind(repoPath: string, baseBranch: string): Promise<string> {
+  const upstream = await git(repoPath, ['rev-parse', '--abbrev-ref', `${baseBranch}@{upstream}`]).catch(
+    () => '',
+  )
+  if (!upstream) return 'no upstream'
+  const counts = await git(repoPath, ['rev-list', '--left-right', '--count', `${upstream}...${baseBranch}`]).catch(
+    () => '',
+  )
+  const [behindRaw, aheadRaw] = counts.split(/\s+/)
+  const behind = Number(behindRaw || 0)
+  const ahead = Number(aheadRaw || 0)
+  return `ahead ${ahead}, behind ${behind}`
+}
+
+export async function collectProjectRepoHygiene(params: {
+  repoPath: string
+  baseBranch?: string
+  featureBranch?: string
+  prUrl?: string
+}): Promise<ProjectRepoHygiene> {
+  const state = await inspectProjectRepoState(params.repoPath)
+  const baseBranch = params.baseBranch || state.baseBranch
+  const status = await dirtyStatus(params.repoPath)
+  const untrackedFiles = await gitLines(params.repoPath, ['ls-files', '--others', '--exclude-standard'])
+  const branchLines = await gitLines(params.repoPath, ['branch', '--format=%(refname:short)'])
+  const stashLines = await gitLines(params.repoPath, ['stash', 'list'])
+  const baseAheadBehind = await aheadBehind(params.repoPath, baseBranch)
+  const localBranchesCreatedByLane = branchLines.filter((branch) =>
+    branch.startsWith('mission/'),
+  )
+  const stashIdsCreatedByLane = stashLines.filter((line) =>
+    /single-lane|mission|gauntlet/i.test(line),
+  )
+  const warnings: string[] = []
+  if (/ahead [1-9]/i.test(baseAheadBehind)) {
+    warnings.push(`Base branch ${baseBranch} is ahead of origin (${baseAheadBehind}).`)
+  }
+  if (status) warnings.push(`Repo has dirty status: ${status}`)
+  if (untrackedFiles.length > 0) {
+    warnings.push(`Repo has untracked files: ${untrackedFiles.join(', ')}`)
+  }
+
+  return {
+    repoPath: params.repoPath,
+    currentBranch: state.currentBranch,
+    baseBranch,
+    featureBranch: params.featureBranch,
+    dirtyStatus: status,
+    untrackedFiles,
+    localBranchesCreatedByLane,
+    stashIdsCreatedByLane,
+    aheadBehind: baseAheadBehind,
+    prUrl: params.prUrl,
+    warnings,
+  }
+}
+
+export async function assertCleanOrStashedLaneEntry(params: {
+  repoPath: string
+  baseBranch?: string
+  featureBranch?: string
+  checkpointStashId?: string
+}): Promise<CleanOrStashedLaneEntry> {
+  const hygiene = await collectProjectRepoHygiene(params)
+  const isClean = hygiene.dirtyStatus.length === 0
+  if (!isClean && !params.checkpointStashId) {
+    throw new Error(
+      `Lane entry requires clean or checkpointed repo state before branch switching. Dirty status: ${hygiene.dirtyStatus}`,
+    )
+  }
+  return { isClean, checkpointStashId: params.checkpointStashId, hygiene }
 }
 
 export async function inspectProjectRepoState(

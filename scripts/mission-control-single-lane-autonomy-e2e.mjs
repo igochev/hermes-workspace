@@ -12,6 +12,9 @@ const projectName = 'Production Dogfood — Family Command Center ABACUS'
 const reportDir = path.join(process.cwd(), 'dogfood-output')
 const pollTimeoutMs = Number(process.env.HERMES_SINGLE_LANE_E2E_TIMEOUT_MS || 30 * 60 * 1000)
 const pollIntervalMs = Number(process.env.HERMES_SINGLE_LANE_E2E_POLL_MS || 10_000)
+const resumeWorkItemId = process.env.HERMES_SINGLE_LANE_E2E_WORK_ITEM_ID || ''
+const allowNonE2eResume = process.env.HERMES_SINGLE_LANE_E2E_ALLOW_NON_E2E_RESUME === 'true'
+const cleanupBranchDeletionEnabled = process.env.HERMES_SINGLE_LANE_E2E_CLEANUP_BRANCHES === 'true'
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -33,6 +36,89 @@ function gitStatusShort(cwd) {
   return git(cwd, ['status', '--short'])
 }
 
+function gitBranch(cwd) {
+  return git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])
+}
+
+function collectRepoHygieneFindings(repoHygiene) {
+  const findings = [...(repoHygiene.findings || [])]
+  if (repoHygiene.beforeDirtyStatus) findings.push(`Repo started dirty: ${repoHygiene.beforeDirtyStatus}`)
+  if (repoHygiene.afterDirtyStatus) findings.push(`Repo ended dirty: ${repoHygiene.afterDirtyStatus}`)
+  if (repoHygiene.afterBranch !== targetBranch) findings.push(`Repo ended on ${repoHygiene.afterBranch}, expected ${targetBranch}`)
+  if (repoHygiene.checkoutError) findings.push(`Checkout cleanup failed: ${repoHygiene.checkoutError}`)
+  if (repoHygiene.stashCreated) findings.push(`Created safety stash before checkout: ${repoHygiene.stashCreated}`)
+  if (/ahead [1-9]/i.test(repoHygiene.aheadBehind || '')) findings.push(`Base branch ${repoHygiene.baseBranch || targetBranch} is ahead of origin (${repoHygiene.aheadBehind}).`)
+  return Array.from(new Set(findings))
+}
+
+function gitLines(cwd, args) {
+  return git(cwd, args)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function gitLinesAllowEmpty(cwd, args) {
+  try {
+    return gitLines(cwd, args)
+  } catch {
+    return []
+  }
+}
+
+function gitAheadBehind(cwd, baseBranch) {
+  try {
+    const upstream = git(cwd, ['rev-parse', '--abbrev-ref', `${baseBranch}@{upstream}`])
+    const [behind = '0', ahead = '0'] = git(cwd, ['rev-list', '--left-right', '--count', `${upstream}...${baseBranch}`]).split(/\s+/)
+    return `ahead ${Number(ahead)}, behind ${Number(behind)}`
+  } catch {
+    return 'no upstream'
+  }
+}
+
+function collectLaneRepoHygiene(repoHygiene, { baseBranch = targetBranch, featureBranch = '', prUrl = '' } = {}) {
+  const currentBranch = gitBranch(targetRepo)
+  const dirtyStatus = gitStatusShort(targetRepo)
+  const untrackedFiles = gitLinesAllowEmpty(targetRepo, ['ls-files', '--others', '--exclude-standard'])
+  const localBranchesCreatedByLane = gitLinesAllowEmpty(targetRepo, ['branch', '--format=%(refname:short)']).filter((branch) => branch.startsWith('mission/'))
+  const stashIdsCreatedByLane = gitLinesAllowEmpty(targetRepo, ['stash', 'list']).filter((line) => /single-lane|mission|gauntlet/i.test(line))
+  return {
+    ...repoHygiene,
+    currentBranch,
+    baseBranch,
+    featureBranch,
+    dirtyStatus,
+    untrackedFiles,
+    localBranchesCreatedByLane,
+    stashIdsCreatedByLane,
+    aheadBehind: gitAheadBehind(targetRepo, baseBranch),
+    prUrl,
+    cleanupBranchDeletionEnabled,
+  }
+}
+
+function checkoutTargetBranchWhenSafe(repoHygiene) {
+  repoHygiene.checkoutAttempted = true
+  const currentBranch = gitBranch(targetRepo)
+  const dirtyStatus = gitStatusShort(targetRepo)
+  if (currentBranch === targetBranch) {
+    repoHygiene.checkoutResult = `Already on target base branch ${targetBranch}.`
+    return
+  }
+  if (dirtyStatus) {
+    const stashMessage = `single-lane-e2e-safety-${reportTimestamp()}`
+    git(targetRepo, ['stash', 'push', '-u', '-m', stashMessage])
+    repoHygiene.stashCreated = stashMessage
+  }
+  try {
+    git(targetRepo, ['checkout', targetBranch])
+    repoHygiene.checkoutResult = `Checked out ${targetBranch} from ${currentBranch}.`
+  } catch (error) {
+    repoHygiene.checkoutError = error instanceof Error ? error.message : String(error)
+    repoHygiene.checkoutResult = `Failed to checkout ${targetBranch} from ${currentBranch}.`
+  }
+}
+
 function gitChangedFilesSince(cwd, baseCommit) {
   const committed = baseCommit ? git(cwd, ['diff', '--name-only', `${baseCommit}..HEAD`]) : ''
   const unstaged = git(cwd, ['diff', '--name-only'])
@@ -49,12 +135,34 @@ function gitChangedFilesSince(cwd, baseCommit) {
   )
 }
 
+function gitChangedFilesForCommit(cwd, commit) {
+  if (!commit) return []
+  const output = git(cwd, ['diff-tree', '--no-commit-id', '--name-only', '-r', '-m', commit])
+  return Array.from(new Set(output.split('\n').map((line) => line.trim()).filter(Boolean)))
+}
+
 function normalizeItemsPayload(body) {
   return body.workItems || body.items || []
 }
 
 function normalizeWorkItemPayload(body) {
   return body.workItem || body.item || body
+}
+
+function historyEventsForReport(workItem) {
+  const workItemId = workItem?.id
+  return (workItem?.history || []).flatMap((entry) => {
+    const note = entry?.note || ''
+    const phase = entry?.phase
+    const action = (() => {
+      if (/Planner enrichment requested|Planner .*launched/i.test(note)) return 'launch_planner'
+      if (/Launched .*builder|Phase 2: build|Builder/i.test(note) && phase === 'build') return 'launch_builder'
+      if (/Recovered valid Builder evidence|advanced work item into review/i.test(note)) return 'sync_execution'
+      if (/Merge-Healer merged/i.test(note)) return 'run_merge_healer'
+      return ''
+    })()
+    return action ? [{ action, workItemId, observedAt: entry.createdAt, message: note }] : []
+  })
 }
 
 function eventActions(report) {
@@ -84,6 +192,7 @@ function expectedBranchName(workItemId, title) {
 export function validateSingleLaneAutonomyE2eReport(report) {
   assert(report && typeof report === 'object', 'Report is required')
   assert(/^single-lane-autonomy-e2e-/.test(report.e2eRunId || ''), 'Report e2eRunId must start with single-lane-autonomy-e2e-')
+  assert(report.mode === 'fresh' || report.mode === 'resume', 'Report mode must be fresh or resume')
   assert(Array.isArray(report.createdWorkItemIds), 'Report createdWorkItemIds must be an array')
   assert(report.createdWorkItemIds.length === 1, 'Single-lane E2E must create exactly one work item')
   assert(report.workItemId === report.createdWorkItemIds[0], 'Report workItemId must be the single created work item id')
@@ -124,10 +233,15 @@ export function buildSingleLaneAutonomyE2eMarkdown(report) {
     .join('\n') || '| — | — | — |'
   const changedFiles = (report.candidateRepo?.changedFiles || []).map((file) => `- ${file}`).join('\n') || '- none'
   const blockers = (report.blockers || []).map((blocker) => `- ${blocker}`).join('\n') || '- none'
+  const repoHygieneFindings = (report.repoHygiene?.findings || []).length > 0 ? report.repoHygiene.findings.join('; ') : 'none'
+  const localLaneBranches = (report.repoHygiene?.localBranchesCreatedByLane || []).join(', ') || 'none'
+  const stashBackups = (report.repoHygiene?.stashIdsCreatedByLane || []).join(', ') || 'none'
+  const untrackedFiles = (report.repoHygiene?.untrackedFiles || []).join(', ') || 'none'
 
   return `# Branch-Based Single-Lane Autonomy E2E Report
 
 Verdict: ${pass ? 'PASS' : 'FAIL'}
+Mode: ${report.mode || 'unknown'}
 E2E run id: ${report.e2eRunId}
 Project id: ${report.projectId || projectId}
 Work item id: ${report.workItemId}
@@ -167,6 +281,30 @@ After:
 \`\`\`text
 ${report.candidateRepo?.afterStatus || ''}
 \`\`\`
+
+## Repo hygiene
+Branch before: ${report.repoHygiene?.beforeBranch || 'unknown'}
+Branch after: ${report.repoHygiene?.afterBranch || 'unknown'}
+Dirty before:
+\`\`\`text
+${report.repoHygiene?.beforeDirtyStatus || ''}
+\`\`\`
+Dirty after:
+\`\`\`text
+${report.repoHygiene?.afterDirtyStatus || ''}
+\`\`\`
+Checkout attempted: ${report.repoHygiene?.checkoutAttempted === true ? 'yes' : 'no'}
+Checkout result: ${report.repoHygiene?.checkoutResult || 'not attempted'}
+Current branch: ${report.repoHygiene?.currentBranch || report.repoHygiene?.afterBranch || 'unknown'}
+Base branch: ${report.repoHygiene?.baseBranch || report.lane?.baseBranch || 'unknown'}
+Feature branch: ${report.repoHygiene?.featureBranch || report.lane?.branchName || 'unknown'}
+Untracked files: ${untrackedFiles}
+Local lane branches: ${localLaneBranches}
+Stash backups: ${stashBackups}
+Ahead/behind: ${report.repoHygiene?.aheadBehind || 'unknown'}
+PR URL: ${report.repoHygiene?.prUrl || 'none'}
+Branch cleanup deletion enabled: ${report.repoHygiene?.cleanupBranchDeletionEnabled === true ? 'yes' : 'no'}
+Repo hygiene findings: ${repoHygieneFindings}
 
 ## Blockers
 ${blockers}
@@ -249,6 +387,26 @@ function collectManualPhaseMutationCalls(apiCalls) {
   })
 }
 
+function isActiveNonTerminalLaneItem(item) {
+  if (!item || ['done', 'cancelled'].includes(item.status)) return false
+  if (item.status === 'blocked' && item.laneState === 'blocked' && item.laneParkedAt && item.laneBlockedReason) return false
+  return item.status === 'active' || ['preparing', 'building', 'reviewing', 'merge_healing'].includes(item.laneState)
+}
+
+async function assertNoActiveNonTerminalLaneItem(baseUrl, apiCalls, authHeader) {
+  const list = await requestJson(baseUrl, apiCalls, `/api/work-items?projectId=${encodeURIComponent(projectId)}`, { headers: authHeader })
+  const active = normalizeItemsPayload(list).find(isActiveNonTerminalLaneItem)
+  assert(!active, `Refusing fresh single-lane E2E: active non-terminal lane item already exists for ${projectId}: ${active?.id}`)
+}
+
+function assertResumableE2eItem(workItem) {
+  const labels = Array.isArray(workItem?.labels) ? workItem.labels : []
+  assert(
+    labels.includes('single-lane-autonomy-e2e') || allowNonE2eResume,
+    `Resume target ${workItem?.id || 'unknown'} is not labelled single-lane-autonomy-e2e; set HERMES_SINGLE_LANE_E2E_ALLOW_NON_E2E_RESUME=true to override.`,
+  )
+}
+
 function runCandidateTestsIfConfigured() {
   const command = process.env.HERMES_SINGLE_LANE_E2E_CANDIDATE_TEST_COMMAND
   if (!command) return { output: '', passed: false }
@@ -258,7 +416,17 @@ function runCandidateTestsIfConfigured() {
 
 export async function runSingleLaneAutonomyE2e({ baseUrl = defaultBaseUrl } = {}) {
   assert(fs.existsSync(targetRepo), `Target repo missing: ${targetRepo}`)
-  const initialBranch = git(targetRepo, ['rev-parse', '--abbrev-ref', 'HEAD'])
+  const repoHygiene = {
+    beforeBranch: gitBranch(targetRepo),
+    afterBranch: '',
+    beforeDirtyStatus: gitStatusShort(targetRepo),
+    afterDirtyStatus: '',
+    checkoutAttempted: false,
+    checkoutResult: 'not attempted',
+    findings: [],
+  }
+  if (repoHygiene.beforeBranch !== targetBranch) checkoutTargetBranchWhenSafe(repoHygiene)
+  const initialBranch = gitBranch(targetRepo)
   const baseCommit = git(targetRepo, ['rev-parse', '--short', 'HEAD'])
   const beforeStatus = gitStatusShort(targetRepo)
   assert(initialBranch === targetBranch, `Target repo branch mismatch: expected ${targetBranch}, got ${initialBranch}`)
@@ -267,6 +435,7 @@ export async function runSingleLaneAutonomyE2e({ baseUrl = defaultBaseUrl } = {}
   fs.mkdirSync(reportDir, { recursive: true })
   const timestamp = reportTimestamp()
   const e2eRunId = `single-lane-autonomy-e2e-${timestamp}`
+  const mode = resumeWorkItemId ? 'resume' : 'fresh'
   const reportPath = path.join(reportDir, `single-lane-autonomy-e2e-${timestamp}.md`)
   const latestReportPath = path.join(reportDir, 'single-lane-autonomy-e2e-latest.md')
   const workItemTitle = 'Single Lane E2E Code Delivery'
@@ -279,31 +448,45 @@ export async function runSingleLaneAutonomyE2e({ baseUrl = defaultBaseUrl } = {}
   const authHeader = cookie ? { cookie } : {}
   await ensureProject(baseUrl, apiCalls, authHeader)
 
-  const created = await requestJson(baseUrl, apiCalls, '/api/work-items', {
-    method: 'POST',
-    headers: authHeader,
-    body: JSON.stringify({
-      projectId,
-      title: workItemTitle,
-      description: `Branch-based single-lane autonomy ${e2eRunId}: one work item, canonical feature branch, Builder evidence, Merge-Healer integration.`,
-      status: 'inbox',
-      phase: 'research',
-      priority: 'medium',
-      riskLevel: 'low',
-      labels: ['single-lane-autonomy-e2e', e2eRunId],
-      acceptanceCriteria: [
-        'Planner launches only after lane entry and canonical branch preparation.',
-        'Builder changes product code and tests and emits structured evidence with passing tests.',
-        'Merge-Healer integrates the feature branch and the work item reaches done.',
-      ],
-      repoPathSnapshot: targetRepo,
-    }),
-  })
-  const createdWorkItem = normalizeWorkItemPayload(created)
-  const workItemId = createdWorkItem.id
-  const createdWorkItemIds = [workItemId]
-  assert(createdWorkItemIds.length === 1, 'Harness must create exactly one work item')
-  const expected = expectedBranchName(workItemId, workItemTitle)
+  let createdWorkItem
+  let workItemId
+  let createdWorkItemIds
+  let expected
+  if (resumeWorkItemId) {
+    const existing = await requestJson(baseUrl, apiCalls, `/api/work-items/${encodeURIComponent(resumeWorkItemId)}?syncExecution=true`, { headers: authHeader })
+    createdWorkItem = normalizeWorkItemPayload(existing)
+    assertResumableE2eItem(createdWorkItem)
+    workItemId = createdWorkItem.id
+    createdWorkItemIds = [workItemId]
+    expected = expectedBranchName(workItemId, createdWorkItem.title || workItemTitle)
+  } else {
+    await assertNoActiveNonTerminalLaneItem(baseUrl, apiCalls, authHeader)
+    const created = await requestJson(baseUrl, apiCalls, '/api/work-items', {
+      method: 'POST',
+      headers: authHeader,
+      body: JSON.stringify({
+        projectId,
+        title: workItemTitle,
+        description: `Branch-based single-lane autonomy ${e2eRunId}: one work item, canonical feature branch, Builder evidence, Merge-Healer integration.`,
+        status: 'inbox',
+        phase: 'research',
+        priority: 'medium',
+        riskLevel: 'low',
+        labels: ['single-lane-autonomy-e2e', e2eRunId],
+        acceptanceCriteria: [
+          'Planner launches only after lane entry and canonical branch preparation.',
+          'Builder changes product code and tests and emits structured evidence with passing tests.',
+          'Merge-Healer integrates the feature branch and the work item reaches done.',
+        ],
+        repoPathSnapshot: targetRepo,
+      }),
+    })
+    createdWorkItem = normalizeWorkItemPayload(created)
+    workItemId = createdWorkItem.id
+    createdWorkItemIds = [workItemId]
+    expected = expectedBranchName(workItemId, workItemTitle)
+  }
+  assert(createdWorkItemIds.length === 1, 'Harness must create or resume exactly one work item')
 
   const startedAt = Date.now()
   let finalWorkItem = createdWorkItem
@@ -337,29 +520,52 @@ export async function runSingleLaneAutonomyE2e({ baseUrl = defaultBaseUrl } = {}
       return { output: '', passed: false }
     }
   })()
-  const changedFiles = gitChangedFilesSince(targetRepo, baseCommit)
-  const afterStatus = gitStatusShort(targetRepo)
+  const changedFiles = (() => {
+    const sinceBase = gitChangedFilesSince(targetRepo, baseCommit)
+    const mergeCommitFiles = gitChangedFilesForCommit(targetRepo, finalWorkItem.mergeCommit)
+    return Array.from(new Set([...sinceBase, ...mergeCommitFiles]))
+  })()
+  checkoutTargetBranchWhenSafe(repoHygiene)
+  Object.assign(
+    repoHygiene,
+    collectLaneRepoHygiene(repoHygiene, {
+      baseBranch: finalWorkItem.baseBranch || targetBranch,
+      featureBranch: finalWorkItem.branchName || expected,
+      prUrl: finalWorkItem.prUrl || '',
+    }),
+  )
+  repoHygiene.afterBranch = gitBranch(targetRepo)
+  repoHygiene.afterDirtyStatus = gitStatusShort(targetRepo)
+  repoHygiene.findings = collectRepoHygieneFindings(repoHygiene)
+  const afterStatus = repoHygiene.afterDirtyStatus
   const list = await requestJson(baseUrl, apiCalls, `/api/work-items?projectId=${encodeURIComponent(projectId)}`, { headers: authHeader })
   const sameRunItems = normalizeItemsPayload(list).filter((item) => item?.id && (item.title?.includes(e2eRunId) || item.labels?.includes(e2eRunId)))
   const extraE2eItemsCreated = sameRunItems.map((item) => item.id).filter((id) => id !== workItemId)
   if (extraE2eItemsCreated.length > 0) blockers.push(`Extra work items created: ${extraE2eItemsCreated.join(', ')}`)
 
+  const reportEvents = Array.from(
+    new Map(
+      [...orchestratorEvents, ...historyEventsForReport(finalWorkItem)].map((event) => [`${event.action}:${event.workItemId}:${event.observedAt || ''}`, event]),
+    ).values(),
+  )
+
   const report = {
     e2eRunId,
+    mode,
     projectId,
     workItemId,
-    workItemTitle,
+    workItemTitle: finalWorkItem.title || createdWorkItem.title || workItemTitle,
     createdWorkItemIds,
     extraE2eItemsCreated,
     manualPhaseMutationCalls: collectManualPhaseMutationCalls(apiCalls),
-    orchestratorEvents,
+    orchestratorEvents: reportEvents,
     timelineRows,
     lane: {
       branchCreated: Boolean(finalWorkItem.branchName || git(targetRepo, ['branch', '--list', expected])),
       branchName: finalWorkItem.branchName || git(targetRepo, ['rev-parse', '--abbrev-ref', 'HEAD']),
       expectedBranchName: expected,
       baseBranch: finalWorkItem.baseBranch || targetBranch,
-      plannerLaunchedAfterLaneEntry: Boolean(finalWorkItem.laneEnteredAt && eventActions({ orchestratorEvents }).includes('launch_planner')),
+      plannerLaunchedAfterLaneEntry: Boolean(finalWorkItem.laneEnteredAt && eventActions({ orchestratorEvents: reportEvents }).includes('launch_planner')),
     },
     candidateRepo: {
       initialBranch,
@@ -369,6 +575,7 @@ export async function runSingleLaneAutonomyE2e({ baseUrl = defaultBaseUrl } = {}
       testsPassed: tests.passed || finalWorkItem.mergeTestPassed === true,
       testOutput: tests.output,
     },
+    repoHygiene,
     mergeHealer: {
       ran: eventActions({ orchestratorEvents }).includes('run_merge_healer') || Boolean(finalWorkItem.mergeState),
       mergeState: finalWorkItem.mergeState || 'not_started',
@@ -379,10 +586,18 @@ export async function runSingleLaneAutonomyE2e({ baseUrl = defaultBaseUrl } = {}
     blockers,
   }
 
-  validateSingleLaneAutonomyE2eReport(report)
   const markdown = buildSingleLaneAutonomyE2eMarkdown(report)
   fs.writeFileSync(reportPath, markdown, 'utf8')
   fs.writeFileSync(latestReportPath, markdown, 'utf8')
+  try {
+    validateSingleLaneAutonomyE2eReport(report)
+  } catch (error) {
+    if (error && typeof error === 'object') {
+      error.reportPath = reportPath
+      error.latestReportPath = latestReportPath
+    }
+    throw error
+  }
   return { report, reportPath, latestReportPath }
 }
 
@@ -393,6 +608,14 @@ async function main() {
     console.log(`Latest: ${latestReportPath}`)
     console.log(`Work item: ${report.workItemId}`)
   } catch (error) {
+    if (error?.reportPath) {
+      const message = error instanceof Error ? error.stack || error.message : String(error)
+      console.error(`FAIL branch-based single-lane autonomy E2E. Report: ${error.reportPath}`)
+      if (error.latestReportPath) console.error(`Latest: ${error.latestReportPath}`)
+      console.error(message)
+      process.exitCode = 1
+      return
+    }
     fs.mkdirSync(reportDir, { recursive: true })
     const timestamp = reportTimestamp()
     const failReportPath = path.join(reportDir, `single-lane-autonomy-e2e-${timestamp}-FAIL.md`)

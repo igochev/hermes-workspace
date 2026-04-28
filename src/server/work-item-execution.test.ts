@@ -387,6 +387,142 @@ describe('work-item-execution', () => {
     })
   })
 
+  it('advances enabled lane build from local cron output when dashboard job index is unavailable', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const project = createProject({
+      name: 'Single Lane Local Cron Demo',
+      repoPath: '/repos/single-lane-local-cron-demo',
+      defaultBranch: 'main',
+      autonomyLanePolicy: { enabled: true },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Ingest local Builder output',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      riskLevel: 'low',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'job-local-output',
+      missionJobId: 'job-local-output',
+      missionJobName: 'work-item-build-local-output',
+      missionState: 'unknown',
+      laneState: 'building',
+      branchName: 'mission/local-output',
+      baseBranch: 'main',
+    })
+    const evidenceDir = path.join(tempHome, 'dispatch-local-output')
+    fs.mkdirSync(evidenceDir, { recursive: true })
+    const evidencePath = path.join(evidenceDir, 'evidence.json')
+    fs.writeFileSync(
+      evidencePath,
+      JSON.stringify({
+        workItemId: workItem.id,
+        phase: 'build',
+        repository: project.repoPath,
+        baseBranch: 'main',
+        branch: 'mission/local-output',
+        commit: 'abc1234',
+        productFilesChanged: ['lib/feature.ts'],
+        testFilesChanged: ['tests/feature.test.ts'],
+        testsPassed: true,
+        testLog: path.join(evidenceDir, 'test.log'),
+        commands: [{ command: 'npm test', exitCode: 0, summary: '2 passed' }],
+      }),
+    )
+    const outputDir = path.join(process.env.HERMES_HOME!, 'cron', 'output', 'job-local-output')
+    fs.mkdirSync(outputDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(outputDir, '2026-04-27_21-48-26.md'),
+      `✅ Mission complete\nEvidence: ${evidencePath}`,
+    )
+
+    getHermesJobById.mockRejectedValue(new Error('Dashboard unavailable'))
+    listHermesJobs.mockRejectedValue(new Error('Dashboard unavailable'))
+    getHermesJobRuns.mockResolvedValue([])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.state).toBe('succeeded')
+    expect(result.execution.transitionApplied).toBe('build->review')
+    expect(result.execution.job?.id).toBe('job-local-output')
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('review')
+    expect(result.workItem.laneState).toBe('reviewing')
+    expect(result.workItem.branchName).toBe('mission/local-output')
+    expect(result.workItem.artifactPaths).toContain(evidencePath)
+    expect(listExecutionRuns({ workItemId: workItem.id, role: 'mission' })[0]).toMatchObject({
+      state: 'succeeded',
+      branchName: 'mission/local-output',
+    })
+  })
+
+  it('recovers a previously blocked enabled lane build when local Builder evidence becomes parseable', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const project = createProject({
+      name: 'Single Lane Blocked Recovery Demo',
+      repoPath: '/repos/single-lane-blocked-recovery-demo',
+      defaultBranch: 'main',
+      autonomyLanePolicy: { enabled: true },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Recover Builder evidence',
+      status: 'blocked',
+      phase: 'build',
+      priority: 'high',
+      riskLevel: 'low',
+      blockedReason: 'mission_failed',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'job-blocked-local-output',
+      missionJobId: 'job-blocked-local-output',
+      missionJobName: 'work-item-build-blocked-local-output',
+      missionState: 'failed',
+      laneState: 'blocked',
+      laneParkedAt: '2026-04-27T22:09:08.000Z',
+      laneBlockedReason: 'Builder output did not contain parseable structured JSON.',
+      branchName: 'mission/blocked-local-output',
+      baseBranch: 'main',
+    })
+    const evidenceDir = path.join(tempHome, 'dispatch-blocked-local-output')
+    fs.mkdirSync(evidenceDir, { recursive: true })
+    const evidencePath = path.join(evidenceDir, 'evidence.json')
+    fs.writeFileSync(
+      evidencePath,
+      JSON.stringify({
+        workItemId: workItem.id,
+        phase: 'build',
+        repository: project.repoPath,
+        baseBranch: 'main',
+        branch: 'mission/blocked-local-output',
+        commit: 'abc1234',
+        productFilesChanged: ['lib/feature.ts'],
+        testFilesChanged: ['tests/feature.test.ts'],
+        testsPassed: true,
+        commands: [{ command: 'npm test', exitCode: 0, summary: '2 passed' }],
+      }),
+    )
+    const outputDir = path.join(process.env.HERMES_HOME!, 'cron', 'output', 'job-blocked-local-output')
+    fs.mkdirSync(outputDir, { recursive: true })
+    fs.writeFileSync(path.join(outputDir, '2026-04-27_22-10-00.md'), `Evidence: \`${evidencePath}\``)
+
+    getHermesJobById.mockRejectedValue(new Error('Dashboard unavailable'))
+    listHermesJobs.mockRejectedValue(new Error('Dashboard unavailable'))
+    getHermesJobRuns.mockResolvedValue([])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.state).toBe('succeeded')
+    expect(result.execution.transitionApplied).toBe('build->review')
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('review')
+    expect(result.workItem.laneState).toBe('reviewing')
+    expect(result.workItem.blockedReason).toBeUndefined()
+    expect(result.workItem.laneBlockedReason).toBeUndefined()
+  })
+
   it('marks enabled lane running Builder jobs as stale when heartbeat is old and no output exists', async () => {
     const project = createProject({
       name: 'Single Lane Stale Demo',

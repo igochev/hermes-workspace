@@ -21,6 +21,7 @@ import {
   type WorkItemApprovalDecision,
   type WorkItemBlockedReason,
   type WorkItemCriterionStatus,
+  type WorkItemRecord,
   type WorkItemRiskLevel,
   type WorkItemRunTimelineRow,
   type WorkItemRunTimelineState,
@@ -77,6 +78,14 @@ export const WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE = 'Execution sync warning'
 export const WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE = 'Profile Preflight'
 export const WORK_ITEM_RECOVERY_PANEL_TITLE = 'Recovery Actions'
 export const WORK_ITEM_RUNS_SECTION_TITLE = 'Runs / Agents'
+export const WORK_ITEM_OPERATOR_EVIDENCE_LABELS = {
+  baseBranch: 'Base branch',
+  featureBranch: 'Feature branch',
+  mergeTarget: 'Merge target',
+  mergeCommit: 'Merge commit',
+  mergeTest: 'Merge test',
+  mergeArtifacts: 'Merge artifacts',
+} as const
 export const WORK_ITEM_DETAIL_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescriptor> = [
   { surface: 'work-item-back-link', label: 'Back to Project', kind: 'link', target: '/projects/:projectId' },
   {
@@ -111,6 +120,47 @@ export type WorkItemRecoveryPanelItem = {
   title: string
   detail: string
   actions: Array<WorkItemRecoveryAction>
+}
+
+export type WorkItemMergeEvidenceSummary = {
+  baseBranch: string
+  featureBranch: string
+  mergeTarget: string
+  mergeCommit: string
+  mergeTest: string
+  mergeArtifacts: string
+}
+
+export function getWorkItemMergeEvidenceSummary(
+  workItem: Pick<
+    WorkItemRecord,
+    | 'baseBranch'
+    | 'branchName'
+    | 'mergeTargetBranch'
+    | 'mergeCommit'
+    | 'mergeTestCommand'
+    | 'mergeTestPassed'
+    | 'mergeArtifactPaths'
+  >,
+): WorkItemMergeEvidenceSummary {
+  const mergeTestCommand = workItem.mergeTestCommand ?? '—'
+  const mergeTest =
+    workItem.mergeTestPassed === true
+      ? `passed: ${mergeTestCommand}`
+      : workItem.mergeTestPassed === false
+        ? `failed: ${mergeTestCommand}`
+        : mergeTestCommand === '—'
+          ? '—'
+          : `pending: ${mergeTestCommand}`
+
+  return {
+    baseBranch: workItem.baseBranch ?? '—',
+    featureBranch: workItem.branchName ?? '—',
+    mergeTarget: workItem.mergeTargetBranch ?? workItem.baseBranch ?? '—',
+    mergeCommit: workItem.mergeCommit ? workItem.mergeCommit.slice(0, 7) : '—',
+    mergeTest,
+    mergeArtifacts: workItem.mergeArtifactPaths?.length ? workItem.mergeArtifactPaths.join(', ') : '—',
+  }
 }
 
 export function getWorkItemRecoveryPanelItems(
@@ -934,6 +984,7 @@ export function WorkItemDetailScreen({
     (attentionQuery.data?.items ?? []).filter((item) => item.workItemId === workItemId),
   )
   const latestPlanningDraft: PlanningDraftRecord | null = workItem?.latestPlanningDraft ?? null
+  const mergeEvidenceSummary = workItem ? getWorkItemMergeEvidenceSummary(workItem) : null
   const planningDraftStatusLabel = getPlanningDraftStatusLabel(latestPlanningDraft?.status)
   const planningDraftGuidance = getPlanningDraftGuidance(latestPlanningDraft?.status)
   const planningDiff = workItem
@@ -1415,6 +1466,16 @@ export function WorkItemDetailScreen({
                 <Detail label="Assigned Profile" value={workItem.assignedProfile || '—'} />
                 <Detail label="Risk Level" value={WORK_ITEM_RISK_LEVEL_LABELS[workItem.riskLevel]} />
                 <Detail label="Plan File Path" value={workItem.planFilePath || '—'} />
+                {mergeEvidenceSummary ? (
+                  <>
+                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.baseBranch} value={mergeEvidenceSummary.baseBranch} />
+                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.featureBranch} value={mergeEvidenceSummary.featureBranch} />
+                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeTarget} value={mergeEvidenceSummary.mergeTarget} />
+                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeCommit} value={mergeEvidenceSummary.mergeCommit} />
+                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeTest} value={mergeEvidenceSummary.mergeTest} />
+                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeArtifacts} value={mergeEvidenceSummary.mergeArtifacts} />
+                  </>
+                ) : null}
                 {workItem.reviewJobId ? (
                   <>
                     <Detail label="Planner Review Job" value={workItem.reviewJobId} />

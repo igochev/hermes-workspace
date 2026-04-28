@@ -1,6 +1,11 @@
 import { type ProjectRecord } from './projects-store'
 import { type WorkItemPriority, type WorkItemRecord, type WorkItemRiskLevel } from './work-items-store'
 
+export type ProjectLaneRepoSafety = {
+  safe: boolean
+  reason?: string
+}
+
 export type ProjectLaneSelectionResult = {
   active: WorkItemRecord | null
   next: WorkItemRecord | null
@@ -67,6 +72,7 @@ function compareLaneCandidates(a: WorkItemRecord, b: WorkItemRecord): number {
 export function selectNextLaneWorkItem(params: {
   project: ProjectRecord
   workItems: WorkItemRecord[]
+  repoSafety?: ProjectLaneRepoSafety
 }): ProjectLaneSelectionResult {
   const projectItems = params.workItems.filter((workItem) => belongsToProject(params.project, workItem))
   const parked = projectItems.filter(isParkedBlockedItem)
@@ -88,6 +94,16 @@ export function selectNextLaneWorkItem(params: {
       next: null,
       parked,
       reason: `Project lane unsafe: blocked work item ${unsafeBlocked.id} is not safely parked.`,
+    }
+  }
+
+  if (parked.length > 0 && params.repoSafety?.safe === false) {
+    const reason = params.repoSafety.reason?.trim()
+    return {
+      active: null,
+      next: null,
+      parked,
+      reason: `Project lane repo unsafe after parked blocker${reason ? `: ${reason}` : '.'}`,
     }
   }
 

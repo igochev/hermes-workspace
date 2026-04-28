@@ -98,6 +98,33 @@ describe('project autonomy lane selector', () => {
     expect(result.reason).toContain('parked')
   })
 
+  it('refuses to admit the next queued item when parked blocker repo state is unsafe', () => {
+    const blocked = workItem({
+      id: 'blocked-parked-dirty-repo',
+      status: 'blocked',
+      phase: 'build',
+      laneState: 'blocked',
+      laneParkedAt: '2026-04-27T01:00:00.000Z',
+      laneBlockedReason: 'Builder evidence invalid; feature branch still dirty.',
+      branchName: 'mission/blocked-dirty-repo',
+    })
+    const next = workItem({ id: 'next-ready', status: 'ready', phase: 'build' })
+
+    const result = selectNextLaneWorkItem({
+      project: project(),
+      workItems: [blocked, next],
+      repoSafety: {
+        safe: false,
+        reason: 'Repo has uncommitted files on mission/blocked-dirty-repo.',
+      },
+    })
+
+    expect(result).toMatchObject({ active: null, next: null })
+    expect(result.parked).toHaveLength(1)
+    expect(result.reason).toContain('repo unsafe')
+    expect(result.reason).toContain('uncommitted files')
+  })
+
   it('does not select a next item when a blocked lane item is not safely parked', () => {
     const blocked = workItem({
       id: 'blocked-dirty',

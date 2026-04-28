@@ -232,12 +232,19 @@ function applyReadyBuildHint(row: WorkItemRunTimelineRow, workItem: WorkItemReco
 function applyWorkItemMissionFallback(row: WorkItemRunTimelineRow, workItem: WorkItemRecord): WorkItemRunTimelineRow {
   if (row.phase !== 'build' || row.state !== 'not_started' || !workItem.missionJobId) return row
   const state: WorkItemRunTimelineState = workItem.missionState === 'failed' ? 'failed' : workItem.missionState === 'running' ? 'running' : 'scheduled'
-  const error = workItem.missionLastError
+  const error = workItem.laneState === 'blocked' && workItem.laneBlockedReason ? workItem.laneBlockedReason : workItem.missionLastError
+  const isParkedLaneBlocker = workItem.status === 'blocked' && workItem.laneState === 'blocked' && Boolean(workItem.laneParkedAt)
   return {
     ...row,
     state,
-    summary: buildRunSummary('builder', state, error),
-    nextExpectedAction: nextActionForState('builder', state),
+    summary:
+      isParkedLaneBlocker && state === 'failed'
+        ? `Builder parked: ${error ?? 'lane blocker evidence recorded.'}`
+        : buildRunSummary('builder', state, error),
+    nextExpectedAction:
+      isParkedLaneBlocker && state === 'failed'
+        ? 'Review Builder evidence, clean or stash the repo, then retry or unpark this work item.'
+        : nextActionForState('builder', state),
     jobId: workItem.missionJobId,
     jobName: workItem.missionJobName,
     sessionKeyPrefix: workItem.missionSessionKeyPrefix,
