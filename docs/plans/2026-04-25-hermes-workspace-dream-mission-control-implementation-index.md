@@ -2,7 +2,9 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md`
+> **Current active implementation plan:** `docs/plans/2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md`
+>
+> **Previous merge-readiness plan:** `docs/plans/2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md`
 >
 > **Previous always-on policy plan:** `docs/plans/2026-04-28-hermes-workspace-always-on-operator-policy-plan.md`
 >
@@ -70,11 +72,20 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 |---:|---|---|---|
 | 1 | `2026-04-28-hermes-workspace-always-on-operator-policy-plan.md` | Define and implement owner-approved policy for bounded retries, lane escalation notifications, PR publishing gates, and branch/stash cleanup retention before fully unattended operation | Shipped; ACCEPTED FOR SUPERVISED ALWAYS-ON POLICY ONLY. Report: `dogfood-output/always-on-policy-gauntlet-latest.md` |
 
-### Always-On Merge Readiness / Type-Lint Stabilization — review-ready
+### Always-On Merge Readiness / Type-Lint Stabilization — shipped
 
 | Order | Plan | Purpose | Status |
 |---:|---|---|---|
-| 1 | `2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md` | Clean changed-file TypeScript/ESLint blockers, preserve green functional verification, and produce a final pre-commit review package for the completed Always-On slice | Review-ready; final package `dogfood-output/always-on-merge-readiness-final-latest.md`; Owner/Main commit or independent review decision next |
+| 1 | `2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md` | Clean changed-file TypeScript/ESLint blockers, preserve green functional verification, and produce a final pre-commit review package for the completed Always-On slice | Shipped; committed and pushed at `d3026c4`; final package `dogfood-output/always-on-merge-readiness-final-latest.md` |
+
+### Operator UX Clarity Cycle — active
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| P0 | `2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md` | Rename confusing scheduled-job/work-item execution labels and make `/jobs?jobId=...` a sane temporary execution-trace landing path | Active |
+| P1 | `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Work Item Cockpit progressive disclosure: Operator Summary first, raw IDs advanced/collapsed, evidence promoted | Queued; Main/CEO to create detailed plan after P0 review |
+| P2 | `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Dedicated Runs/Executions surface so work-item traces stop landing on Scheduled Jobs | Queued; requires architecture plan after P1 |
+| P3 | `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Morning Review / overnight operator digest | Queued; requires architecture plan after P2 |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -89,7 +100,7 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 Current inspected baseline:
 
 - Branch: `my-hermes-workspace-dev`
-- Commit inspected for this update: `ac52b9b`
+- Commit inspected for this update: `d3026c4`
 - Test command: `pnpm vitest run` or `pnpm test`
 - Build command: `pnpm build`
 - Service: `hermes-workspace.service`
@@ -109,6 +120,8 @@ Core seams:
 | Attention queue | `src/server/attention-queue.ts`, `src/server/attention-queue-store.ts`, `src/routes/api/attention-queue.ts` |
 | Autopilot | `src/server/autopilot-suggestions-store.ts`, `src/routes/api/autopilot-suggestions*`, `src/screens/projects/*autopilot*` |
 | Dashboard | `src/screens/dashboard/dashboard-screen.tsx` |
+| Jobs / scheduled jobs | `src/screens/jobs/jobs-screen.tsx`, `src/lib/jobs-api.ts`, `src/routes/api/jobs*` |
+| Work-item detail UX | `src/screens/projects/work-item-detail-screen.tsx`, `src/server/work-item-run-timeline.ts` |
 | Chat sessions/events | `src/components/workspace-shell.tsx`, `src/screens/chat/chat-queries.ts`, `src/routes/api/sessions.ts`, `src/routes/api/chat-events.ts` |
 
 ---
@@ -170,7 +183,9 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md` | Active stabilization plan | Builder executes now: baseline quality report, changed-file TypeScript/lint cleanup, full functional gauntlet rerun, final pre-commit package |
+| `2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md` | Active Operator UX Clarity plan | Builder executes now: scheduled-job terminology, work-item execution labels, `/jobs?jobId=...` deep-link behavior, live UI verification |
+| `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Current UX roadmap / queued P1-P3 source | Use for P1/P2/P3 context only; do not implement directly until Main creates each detailed plan |
+| `2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md` | Shipped stabilization plan | Historical; final package `dogfood-output/always-on-merge-readiness-final-latest.md`; committed at `d3026c4` |
 | `2026-04-28-hermes-workspace-always-on-operator-policy-plan.md` | Shipped owner-policy plan | Accepted for supervised always-on policy only; report `dogfood-output/always-on-policy-gauntlet-latest.md` |
 | `2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md` | Shipped | Accepted supervised production daily use; report `dogfood-output/single-lane-production-hardening-latest.md` |
 | `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Shipped | Single-lane autonomy implementation; live Task 8 PASS report exists |
@@ -189,20 +204,20 @@ Then live verify UI/API changes.
 
 ---
 
-## 7. Cycle 2 dependency graph
+## 7. Current queued dependency graph
 
 ```text
-Slice V/W: Telemetry + realtime session truth
-  └─ makes the cockpit trustworthy before more automation
+P0: Terminology cleanup + /jobs?jobId deep-link sanity
+  └─ removes immediate scheduled-job / execution-trace confusion
 
-Slice X/Y: Profile/role readiness preflight
-  └─ proves role mappings are usable before Autopilot launches more work
+P1: Work Item Cockpit progressive disclosure
+  └─ depends on P0 vocabulary; reorganizes first viewport and advanced metadata
 
-Slice Z/AA: Autopilot delegation policies
-  └─ depends on profile confidence; uses Planner enrichment from Cycle 1
+P2: Dedicated Runs / Executions surface
+  └─ depends on P1 cockpit and requires an architecture decision for execution IDs/routes
 
-Slice AB/AC: Recovery actions + supervisor controls
-  └─ depends on execution runs/attention from Cycle 1; benefits from profile readiness
+P3: Morning Review / overnight digest
+  └─ depends on trustworthy cockpit/execution evidence so digest is grounded in real lane state
 ```
 
 ---
@@ -226,10 +241,10 @@ A plan is not shipped until:
 
 Start with:
 
-`docs/plans/2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md`
+`docs/plans/2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md`
 
-Builder should execute Task 1 first: record a baseline quality-gate report for the completed Always-On slice. Purpose: make the large uncommitted Always-On implementation merge-ready before any new product feature roadmap.
+Builder should execute Task 1 first: add visible copy constants and baseline tests for terminology. Purpose: remove immediate UX confusion before deeper Work Item Cockpit and Runs/Executions surfaces.
 
-## 10. After Always-On Merge Readiness ships
+## 10. After P0 ships
 
-When the merge-readiness plan is complete, Builder should update the handoff with the final changed-file ESLint result, TypeScript result/classification, functional gauntlet results, service/smoke/browser evidence, and final report path. Main/CEO should then decide whether to commit/request independent review or start the next product feature roadmap.
+When P0 is complete, Builder should update the handoff with focused tests, full regression/build result, service/root smoke, browser/DOM evidence for `/jobs`, `/jobs?jobId=...`, Work Item detail, and Dashboard labels. Main/CEO should then review P0 and create the detailed P1 Work Item Cockpit progressive-disclosure plan. P2 and P3 remain queued architecture slices after P1.
