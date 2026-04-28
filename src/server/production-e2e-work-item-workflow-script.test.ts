@@ -10,6 +10,8 @@ const singleLaneScriptPath = join(process.cwd(), 'scripts/mission-control-single
 const singleLaneScriptUrl = pathToFileURL(singleLaneScriptPath).href
 const sequentialGauntletScriptPath = join(process.cwd(), 'scripts/mission-control-single-lane-sequential-gauntlet.mjs')
 const sequentialGauntletScriptUrl = pathToFileURL(sequentialGauntletScriptPath).href
+const alwaysOnPolicyGauntletScriptPath = join(process.cwd(), 'scripts/mission-control-always-on-policy-gauntlet.mjs')
+const alwaysOnPolicyGauntletScriptUrl = pathToFileURL(alwaysOnPolicyGauntletScriptPath).href
 
 type WorkItemE2eReport = {
   e2eRunId: string
@@ -72,6 +74,28 @@ type SingleLaneAutonomyE2eReport = {
   }
   mergeHealer: { ran: boolean; mergeState: string; mergeCommit?: string }
   finalWorkItem: { status: string; phase?: string; laneState?: string }
+}
+
+type AlwaysOnPolicyGauntletReport = {
+  gauntletRunId: string
+  projectPolicySnapshot: {
+    enabled: boolean
+    retry: { enabled: boolean; maxAttemptsPerPhase: number; cooldownMinutes: number }
+    notifications: { enabled: boolean; digestOnly: boolean; notifyOn: Array<string> }
+    prPublishing: { enabled: boolean; mode: string; requireCleanRepo: boolean; requirePassingMergeTests: boolean }
+    cleanup: { enabled: boolean; dryRun: boolean; retainMergedBranchDays: number; retainLaneStashes: boolean }
+  }
+  retryDisabledDecision: { decision: string; shouldRetry: boolean; evidence: Array<string> }
+  simulatedStaleJobDecision: { decision: string; shouldRetry: boolean; evidence: Array<string> }
+  simulatedRetryExhaustionDecision: { decision: string; shouldRetry: boolean; evidence: Array<string> }
+  unsafeRepoRefusal: { decision: string; shouldRetry: boolean; evidence: Array<string> }
+  prPreflightProof: { status: string; command?: Array<string>; evidence: Array<string> }
+  cleanupDryRunProof: { dryRun: boolean; actions: Array<{ destructive: boolean; command: Array<string> }>; blockers: Array<string> }
+  digestTextExcerpt: string
+  manualPhaseMutationCalls: Array<string>
+  destructiveCleanupExecuted: boolean
+  prPublishExecuted: boolean
+  finalVerdict: string
 }
 
 type SequentialGauntletReport = {
@@ -258,6 +282,127 @@ function validSequentialGauntletReport(overrides: Partial<SequentialGauntletRepo
     ...overrides,
   }
 }
+
+function validAlwaysOnPolicyGauntletReport(
+  overrides: Partial<AlwaysOnPolicyGauntletReport> = {},
+): AlwaysOnPolicyGauntletReport {
+  return {
+    gauntletRunId: 'always-on-policy-gauntlet-2026-04-28T00-00-00-000Z',
+    projectPolicySnapshot: {
+      enabled: false,
+      retry: { enabled: false, maxAttemptsPerPhase: 1, cooldownMinutes: 30 },
+      notifications: {
+        enabled: true,
+        digestOnly: true,
+        notifyOn: ['blocked', 'retry_exhausted', 'unsafe_repo', 'pr_ready', 'cleanup_recommended'],
+      },
+      prPublishing: { enabled: false, mode: 'manual', requireCleanRepo: true, requirePassingMergeTests: true },
+      cleanup: { enabled: false, dryRun: true, retainMergedBranchDays: 30, retainLaneStashes: true },
+    },
+    retryDisabledDecision: {
+      decision: 'recommend_retry',
+      shouldRetry: false,
+      evidence: ['policy=disabled', 'retry=disabled'],
+    },
+    simulatedStaleJobDecision: {
+      decision: 'schedule_retry',
+      shouldRetry: true,
+      evidence: ['finding=mission_stale', 'retryCount=0/1', 'repo=safe'],
+    },
+    simulatedRetryExhaustionDecision: {
+      decision: 'retry_exhausted',
+      shouldRetry: false,
+      evidence: ['retryCount=1/1', 'max attempts exhausted'],
+    },
+    unsafeRepoRefusal: {
+      decision: 'unsafe_repo',
+      shouldRetry: false,
+      evidence: ['repo=unsafe', 'dirty repo refused'],
+    },
+    prPreflightProof: {
+      status: 'manual_required',
+      command: [],
+      evidence: ['ahead 15', 'mode=manual', 'no publish executed'],
+    },
+    cleanupDryRunProof: {
+      dryRun: true,
+      actions: [{ destructive: false, command: ['git', 'branch', '-d', 'mission/example'] }],
+      blockers: [],
+    },
+    digestTextExcerpt: 'Lane Escalations\nretry_exhausted\nunsafe_repo\ncleanup_recommended',
+    manualPhaseMutationCalls: [],
+    destructiveCleanupExecuted: false,
+    prPublishExecuted: false,
+    finalVerdict: 'ACCEPTED FOR SUPERVISED ALWAYS-ON POLICY ONLY',
+    ...overrides,
+  }
+}
+
+describe('always-on policy gauntlet script contract', () => {
+  it('reports policy guardrail proofs without manual lifecycle movement, destructive cleanup, or PR publishing', () => {
+    const source = readFileSync(alwaysOnPolicyGauntletScriptPath, 'utf8')
+
+    expect(source).toContain('always-on-policy-gauntlet')
+    expect(source).toContain('projectPolicySnapshot')
+    expect(source).toContain('retryDisabledDecision')
+    expect(source).toContain('simulatedStaleJobDecision')
+    expect(source).toContain('simulatedRetryExhaustionDecision')
+    expect(source).toContain('unsafeRepoRefusal')
+    expect(source).toContain('prPreflightProof')
+    expect(source).toContain('cleanupDryRunProof')
+    expect(source).toContain('digestTextExcerpt')
+    expect(source).toContain('manualPhaseMutationCalls')
+    expect(source).toContain('destructiveCleanupExecuted')
+    expect(source).toContain('prPublishExecuted')
+    expect(source).toContain('HERMES_ALWAYS_ON_POLICY_ENABLE_DESTRUCTIVE_CLEANUP')
+    expect(source).toContain('HERMES_ALWAYS_ON_POLICY_ENABLE_PR_PUBLISH')
+
+    expect(source).not.toMatch(/\/lifecycle/)
+    expect(source).not.toMatch(/method:\s*['"]PATCH['"][\s\S]{0,240}(status|phase)/)
+    expect(source).not.toMatch(/git\([^\)]*['"]worktree['"]/)
+  })
+
+  it('validates safe always-on policy evidence and final supervised verdict', async () => {
+    const { validateAlwaysOnPolicyGauntletReport } = await import(`${alwaysOnPolicyGauntletScriptUrl}?contract-validator`)
+    const report = validAlwaysOnPolicyGauntletReport()
+
+    expect(validateAlwaysOnPolicyGauntletReport(report)).toBe(report)
+    expect(report.manualPhaseMutationCalls).toEqual([])
+    expect(report.destructiveCleanupExecuted).toBe(false)
+    expect(report.prPublishExecuted).toBe(false)
+    expect(report.finalVerdict).toBe('ACCEPTED FOR SUPERVISED ALWAYS-ON POLICY ONLY')
+  })
+
+  it('rejects unsafe or incomplete always-on policy gauntlet evidence', async () => {
+    const { validateAlwaysOnPolicyGauntletReport } = await import(`${alwaysOnPolicyGauntletScriptUrl}?contract-rejections`)
+    const report = validAlwaysOnPolicyGauntletReport()
+
+    expect(() => validateAlwaysOnPolicyGauntletReport({ ...report, manualPhaseMutationCalls: ['PATCH /api/work-items/wi'] })).toThrow(/manual phase/i)
+    expect(() => validateAlwaysOnPolicyGauntletReport({ ...report, destructiveCleanupExecuted: true })).toThrow(/destructive cleanup/i)
+    expect(() => validateAlwaysOnPolicyGauntletReport({ ...report, prPublishExecuted: true })).toThrow(/PR publish/i)
+    expect(() => validateAlwaysOnPolicyGauntletReport({ ...report, unsafeRepoRefusal: { ...report.unsafeRepoRefusal, shouldRetry: true } })).toThrow(/unsafe repo/i)
+    expect(() => validateAlwaysOnPolicyGauntletReport({ ...report, cleanupDryRunProof: { ...report.cleanupDryRunProof, dryRun: false } })).toThrow(/dry-run/i)
+    expect(() => validateAlwaysOnPolicyGauntletReport({ ...report, digestTextExcerpt: '' })).toThrow(/digest/i)
+  })
+
+  it('builds final always-on policy markdown with guardrails and verdict', async () => {
+    const { buildAlwaysOnPolicyGauntletMarkdown } = await import(`${alwaysOnPolicyGauntletScriptUrl}?contract-markdown`)
+    const report = validAlwaysOnPolicyGauntletReport()
+    const markdown = buildAlwaysOnPolicyGauntletMarkdown(report)
+
+    expect(markdown).toContain('# Always-On Policy Gauntlet Report')
+    expect(markdown).toContain('Verdict: ACCEPTED FOR SUPERVISED ALWAYS-ON POLICY ONLY')
+    expect(markdown).toContain('Retry disabled/default behavior: recommend_retry')
+    expect(markdown).toContain('Simulated stale job decision: schedule_retry')
+    expect(markdown).toContain('Retry exhaustion decision: retry_exhausted')
+    expect(markdown).toContain('Unsafe repo refusal: unsafe_repo')
+    expect(markdown).toContain('PR preflight: manual_required')
+    expect(markdown).toContain('Cleanup dry-run: true')
+    expect(markdown).toContain('Manual phase mutation calls: []')
+    expect(markdown).toContain('Destructive cleanup executed: no')
+    expect(markdown).toContain('PR publish executed: no')
+  })
+})
 
 describe('single-lane sequential gauntlet script contract', () => {
   it('uses three queued work items, orchestrator polling, and forbids manual lifecycle/PATCH phase movement', () => {

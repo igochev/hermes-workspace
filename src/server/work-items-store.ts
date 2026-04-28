@@ -90,6 +90,10 @@ export type WorkItemRecord = {
   laneEnteredAt?: string
   laneParkedAt?: string
   laneBlockedReason?: string
+  laneRetryCount?: number
+  laneLastRetryAt?: string
+  laneRetryExhaustedAt?: string
+  laneRecoveryDecision?: string
   baseBranch?: string
   branchName?: string
   branchCreatedAt?: string
@@ -156,6 +160,10 @@ type CreateWorkItemInput = {
   laneEnteredAt?: string
   laneParkedAt?: string
   laneBlockedReason?: string
+  laneRetryCount?: number
+  laneLastRetryAt?: string
+  laneRetryExhaustedAt?: string
+  laneRecoveryDecision?: string
   baseBranch?: string
   branchName?: string
   branchCreatedAt?: string
@@ -334,6 +342,11 @@ function normalizeMergeState(value: unknown): WorkItemMergeState | undefined {
     : undefined
 }
 
+function normalizeRetryCount(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
+  return Math.max(0, Math.floor(value))
+}
+
 function asHistoryArray(value: unknown): Array<WorkItemHistoryEntry> {
   return Array.isArray(value)
     ? value
@@ -450,6 +463,10 @@ function normalizeWorkItem(
     laneEnteredAt: asOptionalString((workItem as Partial<WorkItemRecord>).laneEnteredAt),
     laneParkedAt: asOptionalString((workItem as Partial<WorkItemRecord>).laneParkedAt),
     laneBlockedReason: asOptionalString((workItem as Partial<WorkItemRecord>).laneBlockedReason),
+    laneRetryCount: normalizeRetryCount((workItem as Partial<WorkItemRecord>).laneRetryCount),
+    laneLastRetryAt: asOptionalString((workItem as Partial<WorkItemRecord>).laneLastRetryAt),
+    laneRetryExhaustedAt: asOptionalString((workItem as Partial<WorkItemRecord>).laneRetryExhaustedAt),
+    laneRecoveryDecision: asOptionalString((workItem as Partial<WorkItemRecord>).laneRecoveryDecision),
     baseBranch: asOptionalString((workItem as Partial<WorkItemRecord>).baseBranch),
     branchName: asOptionalString(workItem.branchName),
     branchCreatedAt: asOptionalString((workItem as Partial<WorkItemRecord>).branchCreatedAt),
@@ -537,6 +554,10 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     laneEnteredAt: input.laneEnteredAt,
     laneParkedAt: input.laneParkedAt,
     laneBlockedReason: input.laneBlockedReason,
+    laneRetryCount: input.laneRetryCount,
+    laneLastRetryAt: input.laneLastRetryAt,
+    laneRetryExhaustedAt: input.laneRetryExhaustedAt,
+    laneRecoveryDecision: input.laneRecoveryDecision,
     baseBranch: input.baseBranch,
     branchName: input.branchName,
     branchCreatedAt: input.branchCreatedAt,

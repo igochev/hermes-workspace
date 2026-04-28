@@ -5,9 +5,11 @@ import {
   PROJECT_BOARD_FLOW_ORDER,
   buildLabelAnalytics,
   buildProjectBoardUrgencySummary,
+  buildProjectAlwaysOnPolicySummary,
   buildProjectLaneCockpit,
   buildProjectStatsLine,
   buildProjectWipHint,
+  buildWorkItemAlwaysOnEvidenceSummary,
   buildWorkItemOperatorSignals,
   buildWorkItemRecoveryHint,
   filterWorkItemsForProjectBoard,
@@ -23,17 +25,11 @@ import {
 
 describe('projects-view-model', () => {
   it('formats compact project stats for project cards', () => {
-    const project: ProjectSummary = {
-      id: 'project-1',
-      name: 'Mission Control',
-      slug: 'mission-control',
-      repoPath: '/repos/mission-control',
-      createdAt: '2026-04-21T00:00:00.000Z',
-      updatedAt: '2026-04-21T00:00:00.000Z',
+    const project: ProjectSummary = makeProject({
       workItemCount: 5,
       activeWorkItemCount: 2,
       doneWorkItemCount: 1,
-    }
+    })
 
     expect(buildProjectStatsLine(project)).toBe('5 work items · 2 active · 1 done')
   })
@@ -616,6 +612,91 @@ describe('projects-view-model', () => {
     expect(frontend.avgCycleTimeDays).toBeGreaterThan(0)
   })
 
+  it('summarizes project always-on policy controls for operator review', () => {
+    const summary = buildProjectAlwaysOnPolicySummary(
+      makeProject({
+        autonomyLanePolicy: {
+          enabled: true,
+          mode: 'single_lane',
+          isolation: 'branch',
+          maxActiveWorkItems: 1,
+          baseBranch: 'test-hermes-workspace',
+          branchPrefix: 'mission',
+          plannerTiming: 'on_lane_entry',
+          blockedBehavior: 'park_and_continue_when_repo_clean',
+          mergeHealerEnabled: true,
+          allowParallelWorktrees: false,
+          alwaysOn: {
+            enabled: true,
+            retry: {
+              enabled: true,
+              maxAttemptsPerPhase: 2,
+              cooldownMinutes: 15,
+              staleScheduledMinutes: 20,
+              staleRunningMinutes: 180,
+            },
+            notifications: {
+              enabled: true,
+              digestOnly: true,
+              notifyOn: ['blocked', 'retry_scheduled', 'retry_exhausted', 'unsafe_repo', 'pr_ready', 'cleanup_recommended'],
+              minRepeatMinutes: 45,
+            },
+            prPublishing: {
+              enabled: true,
+              mode: 'draft',
+              baseBranch: 'test-hermes-workspace',
+              titlePrefix: '[Hermes Workspace]',
+              requireCleanRepo: true,
+              requirePassingMergeTests: true,
+            },
+            cleanup: {
+              enabled: true,
+              deleteMergedBranches: true,
+              retainMergedBranchDays: 14,
+              retainLaneStashes: true,
+              retainLaneStashDays: 21,
+              dryRun: true,
+            },
+          },
+        },
+      }),
+    )
+
+    expect(summary.modeLabel).toBe('Always-on enabled')
+    expect(summary.retrySummary).toBe('Retries enabled: max 2 per phase · cooldown 15m · stale scheduled 20m · stale running 180m')
+    expect(summary.notificationSummary).toBe(
+      'Digest notifications: blocked, retry scheduled, retry exhausted, unsafe repo, PR ready, cleanup recommended · repeat after 45m',
+    )
+    expect(summary.prPublishingSummary).toBe('PR publishing: draft mode · base test-hermes-workspace · clean repo required · passing merge tests required')
+    expect(summary.cleanupSummary).toBe('Cleanup: dry-run · delete merged branches after 14d · retain lane stashes 21d')
+    expect(summary.safetySummary).toBe('Destructive cleanup and PR publishing remain policy-gated with repo hygiene checks.')
+  })
+
+  it('summarizes work-item always-on recovery evidence for detail affordances', () => {
+    const summary = buildWorkItemAlwaysOnEvidenceSummary(
+      makeWorkItem({
+        status: 'blocked',
+        laneState: 'blocked',
+        laneBlockedReason: 'Builder heartbeat stale',
+        laneRecoveryDecision: 'retry_exhausted',
+        laneRetryCount: 2,
+        laneLastRetryAt: '2026-04-28T01:00:00.000Z',
+        laneRetryExhaustedAt: '2026-04-28T02:00:00.000Z',
+        branchName: 'mission/retry-exhausted',
+        prUrl: 'https://github.com/example/repo/pull/5',
+        mergeState: 'merged',
+        mergeTestCommand: 'npm test',
+        mergeTestPassed: true,
+      }),
+    )
+
+    expect(summary.decisionLabel).toBe('Always-on decision: retry exhausted')
+    expect(summary.retryEvidence).toBe('Retry evidence: 2 attempts · last retry 2026-04-28T01:00:00.000Z · exhausted 2026-04-28T02:00:00.000Z')
+    expect(summary.repoSafety).toBe('Unsafe repo/blocker evidence: Builder heartbeat stale')
+    expect(summary.prEvidence).toBe('PR evidence: https://github.com/example/repo/pull/5')
+    expect(summary.cleanupEvidence).toBe('Cleanup evidence: merged branch mission/retry-exhausted eligible for retention review after passing npm test')
+  })
+
   it('builds a single-lane cockpit summary for active branch autonomy', () => {
     const cockpit = buildProjectLaneCockpit(
       makeProject(),
@@ -797,6 +878,37 @@ function makeProject(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
       blockedBehavior: 'park_and_continue_when_repo_clean',
       mergeHealerEnabled: true,
       allowParallelWorktrees: false,
+      alwaysOn: {
+        enabled: false,
+        retry: {
+          enabled: false,
+          maxAttemptsPerPhase: 1,
+          cooldownMinutes: 30,
+          staleScheduledMinutes: 30,
+          staleRunningMinutes: 240,
+        },
+        notifications: {
+          enabled: true,
+          digestOnly: true,
+          notifyOn: ['blocked', 'retry_exhausted', 'unsafe_repo', 'pr_ready', 'cleanup_recommended'],
+          minRepeatMinutes: 60,
+        },
+        prPublishing: {
+          enabled: false,
+          mode: 'manual',
+          titlePrefix: '[Hermes Workspace]',
+          requireCleanRepo: true,
+          requirePassingMergeTests: true,
+        },
+        cleanup: {
+          enabled: false,
+          deleteMergedBranches: false,
+          retainMergedBranchDays: 30,
+          retainLaneStashes: true,
+          retainLaneStashDays: 30,
+          dryRun: true,
+        },
+      },
     },
     workItemCount: overrides.workItemCount ?? 0,
     activeWorkItemCount: overrides.activeWorkItemCount ?? 0,
@@ -840,6 +952,10 @@ function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
     laneEnteredAt: overrides.laneEnteredAt,
     laneParkedAt: overrides.laneParkedAt,
     laneBlockedReason: overrides.laneBlockedReason,
+    laneRetryCount: overrides.laneRetryCount,
+    laneLastRetryAt: overrides.laneLastRetryAt,
+    laneRetryExhaustedAt: overrides.laneRetryExhaustedAt,
+    laneRecoveryDecision: overrides.laneRecoveryDecision,
     baseBranch: overrides.baseBranch,
     branchName: overrides.branchName,
     branchCreatedAt: overrides.branchCreatedAt,
@@ -854,9 +970,13 @@ function makeWorkItem(overrides: Partial<WorkItemRecord>): WorkItemRecord {
     prUrl: overrides.prUrl,
     artifactPaths: overrides.artifactPaths ?? [],
     acceptanceCriteria: overrides.acceptanceCriteria ?? [],
+    criteriaStatus: overrides.criteriaStatus ?? [],
     notes: overrides.notes ?? [],
     approvals: overrides.approvals ?? [],
     labels: overrides.labels ?? [],
+    sourceSuggestionEvidence: overrides.sourceSuggestionEvidence ?? [],
+    reviewQualityGateReasons: overrides.reviewQualityGateReasons ?? [],
+    reviewMissingEvidence: overrides.reviewMissingEvidence ?? [],
     latestPlanningDraft: overrides.latestPlanningDraft,
     runTimeline: overrides.runTimeline,
     history: overrides.history ?? [],

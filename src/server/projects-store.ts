@@ -3,7 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-import { normalizePhaseProfiles, type ConductorPhaseProfiles } from '../lib/conductor-phase-profiles'
+import {  normalizePhaseProfiles } from '../lib/conductor-phase-profiles'
+import type {ConductorPhaseProfiles} from '../lib/conductor-phase-profiles';
 
 export type ReviewAutoApprovalPolicy = {
   enabled: boolean
@@ -36,6 +37,48 @@ export type ProjectRuntimeProfiles = {
   supervisorProfile?: string
 }
 
+export type ProjectAutonomyAlwaysOnNotificationEvent =
+  | 'blocked'
+  | 'retry_scheduled'
+  | 'retry_exhausted'
+  | 'unsafe_repo'
+  | 'pr_ready'
+  | 'pr_published'
+  | 'cleanup_recommended'
+
+export type ProjectAutonomyAlwaysOnPolicy = {
+  enabled: boolean
+  retry: {
+    enabled: boolean
+    maxAttemptsPerPhase: number
+    cooldownMinutes: number
+    staleScheduledMinutes: number
+    staleRunningMinutes: number
+  }
+  notifications: {
+    enabled: boolean
+    digestOnly: boolean
+    notifyOn: Array<ProjectAutonomyAlwaysOnNotificationEvent>
+    minRepeatMinutes: number
+  }
+  prPublishing: {
+    enabled: boolean
+    mode: 'manual' | 'draft'
+    baseBranch?: string
+    titlePrefix: string
+    requireCleanRepo: boolean
+    requirePassingMergeTests: boolean
+  }
+  cleanup: {
+    enabled: boolean
+    deleteMergedBranches: boolean
+    retainMergedBranchDays: number
+    retainLaneStashes: boolean
+    retainLaneStashDays: number
+    dryRun: boolean
+  }
+}
+
 export type ProjectAutonomyLanePolicy = {
   enabled: boolean
   mode: 'single_lane'
@@ -47,6 +90,7 @@ export type ProjectAutonomyLanePolicy = {
   blockedBehavior: 'park_and_continue_when_repo_clean'
   mergeHealerEnabled: boolean
   allowParallelWorktrees: false
+  alwaysOn: ProjectAutonomyAlwaysOnPolicy
 }
 
 export type ProjectRecord = {
@@ -218,6 +262,91 @@ function normalizeRuntimeProfiles(value: unknown): ProjectRuntimeProfiles {
   }
 }
 
+const VALID_ALWAYS_ON_NOTIFY_EVENTS = new Set<ProjectAutonomyAlwaysOnNotificationEvent>([
+  'blocked',
+  'retry_scheduled',
+  'retry_exhausted',
+  'unsafe_repo',
+  'pr_ready',
+  'pr_published',
+  'cleanup_recommended',
+])
+
+const DEFAULT_ALWAYS_ON_NOTIFY_EVENTS: Array<ProjectAutonomyAlwaysOnNotificationEvent> = [
+  'blocked',
+  'retry_exhausted',
+  'unsafe_repo',
+  'pr_ready',
+  'cleanup_recommended',
+]
+
+function positiveIntegerOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : fallback
+}
+
+export function normalizeAutonomyAlwaysOnPolicy(value: unknown): ProjectAutonomyAlwaysOnPolicy {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  const retry = candidate.retry && typeof candidate.retry === 'object'
+    ? (candidate.retry as Record<string, unknown>)
+    : {}
+  const notifications = candidate.notifications && typeof candidate.notifications === 'object'
+    ? (candidate.notifications as Record<string, unknown>)
+    : {}
+  const prPublishing = candidate.prPublishing && typeof candidate.prPublishing === 'object'
+    ? (candidate.prPublishing as Record<string, unknown>)
+    : {}
+  const cleanup = candidate.cleanup && typeof candidate.cleanup === 'object'
+    ? (candidate.cleanup as Record<string, unknown>)
+    : {}
+
+  const notifyOn = Array.isArray(notifications.notifyOn)
+    ? Array.from(
+        new Set(
+          notifications.notifyOn.filter(
+            (event): event is ProjectAutonomyAlwaysOnNotificationEvent =>
+              typeof event === 'string' &&
+              VALID_ALWAYS_ON_NOTIFY_EVENTS.has(event as ProjectAutonomyAlwaysOnNotificationEvent),
+          ),
+        ),
+      )
+    : []
+
+  return {
+    enabled: candidate.enabled === true,
+    retry: {
+      enabled: retry.enabled === true,
+      maxAttemptsPerPhase: positiveIntegerOrDefault(retry.maxAttemptsPerPhase, 1),
+      cooldownMinutes: positiveIntegerOrDefault(retry.cooldownMinutes, 30),
+      staleScheduledMinutes: positiveIntegerOrDefault(retry.staleScheduledMinutes, 30),
+      staleRunningMinutes: positiveIntegerOrDefault(retry.staleRunningMinutes, 240),
+    },
+    notifications: {
+      enabled: notifications.enabled === false ? false : true,
+      digestOnly: notifications.digestOnly === false ? false : true,
+      notifyOn: notifyOn.length > 0 ? notifyOn : [...DEFAULT_ALWAYS_ON_NOTIFY_EVENTS],
+      minRepeatMinutes: positiveIntegerOrDefault(notifications.minRepeatMinutes, 60),
+    },
+    prPublishing: {
+      enabled: prPublishing.enabled === true,
+      mode: prPublishing.mode === 'draft' ? 'draft' : 'manual',
+      baseBranch: asOptionalString(prPublishing.baseBranch),
+      titlePrefix: asOptionalString(prPublishing.titlePrefix) ?? '[Hermes Workspace]',
+      requireCleanRepo: prPublishing.requireCleanRepo === false ? false : true,
+      requirePassingMergeTests: prPublishing.requirePassingMergeTests === false ? false : true,
+    },
+    cleanup: {
+      enabled: cleanup.enabled === true,
+      deleteMergedBranches: cleanup.deleteMergedBranches === true,
+      retainMergedBranchDays: positiveIntegerOrDefault(cleanup.retainMergedBranchDays, 30),
+      retainLaneStashes: cleanup.retainLaneStashes === false ? false : true,
+      retainLaneStashDays: positiveIntegerOrDefault(cleanup.retainLaneStashDays, 30),
+      dryRun: cleanup.dryRun === false ? false : true,
+    },
+  }
+}
+
 function normalizeAutonomyLanePolicy(
   value: unknown,
   projectDefaultBranch?: string,
@@ -234,6 +363,7 @@ function normalizeAutonomyLanePolicy(
     blockedBehavior: 'park_and_continue_when_repo_clean',
     mergeHealerEnabled: candidate.mergeHealerEnabled === false ? false : true,
     allowParallelWorktrees: false,
+    alwaysOn: normalizeAutonomyAlwaysOnPolicy(candidate.alwaysOn),
   }
 }
 
@@ -312,7 +442,7 @@ export function createProject(input: CreateProjectInput): ProjectRecord {
   const project = normalizeProject({
     id: typeof input.id === 'string' && input.id.trim() ? input.id : randomUUID(),
     name: input.name,
-    slug: uniqueSlug(baseSlug, file.projects.map((project) => normalizeProject(project))),
+    slug: uniqueSlug(baseSlug, file.projects.map((storedProject) => normalizeProject(storedProject))),
     repoPath: input.repoPath,
     repoUrl: input.repoUrl,
     defaultBranch: input.defaultBranch,
@@ -328,6 +458,44 @@ export function createProject(input: CreateProjectInput): ProjectRecord {
   file.projects.push(project)
   writeProjectsFile({ projects: file.projects.map((item) => normalizeProject(item)) })
   return project
+}
+
+function mergeAlwaysOnPolicyPatch(current: ProjectAutonomyAlwaysOnPolicy, updates: unknown): ProjectAutonomyAlwaysOnPolicy {
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) return current
+  const patch = updates as Record<string, unknown>
+  return normalizeAutonomyAlwaysOnPolicy({
+    ...current,
+    ...patch,
+    retry:
+      patch.retry && typeof patch.retry === 'object' && !Array.isArray(patch.retry)
+        ? { ...current.retry, ...patch.retry }
+        : current.retry,
+    notifications:
+      patch.notifications && typeof patch.notifications === 'object' && !Array.isArray(patch.notifications)
+        ? { ...current.notifications, ...patch.notifications }
+        : current.notifications,
+    prPublishing:
+      patch.prPublishing && typeof patch.prPublishing === 'object' && !Array.isArray(patch.prPublishing)
+        ? { ...current.prPublishing, ...patch.prPublishing }
+        : current.prPublishing,
+    cleanup:
+      patch.cleanup && typeof patch.cleanup === 'object' && !Array.isArray(patch.cleanup)
+        ? { ...current.cleanup, ...patch.cleanup }
+        : current.cleanup,
+  })
+}
+
+function mergeAutonomyLanePolicyPatch(
+  current: ProjectAutonomyLanePolicy,
+  updates: unknown,
+): ProjectAutonomyLanePolicy {
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) return current
+  const patch = updates as Record<string, unknown>
+  return {
+    ...current,
+    ...patch,
+    alwaysOn: mergeAlwaysOnPolicyPatch(current.alwaysOn, patch.alwaysOn),
+  } as ProjectAutonomyLanePolicy
 }
 
 export function updateProject(projectId: string, updates: UpdateProjectInput): ProjectRecord | null {
@@ -371,12 +539,7 @@ export function updateProject(projectId: string, updates: UpdateProjectInput): P
         : current.autopilotPolicy,
     autonomyLanePolicy:
       updates.autonomyLanePolicy !== undefined
-        ? {
-            ...current.autonomyLanePolicy,
-            ...(updates.autonomyLanePolicy && typeof updates.autonomyLanePolicy === 'object'
-              ? updates.autonomyLanePolicy
-              : {}),
-          }
+        ? mergeAutonomyLanePolicyPatch(current.autonomyLanePolicy, updates.autonomyLanePolicy)
         : current.autonomyLanePolicy,
     createdAt: current.createdAt,
     updatedAt: new Date().toISOString(),

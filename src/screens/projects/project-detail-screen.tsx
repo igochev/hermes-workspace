@@ -1,6 +1,6 @@
 'use client'
 
-import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from 'react'
+import {   useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -11,30 +11,45 @@ import {
   FolderDetailsIcon,
   RefreshIcon,
 } from '@hugeicons/core-free-icons'
+import type {CSSProperties, FormEvent} from 'react';
+import type {
+  ProfileReadinessRole,
+  ProfileReadinessRoleReport,
+  ProfileReadinessStatus,
+} from '@/server/profile-readiness'
+import type {CreateWorkItemInput, PhaseProfiles, ProjectAutonomyAlwaysOnPolicy, ProjectAutopilotPolicy, ProjectRuntimeProfiles, ReviewAutoApprovalPolicy, UpdateProjectInput, WorkItemRiskLevel} from '@/lib/projects-api';
+import type {LabelAnalyticsEntry, ProjectBoardFilter, ProjectBoardUrgencySummary, WorkItemUrgencyTone} from '@/lib/projects-view-model';
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import {
-  createWorkItem,
-  deleteProject,
-  fetchProject,
-  updateProject,
-  type CreateWorkItemInput,
-  type PhaseProfiles,
-  type ProjectAutopilotPolicy,
-  type ProjectRuntimeProfiles,
-  type ReviewAutoApprovalPolicy,
-  type WorkItemRiskLevel,
+
+
+
+
+
+
+
   WORK_ITEM_BLOCKED_REASON_LABELS,
   WORK_ITEM_PHASE_LABELS,
   WORK_ITEM_PRIORITY_LABELS,
   WORK_ITEM_RISK_LEVEL_LABELS,
   WORK_ITEM_STATUS_LABELS,
+
+  createWorkItem,
+  deleteProject,
+  fetchProject,
+  updateProject
 } from '@/lib/projects-api'
 import {
-  PROJECT_STATUS_ORDER,
-  PROJECT_BOARD_FLOW_ORDER,
+
   PROJECT_ACTIVE_WIP_WARNING_THRESHOLD,
+  PROJECT_BOARD_FLOW_ORDER,
+  PROJECT_STATUS_ORDER,
+
+
+
   buildLabelAnalytics,
+  buildProjectAlwaysOnPolicySummary,
   buildProjectBoardUrgencySummary,
   buildProjectLaneCockpit,
   buildProjectWipHint,
@@ -44,18 +59,9 @@ import {
   getUniqueLabels,
   getWorkItemUrgencyTone,
   isProjectWipHigh,
-  sortWorkItemsForProjectBoard,
-  type LabelAnalyticsEntry,
-  type ProjectBoardFilter,
-  type ProjectBoardUrgencySummary,
-  type WorkItemUrgencyTone,
+  sortWorkItemsForProjectBoard
 } from '@/lib/projects-view-model'
 import { fetchProjectProfileReadiness } from '@/lib/profile-readiness-api'
-import type {
-  ProfileReadinessRole,
-  ProfileReadinessRoleReport,
-  ProfileReadinessStatus,
-} from '@/server/profile-readiness'
 import { cn } from '@/lib/utils'
 
 const EMPTY_WORK_ITEM_FORM: Omit<CreateWorkItemInput, 'projectId'> = {
@@ -94,6 +100,38 @@ const DEFAULT_AUTOPILOT_POLICY: ProjectAutopilotPolicy = {
   scoutProfile: '',
   suggestionLimit: 5,
   scoutSources: ['repo-health-scout', 'stale-docs-scout', 'architecture-debt-scout'],
+}
+
+const DEFAULT_ALWAYS_ON_POLICY: ProjectAutonomyAlwaysOnPolicy = {
+  enabled: false,
+  retry: {
+    enabled: false,
+    maxAttemptsPerPhase: 1,
+    cooldownMinutes: 30,
+    staleScheduledMinutes: 30,
+    staleRunningMinutes: 240,
+  },
+  notifications: {
+    enabled: true,
+    digestOnly: true,
+    notifyOn: ['blocked', 'retry_exhausted', 'unsafe_repo', 'pr_ready', 'cleanup_recommended'],
+    minRepeatMinutes: 60,
+  },
+  prPublishing: {
+    enabled: false,
+    mode: 'manual',
+    titlePrefix: '[Hermes Workspace]',
+    requireCleanRepo: true,
+    requirePassingMergeTests: true,
+  },
+  cleanup: {
+    enabled: false,
+    deleteMergedBranches: false,
+    retainMergedBranchDays: 30,
+    retainLaneStashes: true,
+    retainLaneStashDays: 30,
+    dryRun: true,
+  },
 }
 
 type AvailableProfile = {
@@ -187,6 +225,16 @@ export const PROJECT_LANE_EVIDENCE_LABELS = {
   mergeTest: 'Merge test result',
   repoHygiene: 'Repo hygiene',
 } as const
+export const PROJECT_ALWAYS_ON_POLICY_PANEL_TITLE = 'ALWAYS-ON POLICY'
+export const PROJECT_ALWAYS_ON_POLICY_SAFE_TOGGLE_LABEL = 'Enable supervised always-on digest'
+export const PROJECT_ALWAYS_ON_POLICY_LABELS = {
+  mode: 'Mode',
+  retry: 'Retry guardrails',
+  notifications: 'Notification digest events',
+  prPublishing: 'PR publishing gate',
+  cleanup: 'Cleanup retention',
+  safety: 'Safety gates',
+} as const
 
 const REVIEW_AUTO_APPROVAL_PRIORITY_LABELS: Record<ReviewAutoApprovalPolicy['maxPriority'], string> = {
   low: 'Low only',
@@ -198,7 +246,7 @@ export function buildProjectWorkflowPolicyPhaseSummaries(
   phaseProfiles: PhaseProfiles,
 ): Array<string> {
   return (Object.keys(WORK_ITEM_PHASE_LABELS) as Array<keyof PhaseProfiles>).map((phase) => {
-    const mappedProfile = phaseProfiles[phase]?.trim() || PROJECT_ROUTING_POLICY_EMPTY_VALUE
+    const mappedProfile = phaseProfiles[phase].trim() || PROJECT_ROUTING_POLICY_EMPTY_VALUE
     return `${WORK_ITEM_PHASE_LABELS[phase]} → ${mappedProfile}`
   })
 }
@@ -214,7 +262,7 @@ export function buildProjectReviewAutoApprovalSummary(
 }
 
 export function buildProjectDeployGovernanceSummary(phaseProfiles: Pick<PhaseProfiles, 'deploy'>): string {
-  const deployProfile = phaseProfiles.deploy?.trim()
+  const deployProfile = phaseProfiles.deploy.trim()
   if (!deployProfile) {
     return 'Deploy governance uses Auto fallback routing and requires explicit deploy approval before done.'
   }
@@ -273,7 +321,7 @@ export function buildAssignedProfileOptions(
   phaseProfiles: PhaseProfiles,
   phase: keyof PhaseProfiles,
 ): Array<[string, string]> {
-  const suggestedProfile = phaseProfiles[phase]?.trim() || ''
+  const suggestedProfile = phaseProfiles[phase].trim() || ''
   const autoLabel = suggestedProfile
     ? `Auto (${WORK_ITEM_PHASE_LABELS[phase]} → ${suggestedProfile})`
     : `Auto (${WORK_ITEM_PHASE_LABELS[phase]} routing)`
@@ -333,7 +381,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
       return Array.from(
         new Set(
           (data.profiles ?? [])
-            .map((profile) => profile.name?.trim())
+            .map((profile) => profile.name.trim())
             .filter((profileName): profileName is string =>
               typeof profileName === 'string' &&
               profileName.length > 0 &&
@@ -351,10 +399,10 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     if (!project) return
-    setProjectRouting(project.phaseProfiles ?? EMPTY_PHASE_PROFILES)
-    setRuntimeProfiles(project.runtimeProfiles ?? EMPTY_RUNTIME_PROFILES)
-    setAutopilotPolicy(project.autopilotPolicy ?? DEFAULT_AUTOPILOT_POLICY)
-    setReviewAutoApproval(project.reviewAutoApproval ?? DEFAULT_REVIEW_AUTO_APPROVAL)
+    setProjectRouting(project.phaseProfiles)
+    setRuntimeProfiles(project.runtimeProfiles)
+    setAutopilotPolicy(project.autopilotPolicy)
+    setReviewAutoApproval(project.reviewAutoApproval)
   }, [project])
 
   const boardUrgencySummary = useMemo(
@@ -396,9 +444,26 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
         blockedBehavior: 'park_and_continue_when_repo_clean',
         mergeHealerEnabled: true,
         allowParallelWorktrees: false,
+        alwaysOn: DEFAULT_ALWAYS_ON_POLICY,
       },
     }, workItems),
     [project, workItems],
+  )
+  const alwaysOnPolicySummary = useMemo(
+    () => buildProjectAlwaysOnPolicySummary(project ?? {
+      autonomyLanePolicy: {
+        enabled: false,
+        mode: 'single_lane',
+        isolation: 'branch',
+        maxActiveWorkItems: 1,
+        plannerTiming: 'on_lane_entry',
+        blockedBehavior: 'park_and_continue_when_repo_clean',
+        mergeHealerEnabled: true,
+        allowParallelWorktrees: false,
+        alwaysOn: DEFAULT_ALWAYS_ON_POLICY,
+      },
+    }),
+    [project],
   )
   const [labelFilter, setLabelFilter] = useState<string | null>(null)
   const projectWipLaunchHint = useMemo(
@@ -436,7 +501,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
   })
 
   const updateProjectMutation = useMutation({
-    mutationFn: (payload: ProjectProfileWorkflowPolicySavePayload) => updateProject(projectId, payload),
+    mutationFn: (payload: UpdateProjectInput) => updateProject(projectId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey })
       await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects'] })
@@ -469,7 +534,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
     },
   })
 
-  function updateField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+  function updateField<TFormKey extends keyof typeof form>(key: TFormKey, value: (typeof form)[TFormKey]) {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
@@ -493,10 +558,10 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
       priority: form.priority,
       riskLevel: form.riskLevel,
       assignedProfile: form.assignedProfile?.trim() || undefined,
-      labels: form.labels,
+      labels: form.labels ?? [],
       repoPathSnapshot: form.repoPathSnapshot?.trim() || project.repoPath,
-      acceptanceCriteria: form.acceptanceCriteria,
-      notes: form.notes,
+      acceptanceCriteria: form.acceptanceCriteria ?? [],
+      notes: form.notes ?? [],
     })
   }
 
@@ -737,6 +802,66 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
             ) : null}
           </section>
 
+          <section className="mt-5 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                  {PROJECT_ALWAYS_ON_POLICY_PANEL_TITLE}
+                </p>
+                <h2 className="text-lg font-semibold text-ink">{alwaysOnPolicySummary.modeLabel}</h2>
+                <p className="text-xs text-[var(--theme-muted)]">{alwaysOnPolicySummary.safetySummary}</p>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-emerald-500/35 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={updateProjectMutation.isPending}
+                onClick={() => {
+                  updateProjectMutation.mutate({
+                    autonomyLanePolicy: {
+                      alwaysOn: {
+                        ...project.autonomyLanePolicy.alwaysOn,
+                        enabled: true,
+                        notifications: {
+                          ...project.autonomyLanePolicy.alwaysOn.notifications,
+                          enabled: true,
+                          digestOnly: true,
+                        },
+                        retry: {
+                          ...project.autonomyLanePolicy.alwaysOn.retry,
+                          enabled: false,
+                        },
+                        prPublishing: {
+                          ...project.autonomyLanePolicy.alwaysOn.prPublishing,
+                          enabled: false,
+                        },
+                        cleanup: {
+                          ...project.autonomyLanePolicy.alwaysOn.cleanup,
+                          dryRun: true,
+                        },
+                      },
+                    },
+                  })
+                }}
+              >
+                {PROJECT_ALWAYS_ON_POLICY_SAFE_TOGGLE_LABEL}
+              </button>
+            </div>
+            <dl className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              <EvidenceDetail label={PROJECT_ALWAYS_ON_POLICY_LABELS.mode} value={alwaysOnPolicySummary.modeLabel} />
+              <EvidenceDetail label={PROJECT_ALWAYS_ON_POLICY_LABELS.retry} value={alwaysOnPolicySummary.retrySummary} />
+              <EvidenceDetail
+                label={PROJECT_ALWAYS_ON_POLICY_LABELS.notifications}
+                value={alwaysOnPolicySummary.notificationSummary}
+              />
+              <EvidenceDetail
+                label={PROJECT_ALWAYS_ON_POLICY_LABELS.prPublishing}
+                value={alwaysOnPolicySummary.prPublishingSummary}
+              />
+              <EvidenceDetail label={PROJECT_ALWAYS_ON_POLICY_LABELS.cleanup} value={alwaysOnPolicySummary.cleanupSummary} />
+              <EvidenceDetail label={PROJECT_ALWAYS_ON_POLICY_LABELS.safety} value={alwaysOnPolicySummary.safetySummary} />
+            </dl>
+          </section>
+
           {showProjectRouting ? (
             <ProjectProfileWorkflowPolicyEditor
               phaseProfiles={projectRouting}
@@ -746,10 +871,10 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
               availableProfiles={availableProfiles}
               isSaving={updateProjectMutation.isPending}
               onCancel={() => {
-                setProjectRouting(project.phaseProfiles ?? EMPTY_PHASE_PROFILES)
-                setRuntimeProfiles(project.runtimeProfiles ?? EMPTY_RUNTIME_PROFILES)
-                setAutopilotPolicy(project.autopilotPolicy ?? DEFAULT_AUTOPILOT_POLICY)
-                setReviewAutoApproval(project.reviewAutoApproval ?? DEFAULT_REVIEW_AUTO_APPROVAL)
+                setProjectRouting(project.phaseProfiles)
+                setRuntimeProfiles(project.runtimeProfiles)
+                setAutopilotPolicy(project.autopilotPolicy)
+                setReviewAutoApproval(project.reviewAutoApproval)
                 setShowProjectRouting(false)
               }}
               onSave={(payload) => {
@@ -861,7 +986,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                   Acceptance Criteria
                 </label>
                 <textarea
-                  value={form.acceptanceCriteria.join('\n')}
+                  value={(form.acceptanceCriteria ?? []).join('\n')}
                   onChange={(event) =>
                     updateField(
                       'acceptanceCriteria',
@@ -883,7 +1008,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                   Labels
                 </label>
                 <textarea
-                  value={form.labels.join('\n')}
+                  value={(form.labels ?? []).join('\n')}
                   onChange={(event) =>
                     updateField(
                       'labels',
@@ -905,7 +1030,7 @@ export function ProjectDetailScreen({ projectId }: { projectId: string }) {
                   Notes
                 </label>
                 <textarea
-                  value={form.notes.join('\n')}
+                  value={(form.notes ?? []).join('\n')}
                   onChange={(event) =>
                     updateField(
                       'notes',

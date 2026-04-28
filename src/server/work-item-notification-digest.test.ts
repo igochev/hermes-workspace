@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createProject } from './projects-store'
-import { createWorkItem } from './work-items-store'
+import { createWorkItem, updateWorkItem } from './work-items-store'
 import { requestWorkItemApproval } from './work-item-approvals'
 import {
   buildStatusDigest,
@@ -158,5 +158,143 @@ describe('work-item-notification-digest', () => {
     expect(formatDigestAge(65)).toBe('~1h 5m')
     expect(formatDigestAge(120)).toBe('~2h')
     expect(formatDigestAge(0)).toBe('~0m')
+  })
+
+  it('includes actionable lane escalation digest entries for blocked retry and unsafe states', () => {
+    const project = createProject({
+      name: 'Always-On Lane Project',
+      repoPath: '/repos/always-on',
+      autonomyLanePolicy: {
+        enabled: true,
+        alwaysOn: {
+          enabled: true,
+          notifications: {
+            enabled: true,
+            notifyOn: ['blocked', 'retry_scheduled', 'retry_exhausted', 'unsafe_repo'],
+          },
+        },
+      },
+    })
+
+    const blocked = createWorkItem({
+      projectId: project.id,
+      title: 'Blocked lane item',
+      status: 'blocked',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      laneState: 'blocked',
+      laneBlockedReason: 'Builder evidence missing test changes.',
+      laneRecoveryDecision: 'recommend_retry',
+      laneRetryCount: 1,
+    })
+    const retryScheduled = createWorkItem({
+      projectId: project.id,
+      title: 'Retry scheduled lane item',
+      status: 'active',
+      phase: 'build',
+      priority: 'medium',
+      repoPathSnapshot: project.repoPath,
+      laneState: 'building',
+      laneRecoveryDecision: 'schedule_retry',
+      laneLastRetryAt: '2026-04-28T12:00:00.000Z',
+      laneRetryCount: 1,
+    })
+    const exhausted = createWorkItem({
+      projectId: project.id,
+      title: 'Retry exhausted lane item',
+      status: 'blocked',
+      phase: 'review',
+      priority: 'medium',
+      repoPathSnapshot: project.repoPath,
+      laneState: 'blocked',
+      laneBlockedReason: 'Review job failed twice.',
+      laneRecoveryDecision: 'retry_exhausted',
+      laneRetryExhaustedAt: '2026-04-28T12:30:00.000Z',
+      laneRetryCount: 2,
+    })
+    const unsafe = createWorkItem({
+      projectId: project.id,
+      title: 'Unsafe repo lane item',
+      status: 'blocked',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      laneState: 'blocked',
+      laneBlockedReason: 'Repo dirty: operator-notes.txt',
+      laneRecoveryDecision: 'unsafe_repo',
+    })
+
+    const digest = buildStatusDigest()
+
+    expect(digest.laneEscalations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          workItemId: blocked.id,
+          kind: 'blocked',
+          reason: 'Builder evidence missing test changes.',
+          recoveryGuidance: expect.stringContaining('Review the parked lane evidence'),
+        }),
+        expect.objectContaining({
+          workItemId: retryScheduled.id,
+          kind: 'retry_scheduled',
+          retryCount: 1,
+          recoveryGuidance: expect.stringContaining('bounded retry'),
+        }),
+        expect.objectContaining({
+          workItemId: exhausted.id,
+          kind: 'retry_exhausted',
+          retryCount: 2,
+          recoveryGuidance: expect.stringContaining('manual operator recovery'),
+        }),
+        expect.objectContaining({
+          workItemId: unsafe.id,
+          kind: 'unsafe_repo',
+          reason: 'Repo dirty: operator-notes.txt',
+          recoveryGuidance: expect.stringContaining('repo hygiene'),
+        }),
+      ]),
+    )
+    expect(digest.summary.laneEscalationCount).toBe(4)
+  })
+
+  it('formats lane escalations and hashes only actionable state, not generation time', () => {
+    const project = createProject({
+      name: 'Digest Hash Project',
+      repoPath: '/repos/digest-hash',
+      autonomyLanePolicy: {
+        enabled: true,
+        alwaysOn: {
+          enabled: true,
+          notifications: { enabled: true, notifyOn: ['blocked', 'retry_exhausted'] },
+        },
+      },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Hash-stable lane item',
+      status: 'blocked',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      laneState: 'blocked',
+      laneBlockedReason: 'Initial actionable blocker',
+      laneRecoveryDecision: 'recommend_retry',
+    })
+
+    const first = buildStatusDigest()
+    const second = buildStatusDigest()
+    const message = formatDigestForDiscord(first)
+
+    expect(message).toContain('Lane Escalations')
+    expect(message).toContain('Hash-stable lane item')
+    expect(message).toContain('Initial actionable blocker')
+    expect(second.stateHash).toBe(first.stateHash)
+
+    updateWorkItem(workItem.id, { laneRecoveryDecision: 'retry_exhausted', laneRetryCount: 1 })
+    const changed = buildStatusDigest()
+
+    expect(changed.stateHash).not.toBe(first.stateHash)
+    expect(formatDigestForDiscord(changed)).toContain('Retry exhausted')
   })
 })

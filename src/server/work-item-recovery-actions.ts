@@ -1,4 +1,5 @@
 import type { AttentionQueueItem } from './attention-queue-store'
+import type { AlwaysOnLaneRecoveryDecision } from './work-item-supervisor'
 import type { WorkItemPhase, WorkItemRecord } from './work-items-store'
 
 export type WorkItemRecoveryActionType =
@@ -43,6 +44,23 @@ function relaunchPhaseAction(phase: WorkItemPhase): WorkItemRecoveryAction {
     description: `Explicitly relaunch the ${label} phase through the existing launch path.`,
     destructive: false,
     auditNote: `Operator requested ${label} relaunch from recovery actions.`,
+  })
+}
+
+export function recommendAlwaysOnRecoveryAction(
+  decision: AlwaysOnLaneRecoveryDecision,
+): WorkItemRecoveryAction {
+  const phase = decision.retryPhase ?? 'build'
+  const label = PHASE_LABELS[phase]
+  const cooldown = decision.cooldownUntil ? ` after cooldown until ${decision.cooldownUntil}` : ''
+  const evidence = decision.evidence.length > 0 ? ` Evidence: ${decision.evidence.join('; ')}.` : ''
+  return recoveryAction({
+    type: 'relaunch_phase',
+    phase,
+    label: `Schedule bounded ${label} retry`,
+    description: `${decision.reason}${cooldown}.${evidence}`,
+    destructive: false,
+    auditNote: `Always-on policy scheduled bounded ${label} retry ${decision.nextRetryCount}/${decision.maxAttempts}.`,
   })
 }
 

@@ -1,4 +1,6 @@
 import type {
+  ProjectAutonomyAlwaysOnNotificationEvent,
+  ProjectAutonomyAlwaysOnPolicy,
   ProjectRecord,
   ProjectSummary,
   WorkItemPriority,
@@ -6,6 +8,8 @@ import type {
   WorkItemRiskLevel,
   WorkItemStatus,
 } from './projects-api'
+
+export type { ProjectSummary, WorkItemRecord } from './projects-api'
 
 export type ProjectBoardFilter = 'all' | 'attention' | 'execution' | 'approvals' | `label:${string}`
 export type WorkItemUrgencyTone = 'default' | 'warning' | 'danger'
@@ -96,6 +100,132 @@ export type ProjectLaneCockpitSummary = {
   evidence: ProjectLaneCockpitEvidenceSummary
 }
 
+export type ProjectAlwaysOnPolicySummary = {
+  modeLabel: string
+  retrySummary: string
+  notificationSummary: string
+  prPublishingSummary: string
+  cleanupSummary: string
+  safetySummary: string
+}
+
+export type WorkItemAlwaysOnEvidenceSummary = {
+  decisionLabel: string
+  retryEvidence: string
+  repoSafety: string
+  prEvidence: string
+  cleanupEvidence: string
+}
+
+const ALWAYS_ON_NOTIFICATION_LABELS: Record<ProjectAutonomyAlwaysOnNotificationEvent, string> = {
+  blocked: 'blocked',
+  retry_scheduled: 'retry scheduled',
+  retry_exhausted: 'retry exhausted',
+  unsafe_repo: 'unsafe repo',
+  pr_ready: 'PR ready',
+  pr_published: 'PR published',
+  cleanup_recommended: 'cleanup recommended',
+}
+
+export function buildProjectAlwaysOnPolicySummary(
+  project: Pick<ProjectRecord, 'autonomyLanePolicy'>,
+): ProjectAlwaysOnPolicySummary {
+  const policy = project.autonomyLanePolicy.alwaysOn
+  return {
+    modeLabel: policy.enabled ? 'Always-on enabled' : 'Supervised',
+    retrySummary: buildAlwaysOnRetrySummary(policy),
+    notificationSummary: buildAlwaysOnNotificationSummary(policy),
+    prPublishingSummary: buildAlwaysOnPrPublishingSummary(policy),
+    cleanupSummary: buildAlwaysOnCleanupSummary(policy),
+    safetySummary: 'Destructive cleanup and PR publishing remain policy-gated with repo hygiene checks.',
+  }
+}
+
+function buildAlwaysOnRetrySummary(policy: ProjectAutonomyAlwaysOnPolicy): string {
+  if (!policy.retry.enabled) {
+    return `Retries disabled: observe stale scheduled after ${policy.retry.staleScheduledMinutes}m and stale running after ${policy.retry.staleRunningMinutes}m`
+  }
+  return `Retries enabled: max ${policy.retry.maxAttemptsPerPhase} per phase · cooldown ${policy.retry.cooldownMinutes}m · stale scheduled ${policy.retry.staleScheduledMinutes}m · stale running ${policy.retry.staleRunningMinutes}m`
+}
+
+function buildAlwaysOnNotificationSummary(policy: ProjectAutonomyAlwaysOnPolicy): string {
+  if (!policy.notifications.enabled) return 'Notifications disabled'
+  const channel = policy.notifications.digestOnly ? 'Digest notifications' : 'Immediate + digest notifications'
+  const events = policy.notifications.notifyOn.map((event) => ALWAYS_ON_NOTIFICATION_LABELS[event]).join(', ')
+  return `${channel}: ${events || 'no events selected'} · repeat after ${policy.notifications.minRepeatMinutes}m`
+}
+
+function buildAlwaysOnPrPublishingSummary(policy: ProjectAutonomyAlwaysOnPolicy): string {
+  if (!policy.prPublishing.enabled) return 'PR publishing: manual only'
+  const base = policy.prPublishing.baseBranch ? ` · base ${policy.prPublishing.baseBranch}` : ''
+  const clean = policy.prPublishing.requireCleanRepo ? ' · clean repo required' : ''
+  const tests = policy.prPublishing.requirePassingMergeTests ? ' · passing merge tests required' : ''
+  return `PR publishing: ${policy.prPublishing.mode} mode${base}${clean}${tests}`
+}
+
+function buildAlwaysOnCleanupSummary(policy: ProjectAutonomyAlwaysOnPolicy): string {
+  if (!policy.cleanup.enabled) return `Cleanup: disabled · dry-run ${policy.cleanup.dryRun ? 'on' : 'off'}`
+  const mode = policy.cleanup.dryRun ? 'dry-run' : 'destructive when safety gates pass'
+  const branches = policy.cleanup.deleteMergedBranches
+    ? `delete merged branches after ${policy.cleanup.retainMergedBranchDays}d`
+    : `retain merged branches ${policy.cleanup.retainMergedBranchDays}d`
+  const stashes = policy.cleanup.retainLaneStashes
+    ? `retain lane stashes ${policy.cleanup.retainLaneStashDays}d`
+    : `delete lane stashes after ${policy.cleanup.retainLaneStashDays}d`
+  return `Cleanup: ${mode} · ${branches} · ${stashes}`
+}
+
+export function buildWorkItemAlwaysOnEvidenceSummary(
+  workItem: Pick<
+    WorkItemRecord,
+    | 'laneRecoveryDecision'
+    | 'laneRetryCount'
+    | 'laneLastRetryAt'
+    | 'laneRetryExhaustedAt'
+    | 'laneBlockedReason'
+    | 'missionLastError'
+    | 'branchName'
+    | 'mergeState'
+    | 'mergeTestCommand'
+    | 'mergeTestPassed'
+    | 'prUrl'
+  >,
+): WorkItemAlwaysOnEvidenceSummary {
+  return {
+    decisionLabel: `Always-on decision: ${formatEvidenceToken(workItem.laneRecoveryDecision ?? 'observe')}`,
+    retryEvidence: buildAlwaysOnRetryEvidence(workItem),
+    repoSafety: `Unsafe repo/blocker evidence: ${workItem.laneBlockedReason ?? workItem.missionLastError ?? 'no blocker recorded'}`,
+    prEvidence: `PR evidence: ${workItem.prUrl ?? 'no PR URL recorded'}`,
+    cleanupEvidence: buildAlwaysOnCleanupEvidence(workItem),
+  }
+}
+
+function buildAlwaysOnRetryEvidence(
+  workItem: Pick<WorkItemRecord, 'laneRetryCount' | 'laneLastRetryAt' | 'laneRetryExhaustedAt'>,
+): string {
+  const count = workItem.laneRetryCount ?? 0
+  const parts = [`${count} attempt${count === 1 ? '' : 's'}`]
+  if (workItem.laneLastRetryAt) parts.push(`last retry ${workItem.laneLastRetryAt}`)
+  if (workItem.laneRetryExhaustedAt) parts.push(`exhausted ${workItem.laneRetryExhaustedAt}`)
+  return `Retry evidence: ${parts.join(' · ')}`
+}
+
+function buildAlwaysOnCleanupEvidence(
+  workItem: Pick<WorkItemRecord, 'branchName' | 'mergeState' | 'mergeTestCommand' | 'mergeTestPassed'>,
+): string {
+  if (workItem.mergeState === 'merged' && workItem.branchName) {
+    const testCopy = workItem.mergeTestPassed === true && workItem.mergeTestCommand
+      ? ` after passing ${workItem.mergeTestCommand}`
+      : ''
+    return `Cleanup evidence: merged branch ${workItem.branchName} eligible for retention review${testCopy}`
+  }
+  return 'Cleanup evidence: no merged lane branch ready for retention review'
+}
+
+function formatEvidenceToken(value: string): string {
+  return value.replace(/_/g, ' ')
+}
+
 const LANE_ACTIVE_STATES = new Set(['preparing', 'building', 'reviewing', 'merge_healing'])
 const PHASE_LANE_LABELS = {
   research: 'Planner',
@@ -110,19 +240,19 @@ export function buildProjectLaneCockpit(
 ): ProjectLaneCockpitSummary {
   const activeWorkItem = workItems.find(isLaneActiveWorkItem) ?? null
   const parkedBlockedItems = sortLaneCandidates(workItems.filter(isParkedBlockedLaneWorkItem))
-  const nextQueuedWorkItem = sortLaneCandidates(workItems.filter(isLaneQueuedWorkItem))[0] ?? null
-  const evidenceWorkItem = activeWorkItem ?? parkedBlockedItems[0] ?? nextQueuedWorkItem ?? null
+  const nextQueuedWorkItem = sortLaneCandidates(workItems.filter(isLaneQueuedWorkItem)).at(0) ?? null
+  const parkedBlockedWorkItem = parkedBlockedItems.at(0) ?? null
+  const evidenceWorkItem = activeWorkItem ?? parkedBlockedWorkItem ?? nextQueuedWorkItem
   const currentBranch = evidenceWorkItem?.branchName ?? null
   const baseBranch = evidenceWorkItem?.baseBranch ?? project.autonomyLanePolicy.baseBranch ?? project.defaultBranch ?? 'main'
-  const heartbeatLabel = buildLaneHeartbeatLabel(activeWorkItem ?? parkedBlockedItems[0])
-  const mergeStateLabel = buildLaneMergeStateLabel(activeWorkItem ?? parkedBlockedItems[0])
-  const recoveryActions = buildLaneRecoveryActions(activeWorkItem ?? parkedBlockedItems[0])
+  const activeOrParkedWorkItem = activeWorkItem ?? parkedBlockedWorkItem ?? undefined
+  const heartbeatLabel = buildLaneHeartbeatLabel(activeOrParkedWorkItem)
+  const mergeStateLabel = buildLaneMergeStateLabel(activeOrParkedWorkItem)
+  const recoveryActions = buildLaneRecoveryActions(activeOrParkedWorkItem)
 
   return {
     modeLabel: 'Single-lane branch autonomy',
-    parallelWorktreesNote: project.autonomyLanePolicy.allowParallelWorktrees
-      ? 'Parallel worktrees advanced mode is enabled.'
-      : 'Parallel worktrees disabled unless advanced mode is enabled.',
+    parallelWorktreesNote: 'Parallel worktrees disabled unless advanced mode is enabled.',
     activeWorkItem,
     currentBranch,
     baseBranch,
@@ -131,7 +261,7 @@ export function buildProjectLaneCockpit(
     parkedBlockedItems,
     nextQueuedWorkItem,
     mergeStateLabel,
-    blockerLabel: parkedBlockedItems[0]?.laneBlockedReason ?? parkedBlockedItems[0]?.missionLastError ?? null,
+    blockerLabel: parkedBlockedWorkItem?.laneBlockedReason ?? parkedBlockedWorkItem?.missionLastError ?? null,
     recoveryActions,
     evidence: buildLaneEvidenceSummary(evidenceWorkItem),
   }
@@ -441,7 +571,7 @@ const MAX_LABELS_TO_SHOW = 15
 
 // Detect rework: items whose history contains a build→review→build cycle
 function detectRework(workItem: WorkItemRecord): boolean {
-  const history = workItem.history ?? []
+  const history = workItem.history
   const buildReviewBuildPatterns = [
     ['build', 'review', 'build'],
     ['build', 'review', 'build', 'review', 'build'],

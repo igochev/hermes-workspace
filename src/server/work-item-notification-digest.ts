@@ -2,9 +2,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { listApprovalInboxEntries, listWorkItemApprovals, type ApprovalInboxEntry } from './work-item-approvals'
-import { listWorkItems, getWorkItem, type WorkItemRecord, type WorkItemMissionState, type WorkItemBlockedReason } from './work-items-store'
-import { getProject, type ProjectRecord } from './projects-store'
+import { listApprovalInboxEntries } from './work-item-approvals'
+import {    listWorkItems } from './work-items-store'
+import {   getProject } from './projects-store'
+import type {WorkItemBlockedReason, WorkItemMissionState, WorkItemRecord} from './work-items-store';
+import type {ProjectAutonomyAlwaysOnNotificationEvent, ProjectRecord} from './projects-store';
 
 export type DigestApprovalEntry = {
   workItemId: string
@@ -26,15 +28,42 @@ export type DigestBlockedEntry = {
   ageMinutes: number
 }
 
+export type DigestLaneEscalationKind = Extract<
+  ProjectAutonomyAlwaysOnNotificationEvent,
+  'blocked' | 'retry_scheduled' | 'retry_exhausted' | 'unsafe_repo' | 'pr_ready' | 'cleanup_recommended'
+>
+
+export type DigestLaneEscalationEntry = {
+  workItemId: string
+  workItemTitle: string
+  projectName: string
+  kind: DigestLaneEscalationKind
+  laneState?: WorkItemRecord['laneState']
+  phase?: WorkItemRecord['phase']
+  branchName?: string
+  baseBranch?: string
+  reason?: string
+  recoveryDecision?: string
+  recoveryGuidance: string
+  retryCount?: number
+  lastRetryAt?: string
+  exhaustedAt?: string
+  prUrl?: string
+  updatedAt: string
+  ageMinutes: number
+}
+
 export type StatusDigest = {
   generatedAt: string
   pendingApprovals: Array<DigestApprovalEntry>
   blockedItems: Array<DigestBlockedEntry>
   failedMissions: Array<DigestBlockedEntry>
+  laneEscalations: Array<DigestLaneEscalationEntry>
   summary: {
     pendingApprovalCount: number
     blockedCount: number
     failedMissionCount: number
+    laneEscalationCount: number
     oldestPendingApprovalMinutes: number | null
     oldestBlockedMinutes: number | null
   }
@@ -60,8 +89,91 @@ function computeStateHash(digest: StatusDigest): string {
     approvals: digest.pendingApprovals.map((a) => `${a.workItemId}:${a.phase}`).sort(),
     blocked: digest.blockedItems.map((b) => b.workItemId).sort(),
     failed: digest.failedMissions.map((f) => f.workItemId).sort(),
+    laneEscalations: digest.laneEscalations
+      .map((entry) => [
+        entry.workItemId,
+        entry.kind,
+        entry.reason ?? '',
+        entry.recoveryDecision ?? '',
+        entry.retryCount ?? 0,
+        entry.branchName ?? '',
+        entry.prUrl ?? '',
+      ].join(':'))
+      .sort(),
   })
   return createHash('sha256').update(canonical).digest('hex').slice(0, 16)
+}
+
+function notifyEnabled(project: ProjectRecord | null | undefined, kind: DigestLaneEscalationKind): boolean {
+  const notifications = project?.autonomyLanePolicy.alwaysOn.notifications
+  if (!notifications || notifications.enabled === false) return false
+  return notifications.notifyOn.includes(kind)
+}
+
+function buildLaneRecoveryGuidance(kind: DigestLaneEscalationKind): string {
+  if (kind === 'retry_scheduled') return 'Watch the bounded retry cooldown and verify the next run produces fresh evidence.'
+  if (kind === 'retry_exhausted') return 'Retry attempts are exhausted; manual operator recovery is required before the lane continues.'
+  if (kind === 'unsafe_repo') return 'Resolve repo hygiene warnings before retrying or admitting the next lane item.'
+  if (kind === 'pr_ready') return 'Review PR publishing preflight evidence and publish only through the explicit gated action.'
+  if (kind === 'cleanup_recommended') return 'Review cleanup recommendations; retention is dry-run/non-destructive unless explicitly enabled.'
+  return 'Review the parked lane evidence and choose an explicit recovery action.'
+}
+
+function makeLaneEscalationEntry(
+  workItem: WorkItemRecord,
+  projectName: string,
+  kind: DigestLaneEscalationKind,
+): DigestLaneEscalationEntry {
+  return {
+    workItemId: workItem.id,
+    workItemTitle: workItem.title,
+    projectName,
+    kind,
+    laneState: workItem.laneState,
+    phase: workItem.phase,
+    branchName: workItem.branchName,
+    baseBranch: workItem.baseBranch,
+    reason: workItem.laneBlockedReason ?? workItem.missionLastError,
+    recoveryDecision: workItem.laneRecoveryDecision,
+    recoveryGuidance: buildLaneRecoveryGuidance(kind),
+    retryCount: workItem.laneRetryCount,
+    lastRetryAt: workItem.laneLastRetryAt,
+    exhaustedAt: workItem.laneRetryExhaustedAt,
+    prUrl: workItem.prUrl,
+    updatedAt: workItem.updatedAt,
+    ageMinutes: minutesSince(workItem.updatedAt),
+  }
+}
+
+function getLaneEscalationKinds(workItem: WorkItemRecord): Array<DigestLaneEscalationKind> {
+  const decision = workItem.laneRecoveryDecision
+
+  if (decision === 'unsafe_repo') return ['unsafe_repo']
+  if (decision === 'retry_exhausted' || workItem.laneRetryExhaustedAt) return ['retry_exhausted']
+  if (decision === 'schedule_retry') return ['retry_scheduled']
+  if (workItem.laneState === 'blocked' || workItem.status === 'blocked') return ['blocked']
+  if (workItem.mergeState === 'merged' && workItem.branchName && !workItem.prUrl) return ['pr_ready']
+  if (workItem.mergeState === 'merged' && workItem.branchName) return ['cleanup_recommended']
+
+  return []
+}
+
+export function buildLaneEscalations(
+  workItems: Array<WorkItemRecord>,
+): Array<DigestLaneEscalationEntry> {
+  const entries: Array<DigestLaneEscalationEntry> = []
+  for (const workItem of workItems) {
+    const project = getProject(workItem.projectId)
+    const projectName = project?.name ?? 'Unknown project'
+    for (const kind of getLaneEscalationKinds(workItem)) {
+      if (notifyEnabled(project, kind)) entries.push(makeLaneEscalationEntry(workItem, projectName, kind))
+    }
+  }
+  return entries.sort((a, b) => {
+    const projectCompare = a.projectName.localeCompare(b.projectName)
+    if (projectCompare !== 0) return projectCompare
+    return a.workItemTitle.localeCompare(b.workItemTitle)
+  })
 }
 
 export function buildStatusDigest(): StatusDigest {
@@ -122,15 +234,19 @@ export function buildStatusDigest(): StatusDigest {
     ? Math.max(...blockedItems.map((b) => b.ageMinutes))
     : null
 
+  const laneEscalations = buildLaneEscalations(allWorkItems)
+
   const digest: StatusDigest = {
     generatedAt: new Date().toISOString(),
     pendingApprovals,
     blockedItems,
     failedMissions,
+    laneEscalations,
     summary: {
       pendingApprovalCount: pendingApprovals.length,
       blockedCount: blockedItems.length,
       failedMissionCount: failedMissions.length,
+      laneEscalationCount: laneEscalations.length,
       oldestPendingApprovalMinutes,
       oldestBlockedMinutes,
     },
@@ -162,14 +278,14 @@ export function persistDigestHash(hash: string): void {
 }
 
 export function formatDigestForDiscord(digest: StatusDigest): string {
-  const lines: string[] = [
+  const lines: Array<string> = [
     '**📋 Mission Control Status Digest**',
     `_Generated: ${new Date(digest.generatedAt).toLocaleString()}_`,
     '',
   ]
 
   // Summary header
-  const summaryItems: string[] = []
+  const summaryItems: Array<string> = []
   if (digest.summary.pendingApprovalCount > 0) {
     summaryItems.push(`⏳ ${digest.summary.pendingApprovalCount} pending approval${digest.summary.pendingApprovalCount !== 1 ? 's' : ''}`)
   }
@@ -179,9 +295,12 @@ export function formatDigestForDiscord(digest: StatusDigest): string {
   if (digest.summary.failedMissionCount > 0) {
     summaryItems.push(`❌ ${digest.summary.failedMissionCount} failed mission${digest.summary.failedMissionCount !== 1 ? 's' : ''}`)
   }
+  if (digest.summary.laneEscalationCount > 0) {
+    summaryItems.push(`🚨 ${digest.summary.laneEscalationCount} lane escalation${digest.summary.laneEscalationCount !== 1 ? 's' : ''}`)
+  }
 
   if (summaryItems.length === 0) {
-    lines.push('✅ No pending approvals, blocked items, or failed missions.')
+    lines.push('✅ No pending approvals, blocked items, failed missions, or lane escalations.')
     lines.push('')
     lines.push('All clear — no operator attention needed.')
     return lines.join('\n')
@@ -226,6 +345,22 @@ export function formatDigestForDiscord(digest: StatusDigest): string {
         ? ` — ${item.missionLastError.slice(0, 120)}`
         : ''
       lines.push(`• [#${item.workItemId.slice(0, 8)}] **${item.workItemTitle}**${error} · _~${item.ageMinutes}m_ · ${item.projectName}`)
+    }
+    lines.push('')
+  }
+
+  // Lane escalation detail
+  if (digest.laneEscalations.length > 0) {
+    lines.push('**🚨 Lane Escalations:**')
+    for (const escalation of digest.laneEscalations) {
+      const label = escalation.kind
+        .replace(/_/g, ' ')
+        .replace(/^./, (first) => first.toUpperCase())
+      const reason = escalation.reason ? ` — ${escalation.reason.slice(0, 160)}` : ''
+      const retry = typeof escalation.retryCount === 'number' ? ` · retry #${escalation.retryCount}` : ''
+      const branch = escalation.branchName ? ` · branch ${escalation.branchName}` : ''
+      lines.push(`• [#${escalation.workItemId.slice(0, 8)}] **${escalation.workItemTitle}** — ${label}${reason}${retry}${branch} · _~${escalation.ageMinutes}m_ · ${escalation.projectName}`)
+      lines.push(`  ↳ ${escalation.recoveryGuidance}`)
     }
     lines.push('')
   }

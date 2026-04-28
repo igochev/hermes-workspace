@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { recommendWorkItemRecoveryActions } from './work-item-recovery-actions'
+import { recommendAlwaysOnRecoveryAction, recommendWorkItemRecoveryActions } from './work-item-recovery-actions'
 import type { AttentionQueueItem } from './attention-queue-store'
 import type { WorkItemRecord } from './work-items-store'
 
@@ -111,5 +111,32 @@ describe('work item recovery action recommendations', () => {
       'cancel_work_item',
       'dismiss_attention',
     ])
+  })
+
+  it('formats always-on retry decisions as explicit non-destructive recovery evidence', () => {
+    const action = recommendAlwaysOnRecoveryAction({
+      type: 'schedule_retry',
+      event: 'retry_scheduled',
+      shouldRetry: true,
+      retryPhase: 'build',
+      nextRetryCount: 1,
+      maxAttempts: 2,
+      cooldownUntil: '2026-04-25T10:46:00.000Z',
+      reason: 'Policy allows one bounded retry.',
+      evidence: ['finding=mission_stale', 'repo=safe'],
+    })
+
+    expect(action).toEqual(
+      expect.objectContaining({
+        type: 'relaunch_phase',
+        phase: 'build',
+        label: 'Schedule bounded build retry',
+        destructive: false,
+        auditNote: expect.stringContaining('retry 1/2'),
+      }),
+    )
+    expect(action.description).toContain('cooldown until 2026-04-25T10:46:00.000Z')
+    expect(action.description).toContain('finding=mission_stale')
+    expect(action.description).toContain('repo=safe')
   })
 })

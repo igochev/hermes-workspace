@@ -8,11 +8,12 @@ vi.mock('./work-item-execution', () => ({
   syncWorkItemExecutionState,
 }))
 
-import { createProject } from './projects-store'
+import { createProject, type ProjectRecord } from './projects-store'
 import { createWorkItem, getWorkItem, type WorkItemRecord } from './work-items-store'
 import { upsertExecutionRun } from './execution-runs-store'
 import {
   DEFAULT_SUPERVISOR_THRESHOLDS,
+  decideAlwaysOnLaneRecovery,
   detectStaleExecution,
   isWorkItemExecutionCandidate,
   reconcileAllWorkItemExecutions,
@@ -261,6 +262,248 @@ describe('work-item-supervisor', () => {
       scheduledMs: 30 * 60 * 1000,
       runningMs: 4 * 60 * 60 * 1000,
       reviewRunningMs: 2 * 60 * 60 * 1000,
+    })
+  })
+
+  function enabledAlwaysOnProject(overrides: Record<string, unknown> = {}): ProjectRecord {
+    return createProject({
+      name: 'Always-On Demo',
+      repoPath: '/repos/always-on-demo',
+      defaultBranch: 'main',
+      autonomyLanePolicy: {
+        enabled: true,
+        alwaysOn: {
+          enabled: true,
+          retry: { enabled: true, maxAttemptsPerPhase: 2, cooldownMinutes: 15, ...overrides },
+        },
+      },
+    })
+  }
+
+  it('keeps policy-disabled stale lane jobs as recommendations instead of automatic retries', () => {
+    const project = createProject({ name: 'Supervised Demo', repoPath: '/repos/supervised-demo' })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Stale supervised build',
+      status: 'active',
+      phase: 'build',
+      repoPathSnapshot: project.repoPath,
+      missionJobId: 'job-stale',
+      missionState: 'scheduled',
+    })
+    const [finding] = detectStaleExecution({
+      workItem,
+      runs: [
+        {
+          id: 'run-stale',
+          workItemId: workItem.id,
+          projectId: project.id,
+          role: 'mission',
+          phase: 'build',
+          engine: 'conductor',
+          jobId: 'job-stale',
+          state: 'scheduled',
+          lastObservedAt: '2026-04-25T10:00:00.000Z',
+          artifactPaths: [],
+          createdAt: '2026-04-25T10:00:00.000Z',
+          updatedAt: '2026-04-25T10:00:00.000Z',
+        },
+      ],
+      now: new Date('2026-04-25T10:31:00.000Z'),
+    })
+
+    const decision = decideAlwaysOnLaneRecovery({
+      project,
+      workItem,
+      finding: finding!,
+      repoSafety: { safe: true },
+      now: new Date('2026-04-25T10:31:00.000Z'),
+    })
+
+    expect(decision).toMatchObject({
+      type: 'recommend_retry',
+      event: 'blocked',
+      shouldRetry: false,
+      retryPhase: 'build',
+      reason: expect.stringContaining('Always-on retry policy is disabled'),
+    })
+  })
+
+  it('schedules a bounded retry with cooldown evidence when policy allows and repo is clean', () => {
+    const project = enabledAlwaysOnProject()
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Retry stale build',
+      status: 'active',
+      phase: 'build',
+      repoPathSnapshot: project.repoPath,
+      missionJobId: 'job-stale',
+      missionState: 'scheduled',
+    })
+    const finding = detectStaleExecution({
+      workItem,
+      runs: [
+        {
+          id: 'run-stale',
+          workItemId: workItem.id,
+          projectId: project.id,
+          role: 'mission',
+          phase: 'build',
+          engine: 'conductor',
+          jobId: 'job-stale',
+          state: 'scheduled',
+          lastObservedAt: '2026-04-25T10:00:00.000Z',
+          artifactPaths: [],
+          createdAt: '2026-04-25T10:00:00.000Z',
+          updatedAt: '2026-04-25T10:00:00.000Z',
+        },
+      ],
+      now: new Date('2026-04-25T10:31:00.000Z'),
+    })[0]!
+
+    const decision = decideAlwaysOnLaneRecovery({
+      project,
+      workItem,
+      finding,
+      repoSafety: { safe: true },
+      now: new Date('2026-04-25T10:31:00.000Z'),
+    })
+
+    expect(decision).toMatchObject({
+      type: 'schedule_retry',
+      event: 'retry_scheduled',
+      shouldRetry: true,
+      retryPhase: 'build',
+      nextRetryCount: 1,
+      maxAttempts: 2,
+      cooldownUntil: '2026-04-25T10:46:00.000Z',
+    })
+    expect(decision.evidence).toEqual(
+      expect.arrayContaining([
+        'finding=mission_stale',
+        'jobId=job-stale',
+        'retryCount=0/2',
+        'repo=safe',
+      ]),
+    )
+  })
+
+  it('exhausts retry attempts and emits retry_exhausted evidence', () => {
+    const project = enabledAlwaysOnProject()
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Exhaust retry build',
+      status: 'active',
+      phase: 'build',
+      repoPathSnapshot: project.repoPath,
+      missionJobId: 'job-stale',
+      missionState: 'running',
+      laneRetryCount: 2,
+    })
+
+    const decision = decideAlwaysOnLaneRecovery({
+      project,
+      workItem,
+      finding: {
+        id: 'finding-1',
+        workItemId: workItem.id,
+        projectId: project.id,
+        kind: 'mission_stale',
+        severity: 'warning',
+        message: 'Mission stale',
+        jobId: 'job-stale',
+        role: 'mission',
+        observedAt: '2026-04-25T14:31:00.000Z',
+      },
+      repoSafety: { safe: true },
+      now: new Date('2026-04-25T14:31:00.000Z'),
+    })
+
+    expect(decision).toMatchObject({
+      type: 'retry_exhausted',
+      event: 'retry_exhausted',
+      shouldRetry: false,
+      nextRetryCount: 2,
+      maxAttempts: 2,
+      reason: expect.stringContaining('Retry attempts exhausted'),
+    })
+  })
+
+  it('refuses automatic retry when repo safety evidence is unsafe', () => {
+    const project = enabledAlwaysOnProject()
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Unsafe retry build',
+      status: 'active',
+      phase: 'build',
+      repoPathSnapshot: project.repoPath,
+      missionJobId: 'job-stale',
+      missionState: 'scheduled',
+    })
+
+    const decision = decideAlwaysOnLaneRecovery({
+      project,
+      workItem,
+      finding: {
+        id: 'finding-unsafe',
+        workItemId: workItem.id,
+        projectId: project.id,
+        kind: 'mission_stale',
+        severity: 'warning',
+        message: 'Mission stale',
+        jobId: 'job-stale',
+        role: 'mission',
+        observedAt: '2026-04-25T10:31:00.000Z',
+      },
+      repoSafety: { safe: false, reason: 'Repo has uncommitted files: src/app.ts' },
+      now: new Date('2026-04-25T10:31:00.000Z'),
+    })
+
+    expect(decision).toMatchObject({
+      type: 'unsafe_repo',
+      event: 'unsafe_repo',
+      shouldRetry: false,
+      reason: expect.stringContaining('Repo has uncommitted files'),
+    })
+  })
+
+  it('observes stale findings while retry cooldown has not elapsed', () => {
+    const project = enabledAlwaysOnProject()
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Cooldown build',
+      status: 'active',
+      phase: 'build',
+      repoPathSnapshot: project.repoPath,
+      missionJobId: 'job-stale',
+      missionState: 'scheduled',
+      laneRetryCount: 1,
+      laneLastRetryAt: '2026-04-25T10:20:00.000Z',
+    })
+
+    const decision = decideAlwaysOnLaneRecovery({
+      project,
+      workItem,
+      finding: {
+        id: 'finding-cooldown',
+        workItemId: workItem.id,
+        projectId: project.id,
+        kind: 'mission_stale',
+        severity: 'warning',
+        message: 'Mission stale',
+        jobId: 'job-stale',
+        role: 'mission',
+        observedAt: '2026-04-25T10:31:00.000Z',
+      },
+      repoSafety: { safe: true },
+      now: new Date('2026-04-25T10:31:00.000Z'),
+    })
+
+    expect(decision).toMatchObject({
+      type: 'observe',
+      shouldRetry: false,
+      cooldownUntil: '2026-04-25T10:35:00.000Z',
+      reason: expect.stringContaining('Retry cooldown has not elapsed'),
     })
   })
 })

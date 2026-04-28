@@ -46,6 +46,9 @@ import {
   WORK_ITEM_RECOVERY_PANEL_TITLE,
   WORK_ITEM_RUNS_SECTION_TITLE,
   WORK_ITEM_OPERATOR_EVIDENCE_LABELS,
+  WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS,
+  WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE,
+  getWorkItemAlwaysOnEvidenceRows,
   getWorkItemMergeEvidenceSummary,
 } from './work-item-detail-screen'
 
@@ -504,6 +507,36 @@ describe('work item detail screen theme classes', () => {
       mergeTest: 'passed: npm test',
       mergeArtifacts: '.hermes/merge-healer/abc-test.log',
     })
+  })
+
+  it('summarizes always-on evidence rows for retry and policy affordances', () => {
+    expect(WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE).toBe('Always-on policy evidence')
+    expect(WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS).toEqual({
+      decision: 'Recovery decision',
+      retry: 'Retry evidence',
+      repo: 'Repo/blocker safety',
+      pr: 'PR evidence',
+      cleanup: 'Cleanup evidence',
+    })
+
+    expect(
+      getWorkItemAlwaysOnEvidenceRows({
+        laneRecoveryDecision: 'schedule_retry',
+        laneRetryCount: 1,
+        laneLastRetryAt: '2026-04-28T01:00:00.000Z',
+        laneBlockedReason: 'Repo has uncommitted files',
+        branchName: 'mission/retry',
+        mergeState: 'merged',
+        mergeTestCommand: 'npm test',
+        mergeTestPassed: true,
+      }).map((row) => row.value),
+    ).toEqual([
+      'Always-on decision: schedule retry',
+      'Retry evidence: 1 attempt · last retry 2026-04-28T01:00:00.000Z',
+      'Unsafe repo/blocker evidence: Repo has uncommitted files',
+      'PR evidence: no PR URL recorded',
+      'Cleanup evidence: merged branch mission/retry eligible for retention review after passing npm test',
+    ])
   })
 
   it('documents work item detail clickability for launch preflight and recovery controls', () => {

@@ -1,6 +1,8 @@
-import { listExecutionRuns, type ExecutionRunRecord, type ExecutionRunState } from './execution-runs-store'
-import { getLatestPlanningDraftForWorkItem, type PlanningDraftRecord } from './planning-drafts-store'
+import {   listExecutionRuns } from './execution-runs-store'
+import {  getLatestPlanningDraftForWorkItem } from './planning-drafts-store'
 import { listWorkItemApprovals } from './work-item-approvals'
+import type {ExecutionRunRecord, ExecutionRunState} from './execution-runs-store';
+import type {PlanningDraftRecord} from './planning-drafts-store';
 import type { WorkItemPhase, WorkItemRecord } from './work-items-store'
 
 export type WorkItemRunTimelineState =
@@ -259,7 +261,8 @@ function applyWorkItemMissionFallback(row: WorkItemRunTimelineRow, workItem: Wor
 function applyApprovalHint(row: WorkItemRunTimelineRow, workItem: WorkItemRecord): WorkItemRunTimelineRow {
   const latestApproval = listWorkItemApprovals(workItem.id)
     .filter((approval) => approval.phase === row.phase)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .at(0)
   if (!latestApproval) return row
   return {
     ...row,
@@ -280,11 +283,16 @@ function applyMergeHealerHint(row: WorkItemRunTimelineRow, workItem: WorkItemRec
   if (!workItem.mergeState || workItem.mergeState === 'not_started') return row
 
   if (workItem.mergeState === 'merged') {
+    const cleanupSummary = workItem.branchName
+      ? ` Cleanup dry-run recommended for ${workItem.branchName} after retention policy review.`
+      : ''
     return {
       ...row,
       state: 'succeeded',
-      summary: `Merge-Healer merged into ${workItem.mergeTargetBranch ?? 'target'}${workItem.mergeCommit ? ` at ${workItem.mergeCommit.slice(0, 8)}` : ''}.`,
-      nextExpectedAction: undefined,
+      summary: `Merge-Healer merged into ${workItem.mergeTargetBranch ?? 'target'}${workItem.mergeCommit ? ` at ${workItem.mergeCommit.slice(0, 8)}` : ''}.${cleanupSummary}`,
+      nextExpectedAction: workItem.branchName
+        ? 'Review branch/stash cleanup recommendations; deletion is dry-run/non-destructive unless explicitly enabled by policy.'
+        : undefined,
       artifacts: workItem.mergeArtifactPaths ?? [],
     }
   }

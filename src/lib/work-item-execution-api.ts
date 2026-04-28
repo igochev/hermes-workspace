@@ -1,30 +1,16 @@
-import type { WorkItemCriterionStatus, WorkItemLifecycleAction } from './projects-api'
+import type {
+  ProjectRecord,
+  WorkItemLifecycleAction,
+  WorkItemRecord,
+} from './projects-api'
 
 const WORK_ITEMS_BASE = '/api/work-items'
 
 export type WorkItemExecutionState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
 
 export type WorkItemExecutionPayload = {
-  workItem: {
-    id: string
-    missionId?: string
-    missionJobId?: string
-    missionJobName?: string
-    missionSessionKeyPrefix?: string
-    missionLink?: string
-    missionState?: WorkItemExecutionState
-    missionLastRunAt?: string
-    missionLastError?: string
-    status: string
-    phase?: string
-    riskLevel?: 'low' | 'medium' | 'high'
-    acceptanceCriteria: Array<string>
-    criteriaStatus: Array<WorkItemCriterionStatus>
-    notes: Array<string>
-    history: Array<Record<string, unknown>>
-    approvals?: Array<Record<string, unknown>>
-  }
-  project: Record<string, unknown> | null
+  workItem: WorkItemRecord
+  project: ProjectRecord | null
   executionSyncWarning?: string
   execution?: {
     state: WorkItemExecutionState
@@ -65,8 +51,8 @@ export type WorkItemExecutionPayload = {
 }
 
 export type WorkItemLifecyclePayload = {
-  workItem: Record<string, unknown>
-  project: Record<string, unknown> | null
+  workItem: WorkItemRecord
+  project: ProjectRecord | null
   approval?: Record<string, unknown>
 }
 

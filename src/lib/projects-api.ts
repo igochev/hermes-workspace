@@ -39,6 +39,48 @@ export type ProjectRuntimeProfiles = {
   supervisorProfile?: string
 }
 
+export type ProjectAutonomyAlwaysOnNotificationEvent =
+  | 'blocked'
+  | 'retry_scheduled'
+  | 'retry_exhausted'
+  | 'unsafe_repo'
+  | 'pr_ready'
+  | 'pr_published'
+  | 'cleanup_recommended'
+
+export type ProjectAutonomyAlwaysOnPolicy = {
+  enabled: boolean
+  retry: {
+    enabled: boolean
+    maxAttemptsPerPhase: number
+    cooldownMinutes: number
+    staleScheduledMinutes: number
+    staleRunningMinutes: number
+  }
+  notifications: {
+    enabled: boolean
+    digestOnly: boolean
+    notifyOn: Array<ProjectAutonomyAlwaysOnNotificationEvent>
+    minRepeatMinutes: number
+  }
+  prPublishing: {
+    enabled: boolean
+    mode: 'manual' | 'draft'
+    baseBranch?: string
+    titlePrefix: string
+    requireCleanRepo: boolean
+    requirePassingMergeTests: boolean
+  }
+  cleanup: {
+    enabled: boolean
+    deleteMergedBranches: boolean
+    retainMergedBranchDays: number
+    retainLaneStashes: boolean
+    retainLaneStashDays: number
+    dryRun: boolean
+  }
+}
+
 export type ProjectAutonomyLanePolicy = {
   enabled: boolean
   mode: 'single_lane'
@@ -50,6 +92,7 @@ export type ProjectAutonomyLanePolicy = {
   blockedBehavior: 'park_and_continue_when_repo_clean'
   mergeHealerEnabled: boolean
   allowParallelWorktrees: false
+  alwaysOn: ProjectAutonomyAlwaysOnPolicy
 }
 
 export type ProjectRecord = {
@@ -224,6 +267,10 @@ export type WorkItemRecord = {
   laneEnteredAt?: string
   laneParkedAt?: string
   laneBlockedReason?: string
+  laneRetryCount?: number
+  laneLastRetryAt?: string
+  laneRetryExhaustedAt?: string
+  laneRecoveryDecision?: string
   baseBranch?: string
   branchName?: string
   branchCreatedAt?: string
@@ -311,6 +358,10 @@ export type CreateWorkItemInput = {
   laneEnteredAt?: string
   laneParkedAt?: string
   laneBlockedReason?: string
+  laneRetryCount?: number
+  laneLastRetryAt?: string
+  laneRetryExhaustedAt?: string
+  laneRecoveryDecision?: string
   baseBranch?: string
   branchName?: string
   branchCreatedAt?: string

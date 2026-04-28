@@ -6,11 +6,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   assertCleanOrStashedLaneEntry,
+  buildLaneCleanupPlan,
+  buildPrPublishingPreflight,
   buildWorkItemBranchName,
   collectProjectRepoHygiene,
+  collectProjectLaneCleanupInventory,
   ensureWorkItemBranch,
   inspectProjectRepoState,
 } from './project-branch-manager'
+import type { ProjectAutonomyAlwaysOnPolicy } from './projects-store'
 import type { WorkItemRecord } from './work-items-store'
 
 function git(repoPath: string, args: string[]): string {
@@ -42,6 +46,15 @@ function workItem(input: Partial<WorkItemRecord> = {}): WorkItemRecord {
     reviewQualityGateReasons: input.reviewQualityGateReasons ?? [],
     reviewMissingEvidence: input.reviewMissingEvidence ?? [],
     sessionKeys: input.sessionKeys ?? [],
+    laneState: input.laneState,
+    baseBranch: input.baseBranch,
+    branchName: input.branchName,
+    mergeState: input.mergeState,
+    mergeCommit: input.mergeCommit,
+    mergeBaseCommit: input.mergeBaseCommit,
+    mergeTargetBranch: input.mergeTargetBranch,
+    mergeTestPassed: input.mergeTestPassed,
+    prUrl: input.prUrl,
     artifactPaths: input.artifactPaths ?? [],
     acceptanceCriteria: input.acceptanceCriteria ?? [],
     criteriaStatus: input.criteriaStatus ?? [],
@@ -49,6 +62,32 @@ function workItem(input: Partial<WorkItemRecord> = {}): WorkItemRecord {
     history: input.history ?? [],
     createdAt: input.createdAt ?? '2026-04-27T00:00:00.000Z',
     updatedAt: input.updatedAt ?? '2026-04-27T00:00:00.000Z',
+  }
+}
+
+function prPolicy(
+  input: Partial<ProjectAutonomyAlwaysOnPolicy['prPublishing']> = {},
+): ProjectAutonomyAlwaysOnPolicy['prPublishing'] {
+  return {
+    enabled: input.enabled ?? false,
+    mode: input.mode ?? 'manual',
+    baseBranch: input.baseBranch,
+    titlePrefix: input.titlePrefix ?? '[Hermes Workspace]',
+    requireCleanRepo: input.requireCleanRepo ?? true,
+    requirePassingMergeTests: input.requirePassingMergeTests ?? true,
+  }
+}
+
+function cleanupPolicy(
+  input: Partial<ProjectAutonomyAlwaysOnPolicy['cleanup']> = {},
+): ProjectAutonomyAlwaysOnPolicy['cleanup'] {
+  return {
+    enabled: input.enabled ?? false,
+    deleteMergedBranches: input.deleteMergedBranches ?? false,
+    retainMergedBranchDays: input.retainMergedBranchDays ?? 30,
+    retainLaneStashes: input.retainLaneStashes ?? true,
+    retainLaneStashDays: input.retainLaneStashDays ?? 30,
+    dryRun: input.dryRun ?? true,
   }
 }
 
@@ -197,5 +236,323 @@ describe('project-branch-manager', () => {
 
     expect(source).not.toMatch(/execFile\([^\n]+git[^\n]+worktree/)
     expect(source).not.toMatch(/\['worktree'/)
+  })
+
+  it('reports manual PR publishing required when policy is disabled', () => {
+    const preflight = buildPrPublishingPreflight({
+      policy: prPolicy({ enabled: false }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'main',
+        baseBranch: 'main',
+        featureBranch: 'mission/84bfe2c2-demo',
+        dirtyStatus: '',
+        untrackedFiles: [],
+        localBranchesCreatedByLane: ['mission/84bfe2c2-demo'],
+        stashIdsCreatedByLane: [],
+        aheadBehind: 'ahead 2, behind 0',
+        upstreamBranch: 'origin/main',
+        remoteUrl: 'git@github.com:owner/repo.git',
+        warnings: [],
+      },
+      workItem: workItem({
+        title: 'Ship safe PR gate',
+        branchName: 'mission/84bfe2c2-demo',
+        mergeState: 'merged',
+        mergeCommit: 'abc123',
+        mergeTestPassed: true,
+      }),
+      ghAvailable: true,
+    })
+
+    expect(preflight.status).toBe('manual_required')
+    expect(preflight.ready).toBe(false)
+    expect(preflight.publishCommand).toBeUndefined()
+    expect(preflight.evidence).toContain('policy=disabled')
+  })
+
+  it('blocks PR publishing when repo hygiene is dirty or behind upstream', () => {
+    const dirty = buildPrPublishingPreflight({
+      policy: prPolicy({ enabled: true, mode: 'draft' }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'main',
+        baseBranch: 'main',
+        featureBranch: 'mission/84bfe2c2-demo',
+        dirtyStatus: '?? scratch.txt',
+        untrackedFiles: ['scratch.txt'],
+        localBranchesCreatedByLane: ['mission/84bfe2c2-demo'],
+        stashIdsCreatedByLane: [],
+        aheadBehind: 'ahead 2, behind 0',
+        upstreamBranch: 'origin/main',
+        remoteUrl: 'git@github.com:owner/repo.git',
+        warnings: ['Repo has dirty status: ?? scratch.txt'],
+      },
+      workItem: workItem({ branchName: 'mission/84bfe2c2-demo' }),
+      ghAvailable: true,
+    })
+    const behind = buildPrPublishingPreflight({
+      policy: prPolicy({ enabled: true, mode: 'draft' }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'main',
+        baseBranch: 'main',
+        featureBranch: 'mission/84bfe2c2-demo',
+        dirtyStatus: '',
+        untrackedFiles: [],
+        localBranchesCreatedByLane: ['mission/84bfe2c2-demo'],
+        stashIdsCreatedByLane: [],
+        aheadBehind: 'ahead 1, behind 2',
+        upstreamBranch: 'origin/main',
+        remoteUrl: 'git@github.com:owner/repo.git',
+        warnings: [],
+      },
+      workItem: workItem({ branchName: 'mission/84bfe2c2-demo' }),
+      ghAvailable: true,
+    })
+
+    expect(dirty.status).toBe('blocked')
+    expect(dirty.blockers).toContain('Repo must be clean before draft PR publishing.')
+    expect(behind.status).toBe('blocked')
+    expect(behind.blockers).toContain('Base branch is behind upstream (ahead 1, behind 2).')
+  })
+
+  it('blocks PR publishing without upstream remote metadata', () => {
+    const preflight = buildPrPublishingPreflight({
+      policy: prPolicy({ enabled: true, mode: 'draft' }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'main',
+        baseBranch: 'main',
+        featureBranch: 'mission/84bfe2c2-demo',
+        dirtyStatus: '',
+        untrackedFiles: [],
+        localBranchesCreatedByLane: ['mission/84bfe2c2-demo'],
+        stashIdsCreatedByLane: [],
+        aheadBehind: 'no upstream',
+        warnings: [],
+      },
+      workItem: workItem({ branchName: 'mission/84bfe2c2-demo' }),
+      ghAvailable: true,
+    })
+
+    expect(preflight.status).toBe('blocked')
+    expect(preflight.blockers).toContain('Missing upstream branch for main.')
+    expect(preflight.blockers).toContain('Missing git remote URL for PR publishing.')
+  })
+
+  it('reports gh unavailable for enabled draft PR publishing without executing commands', () => {
+    const preflight = buildPrPublishingPreflight({
+      policy: prPolicy({ enabled: true, mode: 'draft' }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'main',
+        baseBranch: 'main',
+        featureBranch: 'mission/84bfe2c2-demo',
+        dirtyStatus: '',
+        untrackedFiles: [],
+        localBranchesCreatedByLane: ['mission/84bfe2c2-demo'],
+        stashIdsCreatedByLane: [],
+        aheadBehind: 'ahead 2, behind 0',
+        upstreamBranch: 'origin/main',
+        remoteUrl: 'git@github.com:owner/repo.git',
+        warnings: [],
+      },
+      workItem: workItem({
+        title: 'Publish draft PR safely',
+        branchName: 'mission/84bfe2c2-demo',
+        mergeState: 'merged',
+        mergeTestPassed: true,
+      }),
+      ghAvailable: false,
+    })
+
+    expect(preflight.status).toBe('unavailable')
+    expect(preflight.ready).toBe(false)
+    expect(preflight.blockers).toContain('GitHub CLI gh is unavailable; install/auth gh before publishing.')
+    expect(preflight.publishCommand).toBeUndefined()
+  })
+
+  it('builds a dry-run draft PR command when policy, merge tests, repo, and gh are ready', () => {
+    const preflight = buildPrPublishingPreflight({
+      policy: prPolicy({ enabled: true, mode: 'draft', baseBranch: 'release' }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'release',
+        baseBranch: 'main',
+        featureBranch: 'mission/84bfe2c2-demo',
+        dirtyStatus: '',
+        untrackedFiles: [],
+        localBranchesCreatedByLane: ['mission/84bfe2c2-demo'],
+        stashIdsCreatedByLane: [],
+        aheadBehind: 'ahead 2, behind 0',
+        upstreamBranch: 'origin/main',
+        remoteUrl: 'git@github.com:owner/repo.git',
+        warnings: [],
+      },
+      workItem: workItem({
+        title: 'Publish draft PR safely',
+        branchName: 'mission/84bfe2c2-demo',
+        mergeState: 'merged',
+        mergeCommit: 'abcdef1234567890',
+        mergeTestPassed: true,
+      }),
+      ghAvailable: true,
+    })
+
+    expect(preflight).toMatchObject({
+      status: 'ready',
+      ready: true,
+      baseBranch: 'release',
+      headBranch: 'mission/84bfe2c2-demo',
+      aheadBehind: 'ahead 2, behind 0',
+      mergeCommit: 'abcdef1234567890',
+    })
+    expect(preflight.publishCommand).toEqual([
+      'gh',
+      'pr',
+      'create',
+      '--draft',
+      '--base',
+      'release',
+      '--head',
+      'mission/84bfe2c2-demo',
+      '--title',
+      '[Hermes Workspace] Publish draft PR safely',
+      '--body',
+      expect.stringContaining('mergeCommit=abcdef1234567890'),
+    ])
+  })
+
+  it('collects lane cleanup inventory with local mission branches and matching safety stashes', async () => {
+    git(repoPath, ['checkout', '-b', 'mission/84bfe2c2-old-merged'])
+    writeFileSync(join(repoPath, 'merged.txt'), 'merged\n', 'utf8')
+    git(repoPath, ['add', 'merged.txt'])
+    git(repoPath, ['commit', '-m', 'merged lane branch'])
+    git(repoPath, ['checkout', 'main'])
+    git(repoPath, ['merge', '--no-ff', 'mission/84bfe2c2-old-merged', '-m', 'merge lane branch'])
+    git(repoPath, ['checkout', '-b', 'mission/11111111-unmerged'])
+    writeFileSync(join(repoPath, 'unmerged.txt'), 'unmerged\n', 'utf8')
+    git(repoPath, ['add', 'unmerged.txt'])
+    git(repoPath, ['commit', '-m', 'unmerged lane branch'])
+    git(repoPath, ['checkout', 'main'])
+    writeFileSync(join(repoPath, 'scratch.txt'), 'scratch\n', 'utf8')
+    git(repoPath, ['stash', 'push', '-u', '-m', 'single-lane-cleanup-safety'])
+
+    const inventory = await collectProjectLaneCleanupInventory({
+      repoPath,
+      baseBranch: 'main',
+      now: '2026-04-28T00:00:00.000Z',
+    })
+
+    expect(inventory.branches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'mission/84bfe2c2-old-merged', merged: true }),
+        expect.objectContaining({ name: 'mission/11111111-unmerged', merged: false }),
+      ]),
+    )
+    expect(inventory.stashes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'stash@{0}', message: expect.stringContaining('single-lane-cleanup-safety') }),
+      ]),
+    )
+  })
+
+  it('keeps cleanup as retention-only when policy is disabled', () => {
+    const plan = buildLaneCleanupPlan({
+      policy: cleanupPolicy({ enabled: false }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'main',
+        baseBranch: 'main',
+        dirtyStatus: '',
+        untrackedFiles: [],
+        localBranchesCreatedByLane: ['mission/old-merged'],
+        stashIdsCreatedByLane: ['stash@{0}: On main: single-lane-old'],
+        aheadBehind: 'ahead 0, behind 0',
+        warnings: [],
+      },
+      inventory: {
+        branches: [{ name: 'mission/old-merged', merged: true, ageDays: 99, lastCommitAt: '2026-01-01T00:00:00.000Z' }],
+        stashes: [{ id: 'stash@{0}', message: 'single-lane-old', ageDays: 99, createdAt: '2026-01-01T00:00:00.000Z' }],
+      },
+    })
+
+    expect(plan.status).toBe('retained')
+    expect(plan.dryRun).toBe(true)
+    expect(plan.actions).toEqual([])
+    expect(plan.evidence).toContain('cleanupPolicy=disabled')
+  })
+
+  it('plans dry-run deletion only for retained merged branches and old lane stashes', () => {
+    const plan = buildLaneCleanupPlan({
+      policy: cleanupPolicy({
+        enabled: true,
+        deleteMergedBranches: true,
+        retainMergedBranchDays: 30,
+        retainLaneStashes: false,
+        retainLaneStashDays: 14,
+        dryRun: true,
+      }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'main',
+        baseBranch: 'main',
+        dirtyStatus: '',
+        untrackedFiles: [],
+        localBranchesCreatedByLane: ['mission/old-merged', 'mission/new-merged', 'mission/unmerged'],
+        stashIdsCreatedByLane: ['stash@{0}: On main: single-lane-old', 'stash@{1}: On main: single-lane-new'],
+        aheadBehind: 'ahead 0, behind 0',
+        warnings: [],
+      },
+      inventory: {
+        branches: [
+          { name: 'mission/old-merged', merged: true, ageDays: 45, lastCommitAt: '2026-03-01T00:00:00.000Z' },
+          { name: 'mission/new-merged', merged: true, ageDays: 3, lastCommitAt: '2026-04-25T00:00:00.000Z' },
+          { name: 'mission/unmerged', merged: false, ageDays: 60, lastCommitAt: '2026-02-01T00:00:00.000Z' },
+        ],
+        stashes: [
+          { id: 'stash@{0}', message: 'single-lane-old', ageDays: 20, createdAt: '2026-04-01T00:00:00.000Z' },
+          { id: 'stash@{1}', message: 'single-lane-new', ageDays: 2, createdAt: '2026-04-26T00:00:00.000Z' },
+        ],
+      },
+    })
+
+    expect(plan.status).toBe('planned')
+    expect(plan.dryRun).toBe(true)
+    expect(plan.actions).toEqual([
+      expect.objectContaining({ type: 'delete_branch', target: 'mission/old-merged', destructive: false }),
+      expect.objectContaining({ type: 'drop_stash', target: 'stash@{0}', destructive: false }),
+    ])
+    expect(plan.evidence.join('\n')).toContain('retained branch mission/new-merged: age 3d < retention 30d')
+    expect(plan.evidence.join('\n')).toContain('retained branch mission/unmerged: branch is not merged')
+    expect(plan.evidence.join('\n')).toContain('retained stash stash@{1}: age 2d < retention 14d')
+  })
+
+  it('blocks destructive cleanup when repo is dirty, behind, or branch is unmerged', () => {
+    const plan = buildLaneCleanupPlan({
+      policy: cleanupPolicy({ enabled: true, deleteMergedBranches: true, dryRun: false }),
+      hygiene: {
+        repoPath,
+        currentBranch: 'main',
+        baseBranch: 'main',
+        dirtyStatus: '?? scratch.txt',
+        untrackedFiles: ['scratch.txt'],
+        localBranchesCreatedByLane: ['mission/unmerged'],
+        stashIdsCreatedByLane: [],
+        aheadBehind: 'ahead 0, behind 1',
+        warnings: ['Repo has dirty status: ?? scratch.txt'],
+      },
+      inventory: {
+        branches: [{ name: 'mission/unmerged', merged: false, ageDays: 99, lastCommitAt: '2026-01-01T00:00:00.000Z' }],
+        stashes: [],
+      },
+    })
+
+    expect(plan.status).toBe('blocked')
+    expect(plan.actions).toEqual([])
+    expect(plan.blockers).toContain('Repo must be clean before destructive cleanup.')
+    expect(plan.blockers).toContain('Base branch is behind upstream (ahead 0, behind 1).')
+    expect(plan.blockers).toContain('Unmerged lane branch mission/unmerged cannot be deleted.')
   })
 })

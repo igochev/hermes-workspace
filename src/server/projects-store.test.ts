@@ -93,7 +93,8 @@ describe('projects-store', () => {
     })
 
     expect(updated).not.toBeNull()
-    expect(updated?.name).toBe('Mission Control Next')
+    if (!updated) throw new Error('Expected project update to succeed')
+    expect(updated.name).toBe('Mission Control Next')
     expect(updated?.slug).toBe('mission-control-next')
     expect(updated?.description).toBe('Project detail copy')
     expect(updated?.repoUrl).toBe('https://github.com/igochev/hermes-workspace')
@@ -128,7 +129,7 @@ describe('projects-store', () => {
       suggestionLimit: 5,
       scoutSources: ['repo-health-scout', 'stale-docs-scout', 'architecture-debt-scout'],
     })
-    expect(project.autonomyLanePolicy).toEqual({
+    expect(project.autonomyLanePolicy).toMatchObject({
       enabled: false,
       mode: 'single_lane',
       isolation: 'branch',
@@ -180,7 +181,7 @@ describe('projects-store', () => {
     const updated = updateProject(project.id, { description: 'Only copy changed' })
 
     expect(updated?.description).toBe('Only copy changed')
-    expect(updated?.autonomyLanePolicy).toEqual({
+    expect(updated?.autonomyLanePolicy).toMatchObject({
       enabled: true,
       mode: 'single_lane',
       isolation: 'branch',
@@ -216,7 +217,7 @@ describe('projects-store', () => {
       },
     })
 
-    expect(updated?.autonomyLanePolicy).toEqual({
+    expect(updated?.autonomyLanePolicy).toMatchObject({
       enabled: true,
       mode: 'single_lane',
       isolation: 'branch',
@@ -227,6 +228,185 @@ describe('projects-store', () => {
       blockedBehavior: 'park_and_continue_when_repo_clean',
       mergeHealerEnabled: false,
       allowParallelWorktrees: false,
+    })
+  })
+
+  it('creates projects with conservative always-on policy defaults', () => {
+    const project = createProject({
+      name: 'Always On Defaults',
+      repoPath: '/repos/always-on-defaults',
+    })
+
+    expect(project.autonomyLanePolicy.alwaysOn).toEqual({
+      enabled: false,
+      retry: {
+        enabled: false,
+        maxAttemptsPerPhase: 1,
+        cooldownMinutes: 30,
+        staleScheduledMinutes: 30,
+        staleRunningMinutes: 240,
+      },
+      notifications: {
+        enabled: true,
+        digestOnly: true,
+        notifyOn: ['blocked', 'retry_exhausted', 'unsafe_repo', 'pr_ready', 'cleanup_recommended'],
+        minRepeatMinutes: 60,
+      },
+      prPublishing: {
+        enabled: false,
+        mode: 'manual',
+        titlePrefix: '[Hermes Workspace]',
+        requireCleanRepo: true,
+        requirePassingMergeTests: true,
+      },
+      cleanup: {
+        enabled: false,
+        deleteMergedBranches: false,
+        retainMergedBranchDays: 30,
+        retainLaneStashes: true,
+        retainLaneStashDays: 30,
+        dryRun: true,
+      },
+    })
+  })
+
+  it('preserves and deep-merges always-on policy during partial project updates', () => {
+    const project = createProject({
+      name: 'Always On Partial',
+      repoPath: '/repos/always-on-partial',
+      autonomyLanePolicy: {
+        enabled: true,
+        alwaysOn: {
+          enabled: true,
+          retry: { enabled: true, maxAttemptsPerPhase: 2, cooldownMinutes: 45 },
+          notifications: { enabled: true, digestOnly: false, notifyOn: ['blocked'], minRepeatMinutes: 15 },
+          prPublishing: { enabled: true, mode: 'draft', baseBranch: 'release', titlePrefix: '[Lane]' },
+          cleanup: { enabled: true, retainMergedBranchDays: 14, dryRun: true },
+        },
+      },
+    })
+
+    const renamed = updateProject(project.id, { description: 'copy only' })
+    expect(renamed?.autonomyLanePolicy.alwaysOn.retry).toEqual({
+      enabled: true,
+      maxAttemptsPerPhase: 2,
+      cooldownMinutes: 45,
+      staleScheduledMinutes: 30,
+      staleRunningMinutes: 240,
+    })
+
+    const updated = updateProject(project.id, {
+      autonomyLanePolicy: {
+        alwaysOn: {
+          retry: { cooldownMinutes: 10 },
+          cleanup: { retainLaneStashDays: 90 },
+        },
+      },
+    })
+
+    expect(updated?.autonomyLanePolicy.alwaysOn).toEqual({
+      enabled: true,
+      retry: {
+        enabled: true,
+        maxAttemptsPerPhase: 2,
+        cooldownMinutes: 10,
+        staleScheduledMinutes: 30,
+        staleRunningMinutes: 240,
+      },
+      notifications: {
+        enabled: true,
+        digestOnly: false,
+        notifyOn: ['blocked'],
+        minRepeatMinutes: 15,
+      },
+      prPublishing: {
+        enabled: true,
+        mode: 'draft',
+        baseBranch: 'release',
+        titlePrefix: '[Lane]',
+        requireCleanRepo: true,
+        requirePassingMergeTests: true,
+      },
+      cleanup: {
+        enabled: true,
+        deleteMergedBranches: false,
+        retainMergedBranchDays: 14,
+        retainLaneStashes: true,
+        retainLaneStashDays: 90,
+        dryRun: true,
+      },
+    })
+  })
+
+  it('normalizes invalid always-on policy values back to safe defaults', () => {
+    const project = createProject({
+      name: 'Always On Invalid',
+      repoPath: '/repos/always-on-invalid',
+      autonomyLanePolicy: {
+        alwaysOn: {
+          enabled: true,
+          retry: {
+            enabled: true,
+            maxAttemptsPerPhase: -1,
+            cooldownMinutes: Number.NaN,
+            staleScheduledMinutes: 'soon',
+            staleRunningMinutes: 0,
+          },
+          notifications: {
+            enabled: true,
+            digestOnly: false,
+            notifyOn: ['blocked', 'unknown-event'],
+            minRepeatMinutes: -5,
+          },
+          prPublishing: {
+            enabled: true,
+            mode: 'auto',
+            titlePrefix: '',
+            requireCleanRepo: false,
+            requirePassingMergeTests: false,
+          },
+          cleanup: {
+            enabled: true,
+            deleteMergedBranches: true,
+            retainMergedBranchDays: -30,
+            retainLaneStashes: false,
+            retainLaneStashDays: Number.POSITIVE_INFINITY,
+            dryRun: false,
+          },
+        },
+      },
+    })
+
+    expect(project.autonomyLanePolicy.alwaysOn).toEqual({
+      enabled: true,
+      retry: {
+        enabled: true,
+        maxAttemptsPerPhase: 1,
+        cooldownMinutes: 30,
+        staleScheduledMinutes: 30,
+        staleRunningMinutes: 240,
+      },
+      notifications: {
+        enabled: true,
+        digestOnly: false,
+        notifyOn: ['blocked'],
+        minRepeatMinutes: 60,
+      },
+      prPublishing: {
+        enabled: true,
+        mode: 'manual',
+        titlePrefix: '[Hermes Workspace]',
+        requireCleanRepo: false,
+        requirePassingMergeTests: false,
+      },
+      cleanup: {
+        enabled: true,
+        deleteMergedBranches: true,
+        retainMergedBranchDays: 30,
+        retainLaneStashes: false,
+        retainLaneStashDays: 30,
+        dryRun: false,
+      },
     })
   })
 
@@ -264,7 +444,7 @@ describe('projects-store', () => {
       suggestionLimit: 5,
       scoutSources: ['repo-health-scout', 'stale-docs-scout', 'architecture-debt-scout'],
     })
-    expect(legacy.autonomyLanePolicy).toEqual({
+    expect(legacy.autonomyLanePolicy).toMatchObject({
       enabled: false,
       mode: 'single_lane',
       isolation: 'branch',

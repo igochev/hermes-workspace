@@ -3,8 +3,15 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
-import { collectProjectRepoHygiene, type ProjectRepoHygiene } from './project-branch-manager'
-import type { WorkItemRecord, WorkItemMergeState } from './work-items-store'
+import {
+
+
+  buildPrPublishingPreflight,
+  collectProjectRepoHygiene
+} from './project-branch-manager'
+import type {PrPublishingPreflight, ProjectRepoHygiene} from './project-branch-manager';
+import type { ProjectAutonomyAlwaysOnPolicy } from './projects-store'
+import type { WorkItemMergeState, WorkItemRecord } from './work-items-store'
 
 const execFileAsync = promisify(execFile)
 const execAsync = promisify(exec)
@@ -22,9 +29,10 @@ export type WorkItemMergeHealerResult = {
   mergeArtifactPaths: Array<string>
   mergeBlockedReason?: string
   repoHygiene?: ProjectRepoHygiene
+  prPublishingPreflight?: PrPublishingPreflight
 }
 
-async function git(repoPath: string, args: string[]): Promise<string> {
+async function git(repoPath: string, args: Array<string>): Promise<string> {
   const result = (await execFileAsync('git', args, {
     cwd: repoPath,
     encoding: 'utf8',
@@ -32,7 +40,7 @@ async function git(repoPath: string, args: string[]): Promise<string> {
   return result.stdout.trim()
 }
 
-async function gitAllowFailure(repoPath: string, args: string[]): Promise<GitResult> {
+async function gitAllowFailure(repoPath: string, args: Array<string>): Promise<GitResult> {
   try {
     return (await execFileAsync('git', args, {
       cwd: repoPath,
@@ -101,6 +109,8 @@ export async function runWorkItemMergeHealer(params: {
   repoPath: string
   workItem: WorkItemRecord
   testCommand?: string
+  prPublishingPolicy?: ProjectAutonomyAlwaysOnPolicy['prPublishing']
+  ghAvailable?: boolean
 }): Promise<WorkItemMergeHealerResult> {
   const targetBranch =
     params.workItem.mergeTargetBranch || params.workItem.baseBranch || 'main'
@@ -234,6 +244,22 @@ export async function runWorkItemMergeHealer(params: {
     baseBranch: targetBranch,
     featureBranch,
   })
+  const mergedWorkItem: WorkItemRecord = {
+    ...params.workItem,
+    mergeState: 'merged',
+    mergeCommit,
+    mergeBaseCommit: baseCommit,
+    mergeTargetBranch: targetBranch,
+    mergeTestPassed: true,
+  }
+  const prPublishingPreflight = params.prPublishingPolicy
+    ? buildPrPublishingPreflight({
+        policy: params.prPublishingPolicy,
+        hygiene: repoHygiene,
+        workItem: mergedWorkItem,
+        ghAvailable: params.ghAvailable,
+      })
+    : undefined
   return {
     mergeState: 'merged',
     mergeTargetBranch: targetBranch,
@@ -244,5 +270,6 @@ export async function runWorkItemMergeHealer(params: {
     mergeTestPassed: true,
     mergeArtifactPaths: [],
     repoHygiene,
+    prPublishingPreflight,
   }
 }

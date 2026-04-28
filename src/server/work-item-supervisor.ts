@@ -1,12 +1,18 @@
-import { listExecutionRuns, type ExecutionRunRecord } from './execution-runs-store'
+import {  listExecutionRuns } from './execution-runs-store'
+import {   getProject } from './projects-store'
+import { collectProjectRepoHygiene } from './project-branch-manager'
 import { syncWorkItemExecutionState } from './work-item-execution'
 import {
+
+
+
   getWorkItem,
   listWorkItems,
-  type WorkItemMissionState,
-  type WorkItemRecord,
-  type WorkItemReviewState,
+  updateWorkItem
 } from './work-items-store'
+import type {ProjectAutonomyAlwaysOnNotificationEvent, ProjectRecord} from './projects-store';
+import type {ExecutionRunRecord} from './execution-runs-store';
+import type {WorkItemMissionState, WorkItemRecord, WorkItemReviewState} from './work-items-store';
 
 export type SupervisorFindingKind =
   | 'mission_failed'
@@ -37,6 +43,30 @@ export type SupervisorThresholds = {
 export type ReconcileWorkItemExecutionResult = {
   checked: number
   findings: Array<SupervisorFinding>
+}
+
+export type AlwaysOnLaneRecoveryDecisionType =
+  | 'observe'
+  | 'recommend_retry'
+  | 'schedule_retry'
+  | 'retry_exhausted'
+  | 'unsafe_repo'
+
+export type AlwaysOnLaneRecoveryDecision = {
+  type: AlwaysOnLaneRecoveryDecisionType
+  event: ProjectAutonomyAlwaysOnNotificationEvent | 'observe'
+  shouldRetry: boolean
+  retryPhase?: WorkItemRecord['phase']
+  nextRetryCount: number
+  maxAttempts: number
+  cooldownUntil?: string
+  reason: string
+  evidence: Array<string>
+}
+
+export type LaneRepoSafetyEvidence = {
+  safe: boolean
+  reason?: string
 }
 
 export const DEFAULT_SUPERVISOR_THRESHOLDS: SupervisorThresholds = {
@@ -106,6 +136,132 @@ function parseTime(value: string | undefined): number | null {
   if (!value) return null
   const time = Date.parse(value)
   return Number.isFinite(time) ? time : null
+}
+
+function minutesFromNow(now: Date, minutes: number): string {
+  return new Date(now.getTime() + minutes * 60 * 1000).toISOString()
+}
+
+function buildAlwaysOnDecision(params: {
+  type: AlwaysOnLaneRecoveryDecisionType
+  event: AlwaysOnLaneRecoveryDecision['event']
+  shouldRetry: boolean
+  workItem: WorkItemRecord
+  finding: SupervisorFinding
+  maxAttempts: number
+  nextRetryCount: number
+  reason: string
+  repoSafety: LaneRepoSafetyEvidence
+  cooldownUntil?: string
+}): AlwaysOnLaneRecoveryDecision {
+  const evidence = [
+    `finding=${params.finding.kind}`,
+    params.finding.jobId ? `jobId=${params.finding.jobId}` : 'jobId=missing',
+    `retryCount=${params.workItem.laneRetryCount ?? 0}/${params.maxAttempts}`,
+    params.repoSafety.safe ? 'repo=safe' : `repo=unsafe${params.repoSafety.reason ? `:${params.repoSafety.reason}` : ''}`,
+  ]
+  if (params.cooldownUntil) evidence.push(`cooldownUntil=${params.cooldownUntil}`)
+  return {
+    type: params.type,
+    event: params.event,
+    shouldRetry: params.shouldRetry,
+    retryPhase: params.workItem.phase,
+    nextRetryCount: params.nextRetryCount,
+    maxAttempts: params.maxAttempts,
+    cooldownUntil: params.cooldownUntil,
+    reason: params.reason,
+    evidence,
+  }
+}
+
+export function decideAlwaysOnLaneRecovery(params: {
+  project: ProjectRecord
+  workItem: WorkItemRecord
+  finding: SupervisorFinding
+  repoSafety: LaneRepoSafetyEvidence
+  now?: Date
+}): AlwaysOnLaneRecoveryDecision {
+  const now = params.now ?? new Date()
+  const alwaysOn = params.project.autonomyLanePolicy.alwaysOn
+  const retry = alwaysOn.retry
+  const maxAttempts = retry.maxAttemptsPerPhase
+  const currentRetryCount = params.workItem.laneRetryCount ?? 0
+  const nextRetryCount = Math.min(currentRetryCount + 1, maxAttempts)
+  const cooldownUntil = minutesFromNow(now, retry.cooldownMinutes)
+
+  if (!alwaysOn.enabled || !retry.enabled) {
+    return buildAlwaysOnDecision({
+      type: 'recommend_retry',
+      event: 'blocked',
+      shouldRetry: false,
+      workItem: params.workItem,
+      finding: params.finding,
+      maxAttempts,
+      nextRetryCount: currentRetryCount,
+      repoSafety: params.repoSafety,
+      reason: 'Always-on retry policy is disabled; operator recovery is recommended instead of an automatic retry.',
+    })
+  }
+
+  if (!params.repoSafety.safe) {
+    return buildAlwaysOnDecision({
+      type: 'unsafe_repo',
+      event: 'unsafe_repo',
+      shouldRetry: false,
+      workItem: params.workItem,
+      finding: params.finding,
+      maxAttempts,
+      nextRetryCount: currentRetryCount,
+      repoSafety: params.repoSafety,
+      reason: `Automatic retry refused because repo safety evidence is unsafe${params.repoSafety.reason ? `: ${params.repoSafety.reason}` : '.'}`,
+    })
+  }
+
+  if (currentRetryCount >= maxAttempts) {
+    return buildAlwaysOnDecision({
+      type: 'retry_exhausted',
+      event: 'retry_exhausted',
+      shouldRetry: false,
+      workItem: params.workItem,
+      finding: params.finding,
+      maxAttempts,
+      nextRetryCount: currentRetryCount,
+      repoSafety: params.repoSafety,
+      reason: `Retry attempts exhausted for ${params.workItem.phase ?? 'current'} phase (${currentRetryCount}/${maxAttempts}).`,
+    })
+  }
+
+  const lastRetryAt = parseTime(params.workItem.laneLastRetryAt)
+  if (lastRetryAt !== null) {
+    const nextAllowedAt = new Date(lastRetryAt + retry.cooldownMinutes * 60 * 1000).toISOString()
+    if (now.getTime() < Date.parse(nextAllowedAt)) {
+      return buildAlwaysOnDecision({
+        type: 'observe',
+        event: 'observe',
+        shouldRetry: false,
+        workItem: params.workItem,
+        finding: params.finding,
+        maxAttempts,
+        nextRetryCount: currentRetryCount,
+        repoSafety: params.repoSafety,
+        cooldownUntil: nextAllowedAt,
+        reason: `Retry cooldown has not elapsed; next retry may be considered at ${nextAllowedAt}.`,
+      })
+    }
+  }
+
+  return buildAlwaysOnDecision({
+    type: 'schedule_retry',
+    event: 'retry_scheduled',
+    shouldRetry: true,
+    workItem: params.workItem,
+    finding: params.finding,
+    maxAttempts,
+    nextRetryCount,
+    repoSafety: params.repoSafety,
+    cooldownUntil,
+    reason: `Always-on retry policy allows bounded retry ${nextRetryCount}/${maxAttempts} for ${params.workItem.phase ?? 'current'} phase.`,
+  })
 }
 
 function latestRunForRole(
@@ -251,6 +407,63 @@ export function detectStaleExecution(params: {
   ]
 }
 
+function recoveryDecisionSummary(decision: AlwaysOnLaneRecoveryDecision): string {
+  return [decision.type, decision.event, decision.reason, ...decision.evidence].join(' | ')
+}
+
+async function repoSafetyForWorkItem(
+  project: ProjectRecord,
+  workItem: WorkItemRecord,
+): Promise<LaneRepoSafetyEvidence> {
+  const repoPath = workItem.repoPathSnapshot || project.repoPath
+  if (!repoPath) return { safe: false, reason: 'No repo path recorded for lane work item.' }
+  try {
+    const hygiene = await collectProjectRepoHygiene({
+      repoPath,
+      baseBranch: workItem.baseBranch ?? project.autonomyLanePolicy.baseBranch ?? project.defaultBranch,
+      featureBranch: workItem.branchName,
+      prUrl: workItem.prUrl,
+    })
+    return hygiene.dirtyStatus ? { safe: false, reason: hygiene.warnings.join('; ') } : { safe: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { safe: false, reason: `Unable to inspect repo hygiene: ${message}` }
+  }
+}
+
+async function persistAlwaysOnRecoveryDecision(params: {
+  workItem: WorkItemRecord
+  findings: Array<SupervisorFinding>
+  now: Date
+}): Promise<void> {
+  const project = getProject(params.workItem.projectId)
+  if (!project?.autonomyLanePolicy.enabled) return
+  const actionableFinding = params.findings.find((finding) =>
+    ['mission_stale', 'review_stale', 'mission_failed', 'review_failed', 'job_missing'].includes(finding.kind),
+  )
+  if (!actionableFinding) return
+
+  const repoSafety = await repoSafetyForWorkItem(project, params.workItem)
+  const decision = decideAlwaysOnLaneRecovery({
+    project,
+    workItem: params.workItem,
+    finding: actionableFinding,
+    repoSafety,
+    now: params.now,
+  })
+  const updates: Parameters<typeof updateWorkItem>[1] = {
+    laneRecoveryDecision: recoveryDecisionSummary(decision),
+  }
+  if (decision.type === 'schedule_retry') {
+    updates.laneRetryCount = decision.nextRetryCount
+    updates.laneLastRetryAt = params.now.toISOString()
+  }
+  if (decision.type === 'retry_exhausted') {
+    updates.laneRetryExhaustedAt = params.now.toISOString()
+  }
+  updateWorkItem(params.workItem.id, updates)
+}
+
 export async function reconcileWorkItemExecution(workItemId: string): Promise<ReconcileWorkItemExecutionResult> {
   const beforeSync = getWorkItem(workItemId)
   if (!beforeSync) return { checked: 0, findings: [] }
@@ -277,6 +490,7 @@ export async function reconcileWorkItemExecution(workItemId: string): Promise<Re
 
   const workItem = getWorkItem(workItemId) ?? beforeSync
   const findings = detectStaleExecution({ workItem, runs: listExecutionRuns({ workItemId }) })
+  await persistAlwaysOnRecoveryDecision({ workItem, findings, now: new Date() })
   return { checked: 1, findings }
 }
 

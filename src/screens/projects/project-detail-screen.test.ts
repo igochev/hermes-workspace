@@ -18,6 +18,9 @@ import {
   PROJECT_LANE_EVIDENCE_LABELS,
   PROJECT_LANE_PARALLEL_WORKTREES_NOTE,
   PROJECT_LANE_RECOVERY_ACTIONS_HEADING,
+  PROJECT_ALWAYS_ON_POLICY_PANEL_TITLE,
+  PROJECT_ALWAYS_ON_POLICY_LABELS,
+  PROJECT_ALWAYS_ON_POLICY_SAFE_TOGGLE_LABEL,
   PROJECT_PHASE_ROUTING_POLICY_LABELS,
   PROJECT_PROFILE_READINESS_COPY,
   PROJECT_PROFILE_READINESS_PANEL_TITLE,
@@ -178,6 +181,19 @@ describe('project detail screen board constants', () => {
     })
   })
 
+  it('surfaces project always-on policy panel copy for owner controls', () => {
+    expect(PROJECT_ALWAYS_ON_POLICY_PANEL_TITLE).toBe('ALWAYS-ON POLICY')
+    expect(PROJECT_ALWAYS_ON_POLICY_SAFE_TOGGLE_LABEL).toBe('Enable supervised always-on digest')
+    expect(PROJECT_ALWAYS_ON_POLICY_LABELS).toEqual({
+      mode: 'Mode',
+      retry: 'Retry guardrails',
+      notifications: 'Notification digest events',
+      prPublishing: 'PR publishing gate',
+      cleanup: 'Cleanup retention',
+      safety: 'Safety gates',
+    })
+  })
+
   it('surfaces project workflow policy copy and helper summaries for routing governance', () => {
     expect(PROJECT_WORKFLOW_POLICY_TOGGLE_LABEL).toBe('Profile & Workflow Policy')
     expect(PROJECT_WORKFLOW_POLICY_PANEL_TITLE).toBe('Project Profile & Workflow Policy')
@@ -239,6 +255,9 @@ describe('project detail screen board constants', () => {
       riskLevel: 'medium',
       labels: [],
       repoPathSnapshot: '/repo',
+      sourceSuggestionEvidence: [],
+      reviewQualityGateReasons: [],
+      reviewMissingEvidence: [],
       sessionKeys: [],
       artifactPaths: [],
       acceptanceCriteria: [],

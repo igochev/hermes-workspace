@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { runWorkItemMergeHealer } from './work-item-merge-healer'
+import type { ProjectAutonomyAlwaysOnPolicy } from './projects-store'
 import type { WorkItemRecord } from './work-items-store'
 
 function git(repoPath: string, args: string[]): string {
@@ -50,6 +51,19 @@ function workItem(input: Partial<WorkItemRecord> = {}): WorkItemRecord {
     history: input.history ?? [],
     createdAt: input.createdAt ?? '2026-04-27T00:00:00.000Z',
     updatedAt: input.updatedAt ?? '2026-04-27T00:00:00.000Z',
+  }
+}
+
+function prPolicy(
+  input: Partial<ProjectAutonomyAlwaysOnPolicy['prPublishing']> = {},
+): ProjectAutonomyAlwaysOnPolicy['prPublishing'] {
+  return {
+    enabled: input.enabled ?? true,
+    mode: input.mode ?? 'draft',
+    baseBranch: input.baseBranch,
+    titlePrefix: input.titlePrefix ?? '[Hermes Workspace]',
+    requireCleanRepo: input.requireCleanRepo ?? true,
+    requirePassingMergeTests: input.requirePassingMergeTests ?? true,
   }
 }
 
@@ -199,5 +213,46 @@ describe('work-item-merge-healer', () => {
       dirtyStatus: '',
       untrackedFiles: [],
     })
+  })
+
+  it('attaches PR publishing preflight evidence after a successful merge when policy is supplied', async () => {
+    const remotePath = join(tempDir, 'origin.git')
+    execFileSync('git', ['init', '--bare', remotePath])
+    git(repoPath, ['remote', 'add', 'origin', remotePath])
+    git(repoPath, ['push', '-u', 'origin', 'main'])
+    git(repoPath, ['checkout', '-b', 'mission/84bfe2c2-autonomous-merge-healing'])
+    writeFileSync(join(repoPath, 'src.ts'), 'export const value = 3\n', 'utf8')
+    git(repoPath, ['add', 'src.ts'])
+    git(repoPath, ['commit', '-m', 'feature'])
+
+    const result = await runWorkItemMergeHealer({
+      repoPath,
+      workItem: workItem({ title: 'Autonomous merge healing' }),
+      prPublishingPolicy: prPolicy({ enabled: true, mode: 'draft' }),
+      ghAvailable: true,
+    })
+
+    expect(result.mergeState).toBe('merged')
+    expect(result.prPublishingPreflight).toMatchObject({
+      status: 'ready',
+      ready: true,
+      baseBranch: 'main',
+      headBranch: 'mission/84bfe2c2-autonomous-merge-healing',
+      aheadBehind: 'ahead 2, behind 0',
+    })
+    expect(result.prPublishingPreflight?.publishCommand).toEqual([
+      'gh',
+      'pr',
+      'create',
+      '--draft',
+      '--base',
+      'main',
+      '--head',
+      'mission/84bfe2c2-autonomous-merge-healing',
+      '--title',
+      '[Hermes Workspace] Autonomous merge healing',
+      '--body',
+      expect.stringContaining(`mergeCommit=${result.mergeCommit}`),
+    ])
   })
 })

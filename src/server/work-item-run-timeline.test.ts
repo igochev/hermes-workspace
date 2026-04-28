@@ -260,6 +260,7 @@ describe('work-item-run-timeline', () => {
       status: 'done',
       phase: 'deploy',
       laneState: 'done',
+      branchName: 'mission/84bfe2c2-cleanup-ready',
       mergeState: 'merged',
       mergeCommit: 'abc123def456',
       mergeTargetBranch: 'main',
@@ -281,7 +282,8 @@ describe('work-item-run-timeline', () => {
       phase: 'deploy',
       profileRole: 'deployer',
       state: 'succeeded',
-      summary: 'Merge-Healer merged into main at abc123de.',
+      summary: 'Merge-Healer merged into main at abc123de. Cleanup dry-run recommended for mission/84bfe2c2-cleanup-ready after retention policy review.',
+      nextExpectedAction: 'Review branch/stash cleanup recommendations; deletion is dry-run/non-destructive unless explicitly enabled by policy.',
       artifacts: [],
     })
     expect(buildWorkItemRunTimeline(conflict).rows[3]).toMatchObject({

@@ -6,31 +6,42 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowLeft01Icon,
-  GithubIcon,
   GitBranchIcon,
+  GithubIcon,
   PlayIcon,
   RefreshIcon,
 } from '@hugeicons/core-free-icons'
+import type {
+  ProfileReadinessReport,
+  ProfileReadinessRoleReport,
+  ProfileReadinessSource,
+  ProfileReadinessStatus,
+} from '@/server/profile-readiness'
+import type { AttentionQueueItem } from '@/server/attention-queue-store'
+import type { WorkItemRecoveryAction } from '@/server/work-item-recovery-actions'
+import type {WorkItemExecutionPayload} from '@/lib/work-item-execution-api';
+import type {PlannerStructuredOutput, PlanningDraftRecord, PlanningDraftStatus, WorkItemApprovalDecision, WorkItemBlockedReason, WorkItemCriterionStatus, WorkItemLifecycleAction, WorkItemRecord, WorkItemRiskLevel, WorkItemRunTimelineRow, WorkItemRunTimelineState, WorkItemStatus} from '@/lib/projects-api';
 import { toast } from '@/components/ui/toast'
 import {
-  deleteWorkItem,
-  updateWorkItem,
-  type PlannerStructuredOutput,
-  type PlanningDraftRecord,
-  type PlanningDraftStatus,
-  type WorkItemApprovalDecision,
-  type WorkItemBlockedReason,
-  type WorkItemCriterionStatus,
-  type WorkItemRecord,
-  type WorkItemRiskLevel,
-  type WorkItemRunTimelineRow,
-  type WorkItemRunTimelineState,
-  type WorkItemStatus,
+
+
+
   WORK_ITEM_BLOCKED_REASON_LABELS,
   WORK_ITEM_PHASE_LABELS,
   WORK_ITEM_PRIORITY_LABELS,
   WORK_ITEM_RISK_LEVEL_LABELS,
   WORK_ITEM_STATUS_LABELS,
+
+
+
+
+
+
+
+
+
+  deleteWorkItem,
+  updateWorkItem
 } from '@/lib/projects-api'
 import {
   acceptPlanningDraft,
@@ -40,12 +51,6 @@ import {
 import { resolveWorkItemApproval } from '@/lib/work-item-approvals-api'
 import { launchWorkItem } from '@/lib/work-item-launch-api'
 import { fetchProjectProfileReadiness } from '@/lib/profile-readiness-api'
-import type {
-  ProfileReadinessReport,
-  ProfileReadinessRoleReport,
-  ProfileReadinessSource,
-  ProfileReadinessStatus,
-} from '@/server/profile-readiness'
 import {
   fetchAttentionQueue,
 } from '@/lib/attention-queue-api'
@@ -53,13 +58,11 @@ import {
   executeWorkItemRecoveryAction,
   toRecoveryActionInput,
 } from '@/lib/work-item-recovery-actions-api'
-import type { AttentionQueueItem } from '@/server/attention-queue-store'
-import type { WorkItemRecoveryAction } from '@/server/work-item-recovery-actions'
+import { buildWorkItemAlwaysOnEvidenceSummary } from '@/lib/projects-view-model'
 import {
+
   applyWorkItemLifecycleAction,
-  syncWorkItemExecution,
-  type WorkItemExecutionPayload,
-  type WorkItemLifecycleAction,
+  syncWorkItemExecution
 } from '@/lib/work-item-execution-api'
 
 export const WORK_ITEM_DETAIL_HEADER_CLASS = 'rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 backdrop-blur-xl'
@@ -78,6 +81,14 @@ export const WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE = 'Execution sync warning'
 export const WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE = 'Profile Preflight'
 export const WORK_ITEM_RECOVERY_PANEL_TITLE = 'Recovery Actions'
 export const WORK_ITEM_RUNS_SECTION_TITLE = 'Runs / Agents'
+export const WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE = 'Always-on policy evidence'
+export const WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS = {
+  decision: 'Recovery decision',
+  retry: 'Retry evidence',
+  repo: 'Repo/blocker safety',
+  pr: 'PR evidence',
+  cleanup: 'Cleanup evidence',
+} as const
 export const WORK_ITEM_OPERATOR_EVIDENCE_LABELS = {
   baseBranch: 'Base branch',
   featureBranch: 'Feature branch',
@@ -163,6 +174,19 @@ export function getWorkItemMergeEvidenceSummary(
   }
 }
 
+export function getWorkItemAlwaysOnEvidenceRows(
+  workItem: Parameters<typeof buildWorkItemAlwaysOnEvidenceSummary>[0],
+): Array<{ label: string; value: string }> {
+  const summary = buildWorkItemAlwaysOnEvidenceSummary(workItem)
+  return [
+    { label: WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS.decision, value: summary.decisionLabel },
+    { label: WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS.retry, value: summary.retryEvidence },
+    { label: WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS.repo, value: summary.repoSafety },
+    { label: WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS.pr, value: summary.prEvidence },
+    { label: WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS.cleanup, value: summary.cleanupEvidence },
+  ]
+}
+
 export function getWorkItemRecoveryPanelItems(
   attentionItems: Array<WorkItemRecoveryPanelSourceItem>,
 ): Array<WorkItemRecoveryPanelItem> {
@@ -195,6 +219,7 @@ const WORK_ITEM_RECOVERY_DEFAULT_NOTES: Record<WorkItemRecoveryAction['type'], s
 const WORK_ITEM_PROFILE_READINESS_SOURCE_LABELS: Record<ProfileReadinessSource, string> = {
   'work-item-assigned-profile': 'work-item override',
   'project-phase-profile': 'project phase mapping',
+  'project-runtime-profile': 'project runtime mapping',
   'project-autopilot-policy': 'project Autopilot policy',
   default: 'default mapping',
   none: 'no mapping',
@@ -357,8 +382,8 @@ export function buildPlanningDraftDiff(
 
   pushDiff('Title', currentWorkItem.title || '—', structuredOutput.title || '—')
   pushDiff('Description', currentWorkItem.description || '—', structuredOutput.description || '—')
-  pushDiff('Priority', currentWorkItem.priority || '—', structuredOutput.priority || '—')
-  pushDiff('Risk level', currentWorkItem.riskLevel || '—', structuredOutput.riskLevel || '—')
+  pushDiff('Priority', currentWorkItem.priority, structuredOutput.priority)
+  pushDiff('Risk level', currentWorkItem.riskLevel, structuredOutput.riskLevel)
   pushDiff(
     'Labels',
     formatPlanningDiffList(currentWorkItem.labels, ', '),
@@ -382,7 +407,7 @@ export function buildWorkItemAcceptanceCriteriaStatus(
   if (acceptanceCriteria.length === 0) return []
 
   return acceptanceCriteria.map((criterion, index) => {
-    const indexed = criteriaStatus[index]
+    const indexed = criteriaStatus.at(index)
     if (indexed && indexed.text === criterion) {
       return { text: criterion, met: indexed.met }
     }
@@ -431,7 +456,7 @@ function shortId(value: string, length = 8): string {
 }
 
 export function getWorkItemRunTimelineIdCopy(
-  row: Pick<WorkItemRunTimelineRow, 'jobId' | 'runId' | 'sessionKey' | 'sessionKeyPrefix'>,
+  row: Partial<WorkItemRunTimelineRow>,
 ): string {
   const ids = [
     row.jobId ? `job ${shortId(row.jobId)}` : null,
@@ -446,7 +471,7 @@ export function getWorkItemRunTimelineArtifactCopy(artifacts: Array<string>): st
   return artifacts.length > 0 ? `Builder changed files: ${artifacts.join(', ')}` : 'No code evidence yet'
 }
 
-export function getWorkItemRunTimelineLinkLabel(row: Pick<WorkItemRunTimelineRow, 'link' | 'sessionKey'>): string | null {
+export function getWorkItemRunTimelineLinkLabel(row: Partial<WorkItemRunTimelineRow>): string | null {
   if (row.link) return 'Open run'
   if (row.sessionKey) return 'Open session'
   return null
@@ -709,7 +734,7 @@ export function WorkItemDetailScreen({
 
   const approvalMutation = useMutation({
     mutationFn: ({ decision, notes }: { decision: WorkItemApprovalDecision; notes?: string }) =>
-      resolveWorkItemApproval(workItem.approvals?.[0]?.id || '', {
+      resolveWorkItemApproval(workItem?.approvals?.[0]?.id ?? '', {
         decision,
         resolvedBy: 'D3n13r',
         notes,
@@ -898,7 +923,7 @@ export function WorkItemDetailScreen({
   }
 
   function toggleAcceptanceCriterion(index: number) {
-    const criterion = acceptanceCriteriaStatus[index]
+    const criterion = acceptanceCriteriaStatus.at(index)
     if (!criterion) return
 
     const nextStatus = acceptanceCriteriaStatus.map((item, itemIndex) =>
@@ -938,8 +963,10 @@ export function WorkItemDetailScreen({
   const [isAddingLabel, setIsAddingLabel] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const labelMutation = useMutation({
-    mutationFn: (labels: Array<string>) =>
-      updateWorkItem(workItem.id, { labels }).then(() => queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })),
+    mutationFn: ({ labels }: { labels: Array<string> }) =>
+      updateWorkItem(workItemId, { labels }).then(() =>
+        queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] }),
+      ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['mission-control', 'projects', projectId] })
       toast('Labels updated')
@@ -958,7 +985,7 @@ export function WorkItemDetailScreen({
     ? getAvailableWorkItemLifecycleActions({ status: workItem.status, phase: workItem.phase })
     : []
   const acceptanceCriteriaStatus = workItem
-    ? buildWorkItemAcceptanceCriteriaStatus(workItem.acceptanceCriteria, workItem.criteriaStatus ?? [])
+    ? buildWorkItemAcceptanceCriteriaStatus(workItem.acceptanceCriteria, workItem.criteriaStatus)
     : []
   const acceptanceCriteriaProgress = getWorkItemAcceptanceCriteriaProgress(acceptanceCriteriaStatus)
   const acceptanceCriteriaProgressLabel =
@@ -985,13 +1012,18 @@ export function WorkItemDetailScreen({
   )
   const latestPlanningDraft: PlanningDraftRecord | null = workItem?.latestPlanningDraft ?? null
   const mergeEvidenceSummary = workItem ? getWorkItemMergeEvidenceSummary(workItem) : null
+  const alwaysOnEvidenceRows = workItem ? getWorkItemAlwaysOnEvidenceRows(workItem) : []
   const planningDraftStatusLabel = getPlanningDraftStatusLabel(latestPlanningDraft?.status)
   const planningDraftGuidance = getPlanningDraftGuidance(latestPlanningDraft?.status)
   const planningDiff = workItem
     ? buildPlanningDraftDiff(workItem, latestPlanningDraft?.structuredOutput)
     : []
   const canLaunchBuild = workItem
-    ? canLaunchBuildFromPlanningState(workItem, latestPlanningDraft)
+    ? canLaunchBuildFromPlanningState({
+        status: workItem.status,
+        phase: workItem.phase,
+        ...(workItem.planFilePath ? { planFilePath: workItem.planFilePath } : {}),
+      }, latestPlanningDraft)
     : true
   const isBuildLaunchAction =
     primaryLaunchLabel === 'Launch Build' || primaryLaunchLabel === 'Relaunch Build'
@@ -1476,6 +1508,9 @@ export function WorkItemDetailScreen({
                     <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeArtifacts} value={mergeEvidenceSummary.mergeArtifacts} />
                   </>
                 ) : null}
+                {alwaysOnEvidenceRows.map((row) => (
+                  <Detail key={row.label} label={`${WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE} · ${row.label}`} value={row.value} />
+                ))}
                 {workItem.reviewJobId ? (
                   <>
                     <Detail label="Planner Review Job" value={workItem.reviewJobId} />
@@ -1498,11 +1533,11 @@ export function WorkItemDetailScreen({
                     <Detail label="Parser Error" value={workItem.reviewParserError || '—'} />
                     <Detail
                       label="Missing Evidence"
-                      value={workItem.reviewMissingEvidence?.join(', ') || '—'}
+                      value={workItem.reviewMissingEvidence.join(', ') || '—'}
                     />
                     <Detail
                       label="Gate Reasons"
-                      value={workItem.reviewQualityGateReasons?.join('; ') || '—'}
+                      value={workItem.reviewQualityGateReasons.join('; ') || '—'}
                     />
                     {getReviewEvidenceAttentionMessage(workItem) ? (
                       <Detail

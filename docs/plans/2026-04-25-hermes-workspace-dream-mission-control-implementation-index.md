@@ -2,7 +2,11 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md`
+> **Current active implementation plan:** `docs/plans/2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md`
+>
+> **Previous always-on policy plan:** `docs/plans/2026-04-28-hermes-workspace-always-on-operator-policy-plan.md`
+>
+> **Previous single-lane hardening plan:** `docs/plans/2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md`
 >
 > **Previous production-readiness plan:** `docs/plans/2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md`
 >
@@ -54,11 +58,23 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 |---:|---|---|---|
 | 1 | `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Reframe Mission Control around one stable autonomous lane per repo/project: branch-based execution, Planner-on-lane-entry, Builder evidence, Merge-Healer, lane cockpit, branch-based E2E | Shipped; live Task 8 PASS report `dogfood-output/single-lane-autonomy-e2e-2026-04-27T22-39-20-392Z.md` |
 
-### Single-Lane Production Hardening — active
+### Single-Lane Production Hardening — shipped
 
 | Order | Plan | Purpose | Status |
 |---:|---|---|---|
-| 1 | `2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md` | Turn the one-item single-lane PASS into production reliability: repeatable harness, 3-item sequential gauntlet, blocked recovery, UI truth, repo hygiene, final ACCEPTED/CONDITIONALLY ACCEPTED/REJECTED verdict | Active |
+| 1 | `2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md` | Turn the one-item single-lane PASS into production reliability: repeatable harness, 3-item sequential gauntlet, blocked recovery, UI truth, repo hygiene, final ACCEPTED/CONDITIONALLY ACCEPTED/REJECTED verdict | Shipped; ACCEPTED for supervised production daily use. Report: `dogfood-output/single-lane-production-hardening-latest.md` |
+
+### Always-On Operator Policy — shipped
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| 1 | `2026-04-28-hermes-workspace-always-on-operator-policy-plan.md` | Define and implement owner-approved policy for bounded retries, lane escalation notifications, PR publishing gates, and branch/stash cleanup retention before fully unattended operation | Shipped; ACCEPTED FOR SUPERVISED ALWAYS-ON POLICY ONLY. Report: `dogfood-output/always-on-policy-gauntlet-latest.md` |
+
+### Always-On Merge Readiness / Type-Lint Stabilization — review-ready
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| 1 | `2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md` | Clean changed-file TypeScript/ESLint blockers, preserve green functional verification, and produce a final pre-commit review package for the completed Always-On slice | Review-ready; final package `dogfood-output/always-on-merge-readiness-final-latest.md`; Owner/Main commit or independent review decision next |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -154,7 +170,9 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md` | Active hardening plan | Builder executes now: repeatable/self-cleaning E2E harness, 3-item sequential gauntlet, blocked recovery, operator UI evidence truth, repo hygiene guardrails, final production hardening verdict |
+| `2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md` | Active stabilization plan | Builder executes now: baseline quality report, changed-file TypeScript/lint cleanup, full functional gauntlet rerun, final pre-commit package |
+| `2026-04-28-hermes-workspace-always-on-operator-policy-plan.md` | Shipped owner-policy plan | Accepted for supervised always-on policy only; report `dogfood-output/always-on-policy-gauntlet-latest.md` |
+| `2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md` | Shipped | Accepted supervised production daily use; report `dogfood-output/single-lane-production-hardening-latest.md` |
 | `2026-04-27-hermes-workspace-single-lane-autonomy-roadmap-implementation-plan.md` | Shipped | Single-lane autonomy implementation; live Task 8 PASS report exists |
 | `2026-04-27-hermes-workspace-production-acceptance-real-project-plan.md` | Historical / superseded | Revisit after single-lane autonomy is functional |
 | `2026-04-26-hermes-workspace-production-readiness-dogfood-plan.md` | Shipped production-readiness plan | Historical context; harness and clickability coverage created here |
@@ -208,10 +226,10 @@ A plan is not shipped until:
 
 Start with:
 
-`docs/plans/2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md`
+`docs/plans/2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md`
 
-Builder should execute Task 1 first: make the single-lane E2E harness repeatable and self-cleaning. The purpose is to convert the one-item Task 8 PASS into a production-reliable operator workflow before any new feature cycle.
+Builder should execute Task 1 first: record a baseline quality-gate report for the completed Always-On slice. Purpose: make the large uncommitted Always-On implementation merge-ready before any new product feature roadmap.
 
-## 10. After Single-Lane Production Hardening ships
+## 10. After Always-On Merge Readiness ships
 
-When the hardening plan is complete, Builder should update the handoff with the final ACCEPTED / CONDITIONALLY ACCEPTED / REJECTED verdict, exact command results, report paths, screenshot paths, repo hygiene state, and any remaining blockers. Main/CEO should then decide whether to start the next product feature cycle or require another reliability slice.
+When the merge-readiness plan is complete, Builder should update the handoff with the final changed-file ESLint result, TypeScript result/classification, functional gauntlet results, service/smoke/browser evidence, and final report path. Main/CEO should then decide whether to commit/request independent review or start the next product feature roadmap.

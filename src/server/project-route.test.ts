@@ -6,6 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route as ProjectRoute } from '../routes/api/projects.$projectId'
 import { createProject } from './projects-store'
 
+type ProjectPatchHandler = (input: { request: Request; params: { projectId: string } }) => Promise<Response>
+
+function getProjectPatchHandler(): ProjectPatchHandler {
+  const route = ProjectRoute as unknown as { options: { server: { handlers: { PATCH: ProjectPatchHandler } } } }
+  return route.options.server.handlers.PATCH
+}
+
 describe('project detail route PATCH profile mappings', () => {
   let tempHome: string
   let previousHermesHome: string | undefined
@@ -43,7 +50,7 @@ describe('project detail route PATCH profile mappings', () => {
       },
     })
 
-    const response = await ProjectRoute.options.server.handlers.PATCH({
+    const response = await getProjectPatchHandler()({
       request: new Request(`http://127.0.0.1:3456/api/projects/${project.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -76,7 +83,7 @@ describe('project detail route PATCH profile mappings', () => {
       defaultBranch: 'main',
     })
 
-    const response = await ProjectRoute.options.server.handlers.PATCH({
+    const response = await getProjectPatchHandler()({
       request: new Request(`http://127.0.0.1:3456/api/projects/${project.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -94,7 +101,7 @@ describe('project detail route PATCH profile mappings', () => {
 
     expect(response.status).toBe(200)
     const body = (await response.json()) as Record<string, any>
-    expect(body.project.autonomyLanePolicy).toEqual({
+    expect(body.project.autonomyLanePolicy).toMatchObject({
       enabled: true,
       mode: 'single_lane',
       isolation: 'branch',
@@ -105,6 +112,74 @@ describe('project detail route PATCH profile mappings', () => {
       blockedBehavior: 'park_and_continue_when_repo_clean',
       mergeHealerEnabled: true,
       allowParallelWorktrees: false,
+    })
+  })
+
+  it('patches nested always-on policy without wiping sibling policy sections', async () => {
+    const project = createProject({
+      name: 'Mission Control Always On',
+      repoPath: '/repos/mission-control-always-on',
+      autonomyLanePolicy: {
+        enabled: true,
+        alwaysOn: {
+          enabled: true,
+          retry: { enabled: true, maxAttemptsPerPhase: 2, cooldownMinutes: 45 },
+          notifications: { enabled: true, digestOnly: false, notifyOn: ['blocked'], minRepeatMinutes: 15 },
+          prPublishing: { enabled: true, mode: 'draft', baseBranch: 'release', titlePrefix: '[Lane]' },
+          cleanup: { enabled: true, retainMergedBranchDays: 14, dryRun: true },
+        },
+      },
+    })
+
+    const response = await getProjectPatchHandler()({
+      request: new Request(`http://127.0.0.1:3456/api/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          autonomyLanePolicy: {
+            alwaysOn: {
+              retry: { cooldownMinutes: 10 },
+              cleanup: { retainLaneStashDays: 90 },
+            },
+          },
+        }),
+      }),
+      params: { projectId: project.id },
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as Record<string, any>
+    expect(body.project.autonomyLanePolicy.alwaysOn).toMatchObject({
+      enabled: true,
+      retry: {
+        enabled: true,
+        maxAttemptsPerPhase: 2,
+        cooldownMinutes: 10,
+        staleScheduledMinutes: 30,
+        staleRunningMinutes: 240,
+      },
+      notifications: {
+        enabled: true,
+        digestOnly: false,
+        notifyOn: ['blocked'],
+        minRepeatMinutes: 15,
+      },
+      prPublishing: {
+        enabled: true,
+        mode: 'draft',
+        baseBranch: 'release',
+        titlePrefix: '[Lane]',
+        requireCleanRepo: true,
+        requirePassingMergeTests: true,
+      },
+      cleanup: {
+        enabled: true,
+        deleteMergedBranches: false,
+        retainMergedBranchDays: 14,
+        retainLaneStashes: true,
+        retainLaneStashDays: 90,
+        dryRun: true,
+      },
     })
   })
 })
