@@ -4,11 +4,12 @@ import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowLeft01Icon, ArrowRight01Icon, CheckmarkCircle02Icon, RefreshIcon, TaskDone01Icon } from '@hugeicons/core-free-icons'
+import type {ApprovalInboxEntry} from '@/lib/work-item-approvals-api';
 import { toast } from '@/components/ui/toast'
 import {
+
   fetchApprovalInbox,
-  resolveWorkItemApproval,
-  type ApprovalInboxEntry,
+  resolveWorkItemApproval
 } from '@/lib/work-item-approvals-api'
 
 export const APPROVALS_INBOX_QUERY_KEY = ['mission-control', 'approvals'] as const

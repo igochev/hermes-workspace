@@ -32,8 +32,13 @@ async function* streamHermesChat(
   }
 
   const queue: Array<string> = []
-  let done = false
-  let failure: Error | null = null
+  const streamState: {
+    done: boolean
+    failure: Error | null
+  } = {
+    done: false,
+    failure: null,
+  }
   let notify: (() => void) | null = null
 
   void streamChat(
@@ -70,19 +75,20 @@ async function* streamHermesChat(
     },
   ).then(
     () => {
-      done = true
+      streamState.done = true
       notify?.()
       notify = null
     },
     (error: unknown) => {
-      failure = error instanceof Error ? error : new Error(String(error))
-      done = true
+      streamState.failure = error instanceof Error ? error : new Error(String(error))
+      streamState.done = true
       notify?.()
       notify = null
     },
   )
 
-  while (!done || queue.length > 0) {
+  for (;;) {
+    if (streamState.done && queue.length === 0) break
     if (queue.length > 0) {
       yield queue.shift() as string
       continue
@@ -93,7 +99,7 @@ async function* streamHermesChat(
     })
   }
 
-  if (failure) throw failure
+  if (streamState.failure !== null) throw streamState.failure
 }
 
 export async function sendChatUnified(

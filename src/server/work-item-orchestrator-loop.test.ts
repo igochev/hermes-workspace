@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  isWorkItemOrchestratorLoopRunning,
+  startWorkItemOrchestratorLoop,
+  stopWorkItemOrchestratorLoop,
+} from './work-item-orchestrator-loop'
+
 const { reconcileAllWorkItemAutonomy } = vi.hoisted(() => ({
   reconcileAllWorkItemAutonomy: vi.fn(),
 }))
@@ -7,12 +13,6 @@ const { reconcileAllWorkItemAutonomy } = vi.hoisted(() => ({
 vi.mock('./work-item-orchestrator', () => ({
   reconcileAllWorkItemAutonomy,
 }))
-
-import {
-  isWorkItemOrchestratorLoopRunning,
-  startWorkItemOrchestratorLoop,
-  stopWorkItemOrchestratorLoop,
-} from './work-item-orchestrator-loop'
 
 describe('work-item-orchestrator-loop', () => {
   let previousAutonomy: string | undefined

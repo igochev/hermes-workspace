@@ -1,5 +1,5 @@
-import { type ProjectRecord } from './projects-store'
-import { type WorkItemPriority, type WorkItemRecord, type WorkItemRiskLevel } from './work-items-store'
+import type {ProjectRecord} from './projects-store';
+import type {WorkItemPriority, WorkItemRecord, WorkItemRiskLevel} from './work-items-store';
 
 export type ProjectLaneRepoSafety = {
   safe: boolean
@@ -71,7 +71,7 @@ function compareLaneCandidates(a: WorkItemRecord, b: WorkItemRecord): number {
 
 export function selectNextLaneWorkItem(params: {
   project: ProjectRecord
-  workItems: WorkItemRecord[]
+  workItems: Array<WorkItemRecord>
   repoSafety?: ProjectLaneRepoSafety
 }): ProjectLaneSelectionResult {
   const projectItems = params.workItems.filter((workItem) => belongsToProject(params.project, workItem))
@@ -107,7 +107,7 @@ export function selectNextLaneWorkItem(params: {
     }
   }
 
-  const next = projectItems.filter(isQueuedCandidate).sort(compareLaneCandidates)[0] ?? null
+  const next = projectItems.filter(isQueuedCandidate).sort(compareLaneCandidates).at(0) ?? null
   if (!next) {
     return {
       active: null,

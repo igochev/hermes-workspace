@@ -784,8 +784,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         const decoder = new TextDecoder()
         let buffer = ''
 
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-        while (true) {
+
+        for (;;) {
           const { done, value } = await reader.read()
           if (done) break
 
@@ -820,7 +820,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
 
         const lifecyclePhase = lifecyclePhaseRef.current as StreamLifecyclePhase
-        if (!finishedRef.current && lifecyclePhase !== 'handoff') {
+        if (lifecyclePhase !== 'handoff') {
           finishStream()
         }
       } catch (err) {

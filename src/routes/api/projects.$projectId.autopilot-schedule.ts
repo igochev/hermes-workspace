@@ -34,7 +34,7 @@ function toRecord(value: unknown): Record<string, unknown> {
 export const Route = createFileRoute('/api/projects/$projectId/autopilot-schedule')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
 
         const project = getProject(params.projectId)

@@ -79,7 +79,7 @@ function ChatRoute() {
   }, [isNewChat, queryClient])
 
   const handleSessionResolved = useCallback(
-    function handleSessionResolved(payload: {
+    function handleSessionResolvedCallback(payload: {
       friendlyId: string
       sessionKey: string
     }) {

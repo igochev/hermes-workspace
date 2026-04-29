@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ExecutionRunRecord } from '../../server/execution-runs-store'
 import {
   buildExecutionsViewModel,
   parseExecutionsRouteInput,
 } from './executions-view-model'
+import type { ExecutionRunRecord } from '../../server/execution-runs-store'
 
 const RUNS: Array<ExecutionRunRecord> = [
   {

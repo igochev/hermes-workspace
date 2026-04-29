@@ -9,7 +9,7 @@ import { getWorkItem } from '../../server/work-items-store'
 export const Route = createFileRoute('/api/projects/$projectId/profile-readiness')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

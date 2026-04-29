@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ExecutionRunRecord } from '../../server/execution-runs-store'
 import {
-  buildExecutionDetailScreenViewModel,
   EXECUTION_DETAIL_BACK_TO_WORK_ITEM_LABEL,
   EXECUTION_DETAIL_JOB_SECTION_TITLE,
   EXECUTION_DETAIL_OPEN_SCHEDULED_JOB_LABEL,
   EXECUTION_DETAIL_SCREEN_TITLE,
   EXECUTION_DETAIL_SESSION_SECTION_TITLE,
+  buildExecutionDetailScreenViewModel,
 } from './execution-detail-screen'
+import type { ExecutionRunRecord } from '../../server/execution-runs-store'
 
 describe('execution detail screen view model', () => {
   it('renders one execution as operator trace evidence, not a Scheduled Jobs page', () => {

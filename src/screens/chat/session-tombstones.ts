@@ -21,7 +21,6 @@ export function filterSessionsWithTombstones<
 >(sessions: Array<T>) {
   if (tombstones.size === 0) return sessions
   const now = Date.now()
-  let changed = false
   const next = sessions.filter((session) => {
     const keyTombstone = tombstones.get(session.key)
     const friendlyTombstone = tombstones.get(session.friendlyId)
@@ -38,11 +37,10 @@ export function filterSessionsWithTombstones<
       return true
     }
     if (keyTombstone || friendlyTombstone) {
-      changed = true
       return false
     }
     return true
   })
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-  return changed ? next : sessions
+
+  return next.length === sessions.length ? sessions : next
 }

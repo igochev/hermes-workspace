@@ -604,10 +604,10 @@ export async function syncWorkItemExecutionState(
 
       // Launch Planner-as-Reviewer mission for two-phase pipeline items
       if (updated.planFilePath) {
-        const project = getProject(updated.projectId)
+        const reviewProject = getProject(updated.projectId)
         const reviewWorkItem = updated
-        if (project) {
-          launchPlannerReview(reviewWorkItem, project).then((reviewLaunch) => {
+        if (reviewProject) {
+          launchPlannerReview(reviewWorkItem, reviewProject).then((reviewLaunch) => {
             if (reviewLaunch) {
               updateWorkItem(reviewWorkItem.id, {
                 reviewJobId: reviewLaunch.reviewJobId,
@@ -691,10 +691,10 @@ export async function syncWorkItemExecutionState(
           let parseResult: ReviewDecisionParseResult
 
           // Extract review output text: latest run output, job last_error, or empty
-          const jobRuns = await getHermesJobRuns(updated.reviewJobId).catch(
+          const reviewJobRuns = await getHermesJobRuns(updated.reviewJobId).catch(
             () => [],
           )
-          const latestReviewRun = jobRuns.length > 0 ? jobRuns[0] : null
+          const latestReviewRun = reviewJobRuns.length > 0 ? reviewJobRuns[0] : null
           recordExecutionRun({
             workItem: updated,
             project,

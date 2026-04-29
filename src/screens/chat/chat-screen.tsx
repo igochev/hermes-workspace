@@ -1,8 +1,5 @@
 // Module-level local model override — set by composer when user picks a local model
 // Avoids prop threading. Reset when switching back to cloud models.
-export let _localModelOverride = ''
-export function setLocalModelOverride(model: string) { _localModelOverride = model }
-
 import {
   useCallback,
   useEffect,
@@ -99,6 +96,9 @@ import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
+
+export let _localModelOverride = ''
+export function setLocalModelOverride(model: string) { _localModelOverride = model }
 // Activity store removed — not used in Hermes Workspace
 const _noopSetActivity = (_s: string) => {}
 
@@ -221,7 +221,7 @@ function exportConversationTranscript(payload: {
       const text = textFromMessage(message).trim()
       const attachments = Array.isArray(message.attachments)
         ? message.attachments
-            .map((attachment) => attachment?.name?.trim())
+            .map((attachment) => attachment.name?.trim())
             .filter((value): value is string => Boolean(value))
         : []
 
@@ -278,12 +278,10 @@ function messageFallbackSignature(message: ChatMessage): string {
   const attachments = Array.isArray(message.attachments)
     ? message.attachments
         .map((attachment) => {
-          const name =
-            typeof attachment?.name === 'string' ? attachment.name : ''
-          const size =
-            typeof attachment?.size === 'number' ? String(attachment.size) : ''
+          const name = typeof attachment.name === 'string' ? attachment.name : ''
+          const size = typeof attachment.size === 'number' ? String(attachment.size) : ''
           const type =
-            typeof attachment?.contentType === 'string'
+            typeof attachment.contentType === 'string'
               ? attachment.contentType
               : ''
           return `${name}:${size}:${type}`
@@ -382,11 +380,10 @@ function getMessageAttachmentSignature(message: ChatMessage): string {
 
   return message.attachments
     .map((attachment) => {
-      const name = typeof attachment?.name === 'string' ? attachment.name : ''
-      const size =
-        typeof attachment?.size === 'number' ? String(attachment.size) : ''
+      const name = typeof attachment.name === 'string' ? attachment.name : ''
+      const size = typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment?.contentType === 'string'
+        typeof attachment.contentType === 'string'
           ? attachment.contentType
           : ''
       return `${name}:${size}:${type}`
@@ -593,7 +590,7 @@ export function ChatScreen({
   // On remount, check if the server still has an active run for this session.
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
-    sessionKey: resolvedSessionKey ?? '',
+    sessionKey: resolvedSessionKey,
     enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
 
@@ -1327,14 +1324,14 @@ export function ChatScreen({
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
       const id = isPortableMode
         ? localStreamingMessageId
-        : last?.role === 'assistant'
+        : last.role === 'assistant'
           ? (last as any).__optimisticId || (last as any).id || null
           : null
       return { isStreaming: true, streamingMessageId: id }
     }
     if (waitingForResponse && finalDisplayMessages.length > 0) {
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-      if (last && last.role === 'assistant') {
+      if (last.role === 'assistant') {
         const isStreamingPlaceholder =
           (last as any).__streamingStatus === 'streaming'
         if (!isStreamingPlaceholder) {
@@ -1369,7 +1366,7 @@ export function ChatScreen({
     if (waitingForResponse) {
       messageCountAtSendRef.current = finalDisplayMessages.length
       const lastMsg = finalDisplayMessages[finalDisplayMessages.length - 1]
-      if (lastMsg?.role === 'assistant') {
+      if (lastMsg.role === 'assistant') {
         const raw = lastMsg as Record<string, unknown>
         lastAssistantIdAtSendRef.current = String(
           raw.__optimisticId ??
@@ -1393,7 +1390,7 @@ export function ChatScreen({
       return
     }
     const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-    if (!last || last.role !== 'assistant') return
+    if (last.role !== 'assistant') return
     if ((last as any).__streamingStatus === 'streaming') return
     const countGrew =
       finalDisplayMessages.length > messageCountAtSendRef.current
@@ -1486,19 +1483,17 @@ export function ChatScreen({
   })
   // Don't show errors for new chats or when SSE is connected
   const statusError =
-    !isNewChat && connectionState !== 'connected'
-      ? statusQuery.error instanceof Error
+    !isNewChat && statusQuery.error instanceof Error
+      ? {
+          message: statusQuery.error.message,
+          status: (statusQuery.error as Error & { status?: number }).status,
+        }
+      : !isNewChat && statusQuery.data && !statusQuery.data.ok
         ? {
-            message: statusQuery.error.message,
-            status: (statusQuery.error as Error & { status?: number }).status,
+            message: statusQuery.data.error || 'Hermes unavailable',
+            status: statusQuery.data.status,
           }
-        : statusQuery.data && !statusQuery.data.ok
-          ? {
-              message: statusQuery.data.error || 'Hermes unavailable',
-              status: statusQuery.data.status,
-            }
-          : null
-      : null
+        : null
   const serverError = statusError?.message ?? sessionsError ?? historyError
   const serverErrorStatus = statusError?.status
   const showErrorNotice = Boolean(serverError) && !isNewChat
@@ -1543,7 +1538,7 @@ export function ChatScreen({
       void historyQuery.refetch()
     }, 2000)
     return () => window.clearTimeout(timer)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only
+  }, []) // mount-only
 
   useEffect(() => {
     function handleSSEDrop() {
@@ -1743,7 +1738,7 @@ export function ChatScreen({
    * Response arrives via SSE stream, not via this function.
    */
   const sendMessage = useCallback(
-    function sendMessage(
+    function sendMessageCallback(
       sessionKey: string,
       friendlyId: string,
       body: string,
@@ -1960,7 +1955,7 @@ export function ChatScreen({
   ])
 
   const retryQueuedMessage = useCallback(
-    function retryQueuedMessage(message: ChatMessage, mode: 'manual' | 'auto') {
+    function retryQueuedMessageCallback(message: ChatMessage, mode: 'manual' | 'auto') {
       if (!isRetryableQueuedMessage(message)) return false
 
       const body = textFromMessage(message).trim()
@@ -2028,7 +2023,7 @@ export function ChatScreen({
   )
 
   const flushRetryableMessages = useCallback(
-    function flushRetryableMessages() {
+    function flushRetryableMessagesCallback() {
       for (const message of finalDisplayMessages) {
         retryQueuedMessage(message, 'auto')
       }
@@ -2037,7 +2032,7 @@ export function ChatScreen({
   )
 
   const handleRetryMessage = useCallback(
-    function handleRetryMessage(message: ChatMessage) {
+    function handleRetryMessageCallback(message: ChatMessage) {
       const retryKey = getRetryMessageKey(message)
       retriedQueuedMessageKeysRef.current.delete(retryKey)
       retryQueuedMessage(message, 'manual')
@@ -2046,18 +2041,11 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (false) {
-      // Server connection checks removed — Hermes uses direct API
-      hasSeenDisconnectRef.current = true
-      retriedQueuedMessageKeysRef.current.clear()
-      return
-    }
-
-    if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
+    if (hasSeenDisconnectRef.current) {
       hasSeenDisconnectRef.current = false
       flushRetryableMessages()
     }
-  }, [connectionState, flushRetryableMessages])
+  }, [flushRetryableMessages])
 
   useEffect(() => {
     if (statusError) {
@@ -2135,11 +2123,11 @@ export function ChatScreen({
       queryClient.setQueryData(
         chatQueryKeys.sessions,
         function upsert(existing: unknown) {
-          const sessions = Array.isArray(existing)
+          const cachedSessions = Array.isArray(existing)
             ? (existing as Array<SessionMeta>)
             : []
           const now = Date.now()
-          const existingIndex = sessions.findIndex((session) => {
+          const existingIndex = cachedSessions.findIndex((session) => {
             return (
               session.friendlyId === friendlyId || session.key === friendlyId
             )
@@ -2154,11 +2142,11 @@ export function ChatScreen({
                 lastMessage,
                 titleStatus: 'idle',
               },
-              ...sessions,
+              ...cachedSessions,
             ]
           }
 
-          return sessions.map((session, index) => {
+          return cachedSessions.map((session, index) => {
             if (index !== existingIndex) return session
             return {
               ...session,
@@ -2277,8 +2265,8 @@ export function ChatScreen({
       const attachmentPayload: Array<ChatAttachment> = attachments.map(
         (attachment) => ({
           ...attachment,
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-          id: attachment.id ?? crypto.randomUUID(),
+
+          id: attachment.id,
         }),
       )
 
@@ -2389,7 +2377,7 @@ export function ChatScreen({
   useEffect(() => {
     function handleRunCommand(event: Event) {
       const detail = (event as CustomEvent<ChatRunCommandDetail>).detail
-      if (!detail?.command) return
+      if (!detail.command) return
       runPaletteSlashCommand(detail.command)
     }
 
@@ -2451,9 +2439,7 @@ export function ChatScreen({
     composerHandleRef.current?.insertText(reference)
   }, [])
 
-  const historyLoading =
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-    (historyQuery.isLoading && !historyQuery.data) || isRedirecting
+  const historyLoading = historyQuery.isLoading || isRedirecting
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
   const errorNotice = useMemo(() => {
     if (!showErrorNotice) return null
@@ -2469,11 +2455,9 @@ export function ChatScreen({
   }, [serverError, serverErrorStatus, handleRefetch, showErrorNotice])
 
   const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
-    connectionState === 'connected'
-      ? 'connected'
-      : statusQuery.data?.ok === false || statusQuery.isError
-        ? 'disconnected'
-        : 'connecting'
+    statusQuery.data?.ok === false || statusQuery.isError
+      ? 'disconnected'
+      : 'connected'
 
   const activeHeaderToolName =
     liveToolActivity[0]?.name || activeToolCalls[0]?.name || undefined
@@ -2573,7 +2557,7 @@ export function ChatScreen({
               renamingTitle={renamingSessionTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
-              sessions={sessions ?? []}
+              sessions={sessions}
               activeFriendlyId={activeFriendlyId}
               onSelectSession={(key) =>
                 void navigate({
@@ -2720,8 +2704,8 @@ export function ChatScreen({
               wrapperRef={composerRef}
               composerRef={composerHandleRef}
               embedded={embedded}
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-              focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
+
+              focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey}`}
               thinkingLevel={thinkingLevel}
               onThinkingLevelChange={handleThinkingLevelChange}
             />

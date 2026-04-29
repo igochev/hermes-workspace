@@ -21,7 +21,7 @@ function buildProjectPayload(projectId: string) {
 export const Route = createFileRoute('/api/projects/$projectId')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
@@ -94,7 +94,7 @@ export const Route = createFileRoute('/api/projects/$projectId')({
         }
       },
 
-      DELETE: async ({ request, params }) => {
+      DELETE: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

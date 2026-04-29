@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createProject } from './projects-store'
-import { getWorkItem, createWorkItem } from './work-items-store'
+import { createWorkItem, getWorkItem } from './work-items-store'
 import { listWorkItemApprovals } from './work-item-approvals'
 import { applyWorkItemLifecycleTransition } from './work-item-lifecycle'
 

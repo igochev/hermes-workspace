@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { areSidebarPropsEqual, CHAT_SIDEBAR_CLICKABILITY_AUDIT, SessionFreshnessBadge } from './chat-sidebar'
+import { CHAT_SIDEBAR_CLICKABILITY_AUDIT, SessionFreshnessBadge, areSidebarPropsEqual } from './chat-sidebar'
 
 type ChatSidebarProps = Parameters<typeof areSidebarPropsEqual>[0]
 

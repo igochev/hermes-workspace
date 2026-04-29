@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { killAgentSession, toggleAgentPause } from '@/lib/gateway-api'
-import { useMissionStore, type ActiveMission, type MissionProcessType } from '@/stores/mission-store'
 import { emitFeedEvent } from '../components/feed-event-bus'
 import { resolveGatewayModelId } from '../components/hub-utils'
 import type { HubTask, TaskStatus } from '../components/task-board'
 import type { AgentSessionStatusEntry, TeamMember } from '../components/team-panel'
+import type {ActiveMission, MissionProcessType} from '@/stores/mission-store';
+import {   useMissionStore } from '@/stores/mission-store'
+import { killAgentSession, toggleAgentPause } from '@/lib/gateway-api'
 
 type SessionRecord = Record<string, unknown>
 
 type RetryPayload = {
-  tasks: HubTask[]
+  tasks: Array<HubTask>
   messageText: string
 }
 
@@ -63,7 +64,7 @@ function extractTextFromMessage(message: unknown): string {
   if (typeof msg.content === 'string') return msg.content
   if (Array.isArray(msg.content)) {
     return (msg.content as Array<Record<string, unknown>>)
-      .filter((block) => block?.type === 'text' && typeof block.text === 'string')
+      .filter((block) => block.type === 'text' && typeof block.text === 'string')
       .map((block) => block.text as string)
       .join('')
   }
@@ -117,12 +118,12 @@ function getAgentContext(member: TeamMember): string {
 
 function buildDispatchMessage(params: {
   agentId: string
-  agentTasks: HubTask[]
+  agentTasks: Array<HubTask>
   member?: TeamMember
   missionGoal: string
   mode: MissionProcessType
   leadMember?: TeamMember
-  workerMembers?: TeamMember[]
+  workerMembers?: Array<TeamMember>
 }): string {
   const { agentId, agentTasks, member, missionGoal, mode, leadMember, workerMembers } = params
   const agentContext = member ? getAgentContext(member) : ''
@@ -165,7 +166,7 @@ export function useMissionOrchestrator() {
   const streamMapRef = useRef<Map<string, EventSource>>(new Map())
   const lastOutputByAgentRef = useRef<Record<string, string>>({})
   const activityMarkerRef = useRef<Map<string, string>>(new Map())
-  const retryPayloadRef = useRef<Record<string, RetryPayload>>({})
+  const retryPayloadRef = useRef<Partial<Record<string, RetryPayload>>>({})
   const completedSessionKeysRef = useRef<Set<string>>(new Set())
   const dispatchTokenRef = useRef<string | null>(null)
 
@@ -194,7 +195,7 @@ export function useMissionOrchestrator() {
   }, [closeAllStreams])
 
   const updateTasksForAgent = useCallback((agentId: string, status: TaskStatus) => {
-    let changedTasks: HubTask[] = []
+    const changedTasks: Array<HubTask> = []
 
     setMissionTasks((previous) => previous.map((task) => {
       if (task.agentId !== agentId || task.status === status) return task
@@ -429,7 +430,7 @@ export function useMissionOrchestrator() {
   const dispatchAgentTasks = useCallback(async (params: {
     sessionKey: string
     agentId: string
-    agentTasks: HubTask[]
+    agentTasks: Array<HubTask>
     messageText: string
     member?: TeamMember
   }) => {
@@ -490,7 +491,7 @@ export function useMissionOrchestrator() {
     })
   }, [setAgentStatus, setDispatchedTaskIdsByAgent, setMissionTasks])
 
-  const ensureAgentSessions = useCallback(async (team: TeamMember[]) => {
+  const ensureAgentSessions = useCallback(async (team: Array<TeamMember>) => {
     const currentMap = { ...sessionMapRef.current }
     for (const member of team) {
       if (currentMap[member.id]) {
@@ -549,7 +550,7 @@ export function useMissionOrchestrator() {
       const sessionMap = await ensureAgentSessions(mission.team)
       if (dispatchTokenRef.current !== mission.id) return
 
-      const tasksByAgent = new Map<string, HubTask[]>()
+      const tasksByAgent = new Map<string, Array<HubTask>>()
       mission.tasks.forEach((task) => {
         if (!task.agentId) return
         const existing = tasksByAgent.get(task.agentId) ?? []
@@ -559,7 +560,7 @@ export function useMissionOrchestrator() {
 
       if (mission.processType === 'hierarchical') {
         const [leadMember, ...workerMembers] = mission.team
-        if (leadMember) {
+        {
           const leadSessionKey = sessionMap[leadMember.id]
           if (!leadSessionKey) {
             emitFeedEvent({
@@ -719,7 +720,7 @@ export function useMissionOrchestrator() {
 
     const member = mission.team.find((entry) => entry.id === agentId)
     const payload = retryPayloadRef.current[agentId]
-    if (!member || !payload) return
+    if (!member || payload === undefined) return
 
     const currentSessionKey = sessionMapRef.current[agentId]
     if (currentSessionKey) {
@@ -780,18 +781,10 @@ export function useMissionOrchestrator() {
         agentName,
       })
     } catch (error) {
-      if (previousStatus) {
-        setAgentStatus(agentId, previousStatus)
-      } else {
-        setAgentSessionStatus((previous) => {
-          const next = { ...previous }
-          delete next[agentId]
-          return next
-        })
-      }
+      setAgentStatus(agentId, previousStatus)
       throw error
     }
-  }, [setAgentSessionStatus, setAgentStatus])
+  }, [setAgentStatus])
 
   const handleMissionPause = useCallback(async (pause: boolean) => {
     const mission = missionRef.current
@@ -921,7 +914,7 @@ export function useMissionOrchestrator() {
         const response = await fetch('/api/sessions')
         if (!response.ok || cancelled) return
 
-        const payload = (await response.json().catch(() => ({}))) as { sessions?: SessionRecord[] }
+        const payload = (await response.json().catch(() => ({}))) as { sessions?: Array<SessionRecord> }
         const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
         const nextStatus: Record<string, AgentSessionStatusEntry> = {}
         const nextActivityMarkers = new Map<string, string>()
@@ -957,15 +950,15 @@ export function useMissionOrchestrator() {
 
           nextActivityMarkers.set(sessionKey, activityMarker)
 
-          if (isCompleted && existing?.status === 'idle') {
+          if (isCompleted && existing.status === 'idle') {
             nextStatus[member.id] = existing
             continue
           }
-          if (existing?.status === 'waiting_for_input') {
+          if (existing.status === 'waiting_for_input') {
             nextStatus[member.id] = existing
             continue
           }
-          if (existing?.status === 'dispatching' && !lastMessage) {
+          if (existing.status === 'dispatching' && !lastMessage) {
             nextStatus[member.id] = existing
             continue
           }
@@ -998,10 +991,8 @@ export function useMissionOrchestrator() {
           }
         }
 
-        if (!cancelled) {
-          activityMarkerRef.current = nextActivityMarkers
-          setAgentSessionStatus(nextStatus)
-        }
+        activityMarkerRef.current = nextActivityMarkers
+        setAgentSessionStatus(nextStatus)
       } catch {
         /* ignore polling errors */
       }

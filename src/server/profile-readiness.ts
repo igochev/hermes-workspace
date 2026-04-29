@@ -84,7 +84,7 @@ function getSupervisorMapping(
   project: ProjectRecord,
   defaults: EvaluateProfileReadinessInput['defaults'],
 ): Mapping {
-  const projectSupervisorProfile = normalizeProfileName(project.runtimeProfiles?.supervisorProfile)
+  const projectSupervisorProfile = normalizeProfileName(project.runtimeProfiles.supervisorProfile)
   if (projectSupervisorProfile) {
     return { profile: projectSupervisorProfile, source: 'project-runtime-profile' }
   }

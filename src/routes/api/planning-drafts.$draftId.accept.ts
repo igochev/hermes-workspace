@@ -13,7 +13,7 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/planning-drafts/$draftId/accept')({
   server: {
     handlers: {
-      POST: async ({ request, params }) => {
+      POST: ({ request, params }) => {
         if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
 
         try {

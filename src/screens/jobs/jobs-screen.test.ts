@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import type { HermesJob } from '@/lib/jobs-api'
 import {
-  buildScheduledJobsViewModel,
-  getJobsScreenDeepLinkJobId,
   JOBS_SCREEN_HELP_COPY,
   JOBS_SCREEN_NEW_JOB_LABEL,
   JOBS_SCREEN_SEARCH_PLACEHOLDER,
   JOBS_SCREEN_TITLE,
+  buildScheduledJobsViewModel,
+  getJobsScreenDeepLinkJobId,
 } from './jobs-screen'
+import type { HermesJob } from '@/lib/jobs-api'
 
 describe('jobs screen scheduled-job copy and deep links', () => {
   it('exports operator-facing scheduled-job copy', () => {

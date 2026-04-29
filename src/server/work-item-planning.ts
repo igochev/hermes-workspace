@@ -1,19 +1,23 @@
-import { getProject, type ProjectRecord } from './projects-store'
+import {  getProject } from './projects-store'
 import {
+
   acceptPlanningDraft,
   createPlanningDraft,
   getPlanningDraft,
-  updatePlanningDraft,
-  type PlanningDraftRecord,
+  updatePlanningDraft
 } from './planning-drafts-store'
 import { parsePlannerStructuredOutput } from './planner-output-schema'
 import {
+
   appendWorkItemHistoryEntry,
   getWorkItem,
-  updateWorkItem,
-  type WorkItemRecord,
+  updateWorkItem
 } from './work-items-store'
-import { launchConductorMission, type ConductorLaunchResult } from './conductor-launch'
+import {  launchConductorMission } from './conductor-launch'
+import type {WorkItemRecord} from './work-items-store';
+import type {PlanningDraftRecord} from './planning-drafts-store';
+import type {ProjectRecord} from './projects-store';
+import type {ConductorLaunchResult} from './conductor-launch';
 
 export type PrepareWorkItemRequest = {
   orchestratorModel?: unknown
@@ -87,7 +91,7 @@ export function buildPlannerEnrichmentGoal(params: {
     : []
 
   return [
-    `Prepare work item \"${workItem.title}\" for Mission Control project \"${project.name}\" using Planner enrichment.`,
+    `Prepare work item "${workItem.title}" for Mission Control project "${project.name}" using Planner enrichment.`,
     `Work item ID: ${workItem.id}`,
     `Project ID: ${project.id}`,
     `Repository path: ${repoPath}`,

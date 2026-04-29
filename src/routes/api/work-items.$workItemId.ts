@@ -299,7 +299,7 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
         }
       },
 
-      DELETE: async ({ request, params }) => {
+      DELETE: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

@@ -20,12 +20,11 @@ import {
   Search01Icon, Settings01Icon, Sun02Icon, UserGroupIcon, UserMultipleIcon
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { t } from '@/lib/i18n'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   CHAT_OPEN_SETTINGS_EVENT
-  
+
 } from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
@@ -36,6 +35,7 @@ import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
 import type {ChatOpenSettingsDetail} from '../chat-events';
 import type { SessionMeta } from '../types'
+import type { SessionEventsRefreshStatus } from '@/screens/chat/hooks/use-session-events-refresh'
 import { SettingsDialog } from '@/components/settings-dialog'
 import {
   TooltipContent,
@@ -53,7 +53,7 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { StatusDot } from '@/components/status-indicator'
-import type { SessionEventsRefreshStatus } from '@/screens/chat/hooks/use-session-events-refresh'
+import { t } from '@/lib/i18n'
 import {
   MenuContent,
   MenuItem,
@@ -201,8 +201,8 @@ export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   }
 }
 
-export async function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
-  return []
+export function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
+  return Promise.resolve([])
 }
 
 function NavItem({
@@ -278,8 +278,8 @@ function NavItem({
             <TooltipTrigger
               render={
                 <Link
-                  to={item.to!}
-                  search={item.search}
+                  to={item.to}
+                  search={item.search as never}
                   hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
@@ -296,8 +296,8 @@ function NavItem({
     }
     return (
       <Link
-        to={item.to!}
-        search={item.search}
+        to={item.to}
+        search={item.search as never}
         hash={item.hash}
         onClick={handleSelect}
         className={cls}
@@ -577,7 +577,7 @@ function ChatSidebarComponent({
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
       const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
-      handleOpenSettings(detail?.section === 'appearance' ? 'appearance' : 'hermes')
+      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'hermes')
     }
 
     window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)

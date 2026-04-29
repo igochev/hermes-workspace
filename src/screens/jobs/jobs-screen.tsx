@@ -74,8 +74,8 @@ export function buildScheduledJobsViewModel(
     ? jobs.filter(
         (job) =>
           job.id.toLowerCase().includes(q) ||
-          job.name?.toLowerCase().includes(q) ||
-          job.prompt?.toLowerCase().includes(q),
+          job.name.toLowerCase().includes(q) ||
+          job.prompt.toLowerCase().includes(q),
       )
     : jobs
 
@@ -589,7 +589,7 @@ export function JobsScreen() {
                 onPause={(id) => pauseMutation.mutate(id)}
                 onResume={(id) => resumeMutation.mutate(id)}
                 onTrigger={(id) => triggerMutation.mutate(id)}
-                onEdit={(job) => setEditingJob(job)}
+                onEdit={(jobToEdit) => setEditingJob(jobToEdit)}
                 onDelete={(id) => {
                   if (confirm(`Delete job "${job.name}"?`)) {
                     deleteMutation.mutate(id)

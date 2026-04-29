@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  buildPhaseProfileRoutingInstructions,
   EMPTY_PHASE_PROFILES,
+  buildPhaseProfileRoutingInstructions,
   normalizePhaseProfiles,
 } from './conductor-phase-profiles'
 

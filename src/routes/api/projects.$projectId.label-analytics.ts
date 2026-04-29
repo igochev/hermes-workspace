@@ -15,7 +15,7 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/projects/$projectId/label-analytics')({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: ({ params }) => {
         const project = getProject(params.projectId)
         if (!project) return jsonResponse({ error: 'Project not found' }, 404)
 

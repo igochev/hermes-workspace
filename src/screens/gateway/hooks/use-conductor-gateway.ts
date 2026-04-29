@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import type {GatewaySession} from '@/lib/gateway-api';
+import type {ConductorPhaseProfiles} from '@/lib/conductor-phase-profiles';
 import {
-  fetchSessions,
-  type GatewaySession,
+
+  fetchSessions
 } from '@/lib/gateway-api'
 import {
+
   buildPhaseProfileRoutingInstructions,
-  normalizePhaseProfiles,
-  type ConductorPhaseProfiles,
+  normalizePhaseProfiles
 } from '@/lib/conductor-phase-profiles'
 
 type HistoryMessagePart = {
@@ -17,11 +19,11 @@ type HistoryMessagePart = {
 
 type HistoryMessage = {
   role?: string
-  content?: string | HistoryMessagePart[]
+  content?: string | Array<HistoryMessagePart>
 }
 
 type HistoryResponse = {
-  messages?: HistoryMessage[]
+  messages?: Array<HistoryMessage>
   error?: string
 }
 
@@ -55,13 +57,13 @@ type PersistedMission = {
   pausedElapsedMs: number
   accumulatedPausedMs: number
   pauseStartedAt: string | null
-  workerKeys: string[]
-  workerLabels: string[]
+  workerKeys: Array<string>
+  workerLabels: Array<string>
   workerOutputs: Record<string, string>
   streamText: string
   planText: string
   completedAt: string | null
-  tasks: ConductorTask[]
+  tasks: Array<ConductorTask>
 }
 
 type StreamEvent =
@@ -111,11 +113,11 @@ export type MissionHistoryEntry = {
   status: 'completed' | 'failed'
   projectPath: string | null
   outputPath?: string | null
-  workerSummary?: string[]
+  workerSummary?: Array<string>
   outputText?: string
   streamText?: string
   completeSummary?: string
-  workerDetails?: MissionHistoryWorkerDetail[]
+  workerDetails?: Array<MissionHistoryWorkerDetail>
   error?: string | null
 }
 
@@ -133,8 +135,8 @@ function getAgentPersona(index: number) {
 }
 
 
-function extractTasksFromPlan(planText: string): ConductorTask[] {
-  const tasks: ConductorTask[] = []
+function extractTasksFromPlan(planText: string): Array<ConductorTask> {
+  const tasks: Array<ConductorTask> = []
   const patterns = [
     /^\s*(\d+)\.\s+(.+)$/gm,
     /^\s*#{1,3}\s+(?:Step\s+)?(\d+)[.:]\s*(.+)$/gm,
@@ -190,7 +192,7 @@ function toIso(value: unknown): string | null {
 
 function loadPersistedMission(): PersistedMission | null {
   try {
-    const raw = globalThis.localStorage?.getItem(ACTIVE_MISSION_STORAGE_KEY)
+    const raw = globalThis.localStorage.getItem(ACTIVE_MISSION_STORAGE_KEY)
     if (!raw) return null
 
     const parsed = JSON.parse(raw) as Record<string, unknown>
@@ -283,7 +285,7 @@ function loadPersistedMission(): PersistedMission | null {
 
 function loadConductorSettings(): ConductorSettings {
   try {
-    const raw = globalThis.localStorage?.getItem(CONDUCTOR_SETTINGS_STORAGE_KEY)
+    const raw = globalThis.localStorage.getItem(CONDUCTOR_SETTINGS_STORAGE_KEY)
     if (!raw) return DEFAULT_CONDUCTOR_SETTINGS
     const parsed = JSON.parse(raw) as Record<string, unknown>
     return {
@@ -301,15 +303,15 @@ function loadConductorSettings(): ConductorSettings {
 
 function persistConductorSettings(settings: ConductorSettings): void {
   try {
-    globalThis.localStorage?.setItem(CONDUCTOR_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    globalThis.localStorage.setItem(CONDUCTOR_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
   } catch {
     // Ignore persistence failures.
   }
 }
 
-function loadMissionHistory(): MissionHistoryEntry[] {
+function loadMissionHistory(): Array<MissionHistoryEntry> {
   try {
-    const raw = globalThis.localStorage?.getItem(HISTORY_STORAGE_KEY)
+    const raw = globalThis.localStorage.getItem(HISTORY_STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -357,7 +359,7 @@ function appendMissionHistory(entry: MissionHistoryEntry): void {
     // Deduplicate by id before appending
     const filtered = current.filter((e) => e.id !== entry.id)
     const updated = [entry, ...filtered].slice(0, MAX_HISTORY_ENTRIES)
-    globalThis.localStorage?.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated))
+    globalThis.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated))
   } catch {
     // Ignore persistence failures.
   }
@@ -365,7 +367,7 @@ function appendMissionHistory(entry: MissionHistoryEntry): void {
 
 function persistMission(state: PersistedMission): void {
   try {
-    globalThis.localStorage?.setItem(ACTIVE_MISSION_STORAGE_KEY, JSON.stringify(state))
+    globalThis.localStorage.setItem(ACTIVE_MISSION_STORAGE_KEY, JSON.stringify(state))
   } catch {
     // Ignore persistence failures.
   }
@@ -373,7 +375,7 @@ function persistMission(state: PersistedMission): void {
 
 function clearPersistedMission(): void {
   try {
-    globalThis.localStorage?.removeItem(ACTIVE_MISSION_STORAGE_KEY)
+    globalThis.localStorage.removeItem(ACTIVE_MISSION_STORAGE_KEY)
   } catch {
     // Ignore persistence failures.
   }
@@ -381,7 +383,7 @@ function clearPersistedMission(): void {
 
 function clearMissionHistoryStorage(): void {
   try {
-    globalThis.localStorage?.removeItem(HISTORY_STORAGE_KEY)
+    globalThis.localStorage.removeItem(HISTORY_STORAGE_KEY)
   } catch {
     // Ignore persistence failures.
   }
@@ -412,7 +414,7 @@ function deriveWorkerStatus(session: GatewaySession, updatedAt: string | null): 
   return 'running'
 }
 
-function workersLookComplete(workers: ConductorWorker[], staleAfterMs: number): boolean {
+function workersLookComplete(workers: Array<ConductorWorker>, staleAfterMs: number): boolean {
   if (workers.length === 0) return false
 
   return workers.every((worker) => {
@@ -489,20 +491,20 @@ function extractHistoryMessageText(message: HistoryMessage | undefined): string 
   if (typeof message.content === 'string') return message.content
   if (Array.isArray(message.content)) {
     return message.content
-      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+      .map((part) => (typeof part.text === 'string' ? part.text : ''))
       .filter(Boolean)
       .join('\n')
   }
   return ''
 }
 
-function getLastAssistantMessage(messages: HistoryMessage[] | undefined): string {
+function getLastAssistantMessage(messages: Array<HistoryMessage> | undefined): string {
   if (!Array.isArray(messages)) return ''
   // Return the longest assistant message so we prefer the substantive work output.
   let best = ''
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
-    if (message?.role !== 'assistant') continue
+    if (message.role !== 'assistant') continue
     const text = extractHistoryMessageText(message).trim()
     if (text.length > best.length) best = text
   }
@@ -545,14 +547,14 @@ function extractProjectPath(text: string): string | null {
 }
 
 function buildMissionOutputPath(
-  workers: ConductorWorker[],
+  workers: Array<ConductorWorker>,
   workerOutputs: Record<string, string>,
-  tasks: ConductorTask[],
+  tasks: Array<ConductorTask>,
   streamText: string,
 ): string | null {
   const workerOutputTexts = [
     ...Object.values(workerOutputs),
-    ...workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
+    ...workers.map((worker) => getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)),
   ].filter(Boolean)
 
   for (const text of workerOutputTexts) {
@@ -572,9 +574,9 @@ function buildMissionOutputPath(
   return null
 }
 
-function summarizeWorkers(workers: ConductorWorker[]): string[] {
+function summarizeWorkers(workers: Array<ConductorWorker>): Array<string> {
   return workers.map((worker) => {
-    const output = getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+    const output = getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)
     const firstLine = output.split(/\n+/).map((line) => line.trim()).find(Boolean)
     const statusLabel = worker.status === 'stale' ? 'failed' : worker.status
     return `${worker.displayName}: ${firstLine ?? `${statusLabel} · ${worker.totalTokens.toLocaleString()} tok`}`
@@ -616,10 +618,10 @@ function buildCompleteSummary(params: {
   return lines.join('\n')
 }
 
-function buildMissionOutputText(workers: ConductorWorker[], workerOutputs: Record<string, string>, streamText: string): string {
+function buildMissionOutputText(workers: Array<ConductorWorker>, workerOutputs: Record<string, string>, streamText: string): string {
   const workerSections = workers
     .map((worker) => {
-      const output = (workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).trim()
+      const output = (workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)).trim()
       if (!output) return null
       return `### ${worker.displayName}\n\n${output}`
     })
@@ -649,7 +651,7 @@ export function useConductorGateway() {
   const [orchestratorSessionKey, setOrchestratorSessionKey] = useState<string | null>(() => initialMission?.workerKeys[0] ?? null)
   const [streamText, setStreamText] = useState(() => initialMission?.streamText ?? '')
   const [planText, setPlanText] = useState(() => initialMission?.planText ?? '')
-  const [streamEvents, setStreamEvents] = useState<StreamEvent[]>([])
+  const [streamEvents, setStreamEvents] = useState<Array<StreamEvent>>([])
   const [missionStartedAt, setMissionStartedAt] = useState<string | null>(() => initialMission?.missionStartedAt ?? null)
   const [isPaused, setIsPaused] = useState(() => initialMission?.isPaused ?? false)
   const [pausedElapsedMs, setPausedElapsedMs] = useState(() => initialMission?.pausedElapsedMs ?? 0)
@@ -661,8 +663,8 @@ export function useConductorGateway() {
   const [missionWorkerKeys, setMissionWorkerKeys] = useState<Set<string>>(() => new Set(initialMission?.workerKeys ?? []))
   const [missionWorkerLabels, setMissionWorkerLabels] = useState<Set<string>>(() => new Set(initialMission?.workerLabels ?? []))
   const [workerOutputs, setWorkerOutputs] = useState<Record<string, string>>(() => initialMission?.workerOutputs ?? {})
-  const [tasks, setTasks] = useState<ConductorTask[]>(() => initialMission?.tasks ?? [])
-  const [missionHistory, setMissionHistory] = useState<MissionHistoryEntry[]>(() => loadMissionHistory())
+  const [tasks, setTasks] = useState<Array<ConductorTask>>(() => initialMission?.tasks ?? [])
+  const [missionHistory, setMissionHistory] = useState<Array<MissionHistoryEntry>>(() => loadMissionHistory())
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<MissionHistoryEntry | null>(null)
   const [conductorSettings, setConductorSettings] = useState<ConductorSettings>(() => loadConductorSettings())
   const doneRef = useRef(initialMission?.phase === 'complete')
@@ -794,9 +796,7 @@ export function useConductorGateway() {
     }
 
     const timer = setTimeout(() => {
-      if (phase === 'decomposing') {
-        setPhase('running')
-      }
+      setPhase('running')
     }, 15_000)
 
     return () => clearTimeout(timer)
@@ -924,7 +924,7 @@ export function useConductorGateway() {
     if (tasks.length === 0 || workers.length === 0) return
     setTasks((current) => {
       const updated = current.map((task, index) => {
-        const worker = workers[index]
+        const worker = workers.at(index)
         if (!worker) return task
         const workerOutput = workerOutputs[worker.key] ?? null
         const newStatus: ConductorTask['status'] =

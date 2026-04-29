@@ -265,7 +265,7 @@ function buildCriteriaStatus(
   if (acceptanceCriteria.length === 0) return []
 
   return acceptanceCriteria.map((criterion, index) => {
-    const indexed = criteriaStatus[index]
+    const indexed = criteriaStatus.at(index)
     if (indexed && indexed.text === criterion) {
       return { text: criterion, met: indexed.met }
     }

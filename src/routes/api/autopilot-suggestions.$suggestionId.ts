@@ -3,17 +3,18 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProject } from '../../server/projects-store'
 import {
+
+
+
+
+
   acceptAutopilotSuggestion,
   archiveAutopilotSuggestion,
   getAutopilotSuggestion,
   rejectAutopilotSuggestion,
-  updateAutopilotSuggestion,
-  type AutopilotSuggestionImpact,
-  type AutopilotSuggestionRisk,
-  type AutopilotSuggestionEffort,
-  type AutopilotSuggestionSource,
-  type AutopilotSuggestionStatus,
+  updateAutopilotSuggestion
 } from '../../server/autopilot-suggestions-store'
+import type {AutopilotSuggestionEffort, AutopilotSuggestionImpact, AutopilotSuggestionRisk, AutopilotSuggestionSource, AutopilotSuggestionStatus} from '../../server/autopilot-suggestions-store';
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -54,7 +55,7 @@ function isSource(value: unknown): value is AutopilotSuggestionSource {
 export const Route = createFileRoute('/api/autopilot-suggestions/$suggestionId')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
 
         const suggestion = getAutopilotSuggestion(params.suggestionId)
@@ -113,7 +114,7 @@ export const Route = createFileRoute('/api/autopilot-suggestions/$suggestionId')
               ...(isSource(body.source) ? { source: body.source } : {}),
               ...(status ? { status } : {}),
               ...(typeof body.rejectionReason === 'string' || body.rejectionReason === null
-                ? { rejectionReason: (body.rejectionReason as string | null) ?? undefined }
+                ? { rejectionReason: (body.rejectionReason) ?? undefined }
                 : {}),
             }) ?? current
           }

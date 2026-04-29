@@ -368,7 +368,7 @@ export async function streamChat(
   let buffer = ''
   let currentEvent = ''
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read()
     if (done) break
 

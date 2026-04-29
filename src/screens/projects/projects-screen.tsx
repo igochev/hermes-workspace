@@ -10,18 +10,19 @@ import {
   Folder01Icon,
   RefreshIcon,
 } from '@hugeicons/core-free-icons'
+import type {CreateProjectInput} from '@/lib/projects-api';
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import {
+  PROJECT_STATUS_ORDER,
   buildProjectStatsLine,
   groupWorkItemsByStatus,
-  PROJECT_STATUS_ORDER,
 } from '@/lib/projects-view-model'
 import {
-  createProject,
-  fetchProjects,
+
   WORK_ITEM_STATUS_LABELS,
-  type CreateProjectInput,
+  createProject,
+  fetchProjects
 } from '@/lib/projects-api'
 import { cn } from '@/lib/utils'
 
@@ -93,9 +94,9 @@ export function ProjectsScreen() {
     },
   })
 
-  function updateField<K extends keyof CreateProjectInput>(
-    key: K,
-    value: CreateProjectInput[K],
+  function updateField<TField extends keyof CreateProjectInput>(
+    key: TField,
+    value: CreateProjectInput[TField],
   ) {
     setForm((current) => ({ ...current, [key]: value }))
   }

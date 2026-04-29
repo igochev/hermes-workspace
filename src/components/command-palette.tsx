@@ -13,7 +13,7 @@ import {
   PuzzleIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
-import type React from 'react'
+import type { ComponentProps } from 'react'
 import type { SessionMeta } from '@/screens/chat/types'
 import {
   Command,
@@ -46,9 +46,7 @@ type CommandAction = {
   label: string
   keywords: string
   shortcut?: string
-  icon: React.ComponentProps<
-    typeof import('@hugeicons/react').HugeiconsIcon
-  >['icon']
+  icon: ComponentProps<typeof HugeiconsIcon>['icon']
   onSelect: () => void
 }
 

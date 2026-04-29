@@ -39,7 +39,7 @@ const SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   { command: '/help', description: 'Show available commands' },
 ]
 
-const SlashCommandMenu = forwardRef(function SlashCommandMenu(
+const SlashCommandMenu = forwardRef(function SlashCommandMenuCallback(
   { open, query, onSelect }: SlashCommandMenuProps,
   ref: Ref<SlashCommandMenuHandle>,
 ) {
@@ -88,7 +88,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
       },
       selectActive() {
         if (!open || filteredCommands.length === 0) return false
-        const selected = filteredCommands[activeIndex]
+        const selected = filteredCommands.at(activeIndex)
         if (!selected) return false
         onSelect(selected)
         return true

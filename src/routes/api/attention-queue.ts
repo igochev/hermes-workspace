@@ -14,7 +14,7 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/attention-queue')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

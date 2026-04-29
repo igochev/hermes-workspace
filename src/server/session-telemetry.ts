@@ -24,7 +24,7 @@ export type SessionTelemetrySummary = {
   totalTokens: number
   contextPercent: number | null
   accuracy: TelemetryAccuracy
-  topSessions: SessionTelemetryItem[]
+  topSessions: Array<SessionTelemetryItem>
 }
 
 type SessionTelemetrySource = Record<string, unknown>
@@ -40,7 +40,7 @@ type TokenSnapshot = {
 const TOP_SESSION_LIMIT = 6
 
 export function buildSessionTelemetrySummary(
-  sessions: SessionTelemetrySource[] = [],
+  sessions: Array<SessionTelemetrySource> = [],
 ): SessionTelemetrySummary {
   const allItems = sessions.map(normalizeSessionTelemetryItem)
   const topSessions = allItems

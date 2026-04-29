@@ -3,25 +3,26 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type {AutopilotSuggestionImpact, AutopilotSuggestionRecord, AutopilotSuggestionRisk, AutopilotSuggestionSource, AutopilotSuggestionStatus} from '@/lib/autopilot-suggestions-api';
 import { toast } from '@/components/ui/toast'
 import { recommendAutopilotDelegationAction } from '@/server/autopilot-delegation-policy'
 import { fetchProjects } from '@/lib/projects-api'
 import {
-  acceptAutopilotSuggestion,
-  archiveAutopilotSuggestion,
   AUTOPILOT_SUGGESTION_EFFORT_LABELS,
   AUTOPILOT_SUGGESTION_IMPACT_LABELS,
   AUTOPILOT_SUGGESTION_RISK_LABELS,
   AUTOPILOT_SUGGESTION_SOURCE_LABELS,
   AUTOPILOT_SUGGESTION_STATUS_LABELS,
+
+
+
+
+
+  acceptAutopilotSuggestion,
+  archiveAutopilotSuggestion,
   convertAutopilotSuggestion,
   fetchAutopilotSuggestions,
-  rejectAutopilotSuggestion,
-  type AutopilotSuggestionImpact,
-  type AutopilotSuggestionRecord,
-  type AutopilotSuggestionRisk,
-  type AutopilotSuggestionSource,
-  type AutopilotSuggestionStatus,
+  rejectAutopilotSuggestion
 } from '@/lib/autopilot-suggestions-api'
 
 export const AUTOPILOT_SUGGESTIONS_QUERY_KEY = ['mission-control', 'autopilot-suggestions'] as const

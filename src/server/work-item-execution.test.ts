@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createProject } from './projects-store'
+import {  createWorkItem, getWorkItem } from './work-items-store'
+import { listWorkItemApprovals } from './work-item-approvals'
+import { syncWorkItemExecutionState } from './work-item-execution'
+import { listExecutionRuns } from './execution-runs-store'
+import type {WorkItemRecord} from './work-items-store';
+
 const { getHermesJobById, listHermesJobs, getHermesJobRuns } = vi.hoisted(() => ({
   getHermesJobById: vi.fn(),
   listHermesJobs: vi.fn(),
@@ -11,12 +18,6 @@ vi.mock('./hermes-jobs', () => ({
   listHermesJobs,
   getHermesJobRuns,
 }))
-
-import { createProject } from './projects-store'
-import { createWorkItem, getWorkItem, type WorkItemRecord } from './work-items-store'
-import { listWorkItemApprovals } from './work-item-approvals'
-import { syncWorkItemExecutionState } from './work-item-execution'
-import { listExecutionRuns } from './execution-runs-store'
 
 describe('work-item-execution', () => {
   let tempHome: string
@@ -648,7 +649,7 @@ describe('work-item-execution', () => {
         reviewAutoApproval: { enabled: true, maxPriority: 'medium' },
       })
       // Create work item in review phase with reviewJobId
-      let workItem = createWorkItem({
+      const workItem = createWorkItem({
         projectId: project.id,
         title: 'Approved gate passes',
         status: 'active',
@@ -747,7 +748,7 @@ describe('work-item-execution', () => {
         repoPath: '/repos/mission-control-demo',
         defaultBranch: 'main',
       })
-      let workItem = createWorkItem({
+      const workItem = createWorkItem({
         projectId: project.id,
         title: 'Changes requested gate',
         status: 'active',
@@ -810,7 +811,7 @@ describe('work-item-execution', () => {
         defaultBranch: 'main',
         reviewAutoApproval: { enabled: false, maxPriority: 'low' },
       })
-      let workItem = createWorkItem({
+      const workItem = createWorkItem({
         projectId: project.id,
         title: 'Manual review needed',
         status: 'active',
@@ -864,7 +865,6 @@ describe('work-item-execution', () => {
       expect(result.workItem.reviewQualityGateStatus).toBe('manual_review')
       expect(result.workItem.reviewParserError).toBeTruthy()
       // Approval remains pending
-      const { listWorkItemApprovals } = await import('./work-item-approvals')
       const approvals = listWorkItemApprovals(workItem.id)
       expect(approvals[0]?.status).toBe('pending')
     })
@@ -876,7 +876,7 @@ describe('work-item-execution', () => {
         defaultBranch: 'main',
         reviewAutoApproval: { enabled: true, maxPriority: 'medium' },
       })
-      let workItem = createWorkItem({
+      const workItem = createWorkItem({
         projectId: project.id,
         title: 'High risk manual',
         status: 'active',
@@ -936,7 +936,6 @@ DECISION: APPROVED`,
       // High-risk should stay manual_review
       expect(result.workItem.reviewDecision).toBe('manual_review')
       expect(result.workItem.reviewQualityGateStatus).toBe('manual_review')
-      const { listWorkItemApprovals } = await import('./work-item-approvals')
       const approvals = listWorkItemApprovals(workItem.id)
       expect(approvals[0]?.status).toBe('pending')
     })
@@ -947,7 +946,7 @@ DECISION: APPROVED`,
         repoPath: '/repos/mission-control-demo',
         defaultBranch: 'main',
       })
-      let workItem = createWorkItem({
+      const workItem = createWorkItem({
         projectId: project.id,
         title: 'Dedup test',
         status: 'active',
@@ -1013,7 +1012,7 @@ DECISION: APPROVED`,
         defaultBranch: 'main',
         reviewAutoApproval: { enabled: false, maxPriority: 'low' },
       })
-      let workItem = createWorkItem({
+      const workItem = createWorkItem({
         projectId: project.id,
         title: 'Failed review no output',
         status: 'active',
@@ -1054,7 +1053,6 @@ DECISION: APPROVED`,
       // Failed job without parseable structured decision = manual_review
       expect(result.workItem.reviewDecision).toBe('manual_review')
       expect(result.workItem.reviewQualityGateStatus).toBe('manual_review')
-      const { listWorkItemApprovals } = await import('./work-item-approvals')
       const approvals = listWorkItemApprovals(workItem.id)
       expect(approvals[0]?.status).toBe('pending')
     })

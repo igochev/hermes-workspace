@@ -1,8 +1,28 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  createPlanningDraft,
+  getLatestPlanningDraftForWorkItem,
+} from './planning-drafts-store'
+import { createProject } from './projects-store'
+import { upsertExecutionRun } from './execution-runs-store'
+import {
+
+  createWorkItem,
+  getWorkItem,
+  updateWorkItem
+} from './work-items-store'
+import { requestWorkItemReviewApproval } from './work-item-approvals'
+import {
+  reconcileAllWorkItemAutonomy,
+  reconcileWorkItemAutonomy,
+} from './work-item-orchestrator'
+import type * as WorkItemPlanningModule from './work-item-planning'
+import type {WorkItemRecord} from './work-items-store';
 
 const {
   getLatestHermesJobOutput,
@@ -21,7 +41,7 @@ vi.mock('./hermes-job-output', () => ({
 }))
 
 vi.mock('./work-item-planning', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./work-item-planning')>()),
+  ...(await importOriginal<typeof WorkItemPlanningModule>()),
   prepareWorkItemWithPlanner,
 }))
 
@@ -32,24 +52,6 @@ vi.mock('./work-item-launch', () => ({
 vi.mock('./work-item-execution', () => ({
   syncWorkItemExecutionState,
 }))
-
-import {
-  createPlanningDraft,
-  getLatestPlanningDraftForWorkItem,
-} from './planning-drafts-store'
-import { createProject } from './projects-store'
-import { upsertExecutionRun } from './execution-runs-store'
-import {
-  createWorkItem,
-  getWorkItem,
-  updateWorkItem,
-  type WorkItemRecord,
-} from './work-items-store'
-import { requestWorkItemReviewApproval } from './work-item-approvals'
-import {
-  reconcileAllWorkItemAutonomy,
-  reconcileWorkItemAutonomy,
-} from './work-item-orchestrator'
 
 describe('work-item-orchestrator', () => {
   let tempHome: string

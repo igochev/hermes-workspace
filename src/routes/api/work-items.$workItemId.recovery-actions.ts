@@ -5,11 +5,12 @@ import { getAttentionQueueItem, markAttentionQueueItemResolved } from '../../ser
 import { launchWorkItemIntoConductor } from '../../server/work-item-launch'
 import { applyWorkItemLifecycleTransition } from '../../server/work-item-lifecycle'
 import {
+
   appendWorkItemHistoryEntry,
   getWorkItem,
-  updateWorkItem,
-  type WorkItemPhase,
+  updateWorkItem
 } from '../../server/work-items-store'
+import type {WorkItemPhase} from '../../server/work-items-store';
 import type { WorkItemRecoveryActionType } from '../../server/work-item-recovery-actions'
 
 function jsonResponse(data: unknown, status = 200) {

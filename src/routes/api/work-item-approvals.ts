@@ -13,7 +13,7 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/work-item-approvals')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
         return jsonResponse({ approvals: listApprovalInboxEntries() })
       },

@@ -3,14 +3,15 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProject } from '../../server/projects-store'
 import {
+
+
+
+
+
   createAutopilotSuggestion,
-  listAutopilotSuggestions,
-  type AutopilotSuggestionImpact,
-  type AutopilotSuggestionRisk,
-  type AutopilotSuggestionEffort,
-  type AutopilotSuggestionSource,
-  type AutopilotSuggestionStatus,
+  listAutopilotSuggestions
 } from '../../server/autopilot-suggestions-store'
+import type {AutopilotSuggestionEffort, AutopilotSuggestionImpact, AutopilotSuggestionRisk, AutopilotSuggestionSource, AutopilotSuggestionStatus} from '../../server/autopilot-suggestions-store';
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -51,7 +52,7 @@ function isSource(value: unknown): value is AutopilotSuggestionSource {
 export const Route = createFileRoute('/api/autopilot-suggestions')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

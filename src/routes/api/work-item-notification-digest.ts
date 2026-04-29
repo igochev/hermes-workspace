@@ -13,7 +13,7 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/work-item-notification-digest')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
 
         const format = new URL(request.url).searchParams.get('format')

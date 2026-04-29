@@ -3,18 +3,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createProject } from './projects-store'
+import { createWorkItem } from './work-items-store'
+import { reconcileWorkItemAutonomy } from './work-item-orchestrator'
+import type * as WorkItemPlanningModule from './work-item-planning'
+
 const { prepareWorkItemWithPlanner } = vi.hoisted(() => ({
   prepareWorkItemWithPlanner: vi.fn(),
 }))
 
 vi.mock('./work-item-planning', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./work-item-planning')>()),
+  ...(await importOriginal<typeof WorkItemPlanningModule>()),
   prepareWorkItemWithPlanner,
 }))
-
-import { createProject } from './projects-store'
-import { createWorkItem } from './work-items-store'
-import { reconcileWorkItemAutonomy } from './work-item-orchestrator'
 
 describe('work-item orchestrator Planner launch evidence', () => {
   let tempHome: string

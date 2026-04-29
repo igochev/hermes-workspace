@@ -13,7 +13,7 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/execution-runs/$executionRunId')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

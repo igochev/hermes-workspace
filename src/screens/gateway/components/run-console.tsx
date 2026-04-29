@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckmarkCircle02Icon, Copy01Icon, Rocket01Icon, ViewIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { fetchSessionHistory } from '@/lib/gateway-api'
-import { cn } from '@/lib/utils'
-import { RunLearnings, type RunLearningsProps } from './run-learnings'
+import { RunLearnings  } from './run-learnings'
 import { MissionEventLog } from './mission-event-log'
+import {  onFeedEvent } from './feed-event-bus'
+import type {FeedEvent} from './feed-event-bus';
+import type {RunLearningsProps} from './run-learnings';
 import type { MissionEvent } from '@/screens/gateway/lib/mission-events'
-import { onFeedEvent, type FeedEvent } from './feed-event-bus'
+import { cn } from '@/lib/utils'
+import { fetchSessionHistory } from '@/lib/gateway-api'
 
 type RunArtifact = {
   id: string
@@ -19,7 +21,7 @@ type RunArtifact = {
 
 type RunReport = {
   summary: string
-  keyFindings: string[]
+  keyFindings: Array<string>
   duration: string
   totalTokens: number
   totalCost: number
@@ -43,14 +45,14 @@ type RunConsoleProps = {
   onSteerAgent?: (agentId: string, message: string) => void
   onApprove?: (approvalId: string) => void
   onDeny?: (approvalId: string) => void
-  sessionKeys?: string[]
+  sessionKeys?: Array<string>
   agentNameMap?: Record<string, string>
-  artifacts?: RunArtifact[]
+  artifacts?: Array<RunArtifact>
   report?: RunReport
-  missionEvents?: MissionEvent[]
+  missionEvents?: Array<MissionEvent>
   learnings?: RunLearningsProps['learnings']
   onAddLearning?: RunLearningsProps['onAddLearning']
-  tabs?: ConsoleTab[]
+  tabs?: Array<ConsoleTab>
   minimalChrome?: boolean
 }
 
@@ -141,8 +143,12 @@ function extractContent(msg: { content?: string | Array<{ type?: string; text?: 
 
 function sanitizeArgsPreview(args?: string): string {
   if (!args) return 'No arguments'
-  const cleaned = args
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+  const cleaned = Array.from(args)
+    .map((char) => {
+      const code = char.charCodeAt(0)
+      return code <= 0x1f || code === 0x7f ? ' ' : char
+    })
+    .join('')
     .replace(/\s+/g, ' ')
     .trim()
   if (!cleaned) return 'No arguments'
@@ -222,14 +228,14 @@ export function RunConsole({
   const [streamView, setStreamView] = useState<StreamView>('combined')
   const [steerTarget, setSteerTarget] = useState<string | null>(null)
   const [steerInput, setSteerInput] = useState('')
-  const [historyEvents, setHistoryEvents] = useState<LiveStreamEvent[]>([])
-  const [feedEvents, setFeedEvents] = useState<LiveStreamEvent[]>([])
+  const [historyEvents, setHistoryEvents] = useState<Array<LiveStreamEvent>>([])
+  const [feedEvents, setFeedEvents] = useState<Array<LiveStreamEvent>>([])
   const [isAutoScroll, setIsAutoScroll] = useState(true)
   const [copiedArtifactId, setCopiedArtifactId] = useState<string | null>(null)
   const [expandedArtifactId, setExpandedArtifactId] = useState<string | null>(null)
   const streamEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const allowedTabs = useMemo<ConsoleTab[]>(
+  const allowedTabs = useMemo<Array<ConsoleTab>>(
     () => (tabs && tabs.length > 0 ? tabs : TAB_OPTIONS.map((tab) => tab.id)),
     [tabs],
   )
@@ -237,11 +243,11 @@ export function RunConsole({
   // Fetch session history for all session keys
   const fetchAllHistory = useCallback(async () => {
     if (!sessionKeys?.length) return
-    const allEvents: LiveStreamEvent[] = []
+    const allEvents: Array<LiveStreamEvent> = []
     for (const key of sessionKeys) {
       try {
         const res = await fetchSessionHistory(key)
-        const msgs = res?.messages ?? []
+        const msgs = res.messages ?? []
         const agentName = agentNameMap?.[key] ?? 'Agent'
         for (const msg of msgs) {
           const content = extractContent(msg)
@@ -354,12 +360,10 @@ export function RunConsole({
       }
     }
     return Array.from(grouped.entries()).map(([agentName, events]) => ({ agentName, events }))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEvents])
 
   const copyArtifactContent = useCallback(async (artifact: RunArtifact) => {
     const textToCopy = artifact.content || artifact.path || artifact.name
-    if (!textToCopy || !navigator?.clipboard?.writeText) return
     try {
       await navigator.clipboard.writeText(textToCopy)
       setCopiedArtifactId(artifact.id)
@@ -716,7 +720,7 @@ export function RunConsole({
               eventsByAgent.length >= 3 ? (
                 <div className="flex gap-3 overflow-x-auto pb-2">
                   {eventsByAgent.map((lane) => {
-                    const latestEvent = lane.events[lane.events.length - 1]
+                    const latestEvent = lane.events.at(-1)
                     const laneDotClass =
                       latestEvent?.eventType === 'error'
                         ? 'bg-red-400'
@@ -767,7 +771,7 @@ export function RunConsole({
                   )}
                 >
                   {eventsByAgent.map((lane) => {
-                    const latestEvent = lane.events[lane.events.length - 1]
+                    const latestEvent = lane.events.at(-1)
                     const laneDotClass =
                       latestEvent?.eventType === 'error'
                         ? 'bg-red-400'

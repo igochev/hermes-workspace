@@ -1,11 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+
   createProject,
-  listProjects,
-  type ProjectRecord,
+  listProjects
 } from '../../server/projects-store'
 import { listWorkItems } from '../../server/work-items-store'
+import type {ProjectRecord} from '../../server/projects-store';
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -27,7 +28,7 @@ function toProjectSummary(project: ProjectRecord) {
 export const Route = createFileRoute('/api/projects')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

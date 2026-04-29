@@ -20,6 +20,12 @@ import {
   useRef,
   useState,
 } from 'react'
+import { setLocalModelOverride } from '../chat-screen'
+import {
+  MODEL_SWITCH_BLOCKED_TOAST,
+  getZeroForkModelInfoFlags,
+  shouldBlockZeroForkModelSwitch,
+} from './chat-composer-model-switch'
 import type { CSSProperties, Ref } from 'react'
 
 import type { ModelCatalogEntry, ModelSwitchResponse } from '@/lib/model-types'
@@ -44,11 +50,7 @@ import { cn } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
 import { toast } from '@/components/ui/toast'
-import {
-  getZeroForkModelInfoFlags,
-  MODEL_SWITCH_BLOCKED_TOAST,
-  shouldBlockZeroForkModelSwitch,
-} from './chat-composer-model-switch'
+
 
 type ChatComposerAttachment = {
   id: string
@@ -261,14 +263,12 @@ async function fetchModelsForProvider(
   }
 
   const payload = (await response.json()) as HermesAvailableModelsResponse
-  return (payload.models || []).map((model) => ({
+  return payload.models.map((model) => ({
     id: model.id,
     name: model.id,
     provider: normalizedProvider,
   }))
 }
-
-import { setLocalModelOverride } from '../chat-screen'
 
 const LOCAL_PROVIDERS_SET = new Set(['ollama', 'atomic-chat'])
 
@@ -743,7 +743,7 @@ function ChatComposerComponent({
   } | null>(null)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
   const { settings: composerSettings } = useSettings()
-  const chatNavMode = composerSettings.mobileChatNavMode ?? 'dock'
+  const chatNavMode = composerSettings.mobileChatNavMode
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 767px)').matches
@@ -899,7 +899,7 @@ function ChatComposerComponent({
   })
 
   const handleModelSelect = useCallback(
-    function handleModelSelect(nextModel: string, provider?: string) {
+    function handleModelSelectCallback(nextModel: string, provider?: string) {
       const model = nextModel.trim()
       if (!model) return
       const normalizedSessionKey =
@@ -935,7 +935,7 @@ function ChatComposerComponent({
   const retryModel = modelNotice?.retryModel ?? ''
   const retryProvider = modelNotice?.retryProvider
   const handleRetryModelSwitch = useCallback(
-    function handleRetryModelSwitch() {
+    function handleRetryModelSwitchCallback() {
       if (!retryModel) return
       handleModelSelect(retryModel, retryProvider)
     },
@@ -1008,14 +1008,14 @@ function ChatComposerComponent({
     }
   }, [attachments.length, value])
 
-  const cancelFocusPromptFrame = useCallback(function cancelFocusPromptFrame() {
+  const cancelFocusPromptFrame = useCallback(function cancelFocusPromptFrameCallback() {
     if (focusFrameRef.current === null) return
     window.cancelAnimationFrame(focusFrameRef.current)
     focusFrameRef.current = null
   }, [])
 
   const focusPrompt = useCallback(
-    function focusPrompt() {
+    function focusPromptCallback() {
       if (typeof window === 'undefined') return
       cancelFocusPromptFrame()
       focusFrameRef.current = window.requestAnimationFrame(
@@ -1073,7 +1073,6 @@ function ChatComposerComponent({
     if (isMobileViewport) return
     // Only focus on focusKey change (session switch), not on every disabled toggle
     focusPrompt()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey, isMobileViewport])
 
   useLayoutEffect(() => {
@@ -1107,7 +1106,7 @@ function ChatComposerComponent({
   }, [isModelMenuOpen])
 
   const persistDraft = useCallback(
-    function persistDraft(nextValue: string) {
+    function persistDraftCallback(nextValue: string) {
       if (typeof window === 'undefined') return
       if (nextValue.length === 0) {
         window.sessionStorage.removeItem(draftStorageKey)
@@ -1119,7 +1118,7 @@ function ChatComposerComponent({
   )
 
   const clearDraft = useCallback(
-    function clearDraft() {
+    function clearDraftCallback() {
       if (typeof window === 'undefined') return
       window.sessionStorage.removeItem(draftStorageKey)
     },
@@ -1127,7 +1126,7 @@ function ChatComposerComponent({
   )
 
   const handleValueChange = useCallback(
-    function handleValueChange(nextValue: string) {
+    function handleValueChangeCallback(nextValue: string) {
       setIsSlashMenuDismissed(false)
       setValue(nextValue)
       persistDraft(nextValue)
@@ -1537,14 +1536,14 @@ function ChatComposerComponent({
   }, [voiceRecorder])
 
   const handleAbort = useCallback(
-    function handleAbort() {
+    function handleAbortCallback() {
       onAbort?.()
     },
     [onAbort],
   )
 
   const handleOpenAttachmentPicker = useCallback(
-    function handleOpenAttachmentPicker(
+    function handleOpenAttachmentPickerCallback(
       event: React.MouseEvent<HTMLButtonElement>,
     ) {
       event.preventDefault()
@@ -1555,7 +1554,7 @@ function ChatComposerComponent({
   )
 
   const handleAttachmentInputChange = useCallback(
-    function handleAttachmentInputChange(
+    function handleAttachmentInputChangeCallback(
       event: React.ChangeEvent<HTMLInputElement>,
     ) {
       const files = Array.from(event.target.files ?? [])
@@ -1568,7 +1567,7 @@ function ChatComposerComponent({
   )
 
   const handleSelectSlashCommand = useCallback(
-    function handleSelectSlashCommand(command: SlashCommandDefinition) {
+    function handleSelectSlashCommandCallback(command: SlashCommandDefinition) {
       if (command.command === '/fast') {
         setIsSlashMenuDismissed(false)
         setFastMode((previous) => !previous)

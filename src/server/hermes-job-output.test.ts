@@ -1,8 +1,13 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { mkdtempSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync  } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  getLatestHermesJobOutput,
+  getLatestLocalCronOutput,
+  parseBuilderEvidenceOutput,
+} from './hermes-job-output'
 
 const { getHermesJobRuns } = vi.hoisted(() => ({
   getHermesJobRuns: vi.fn(),
@@ -11,12 +16,6 @@ const { getHermesJobRuns } = vi.hoisted(() => ({
 vi.mock('./hermes-jobs', () => ({
   getHermesJobRuns,
 }))
-
-import {
-  getLatestHermesJobOutput,
-  getLatestLocalCronOutput,
-  parseBuilderEvidenceOutput,
-} from './hermes-job-output'
 
 describe('hermes-job-output', () => {
   let tempHome: string

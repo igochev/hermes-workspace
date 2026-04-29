@@ -18,20 +18,20 @@ export function isSyntheticSessionKey(
   return SYNTHETIC_SESSION_KEYS.has(value.trim())
 }
 
-export async function resolveSessionKey({
+export function resolveSessionKey({
   rawSessionKey,
   friendlyId,
   defaultKey = 'new',
 }: ResolveSessionKeyInput): Promise<ResolveSessionResult> {
   const trimmedRaw = rawSessionKey?.trim() ?? ''
   if (trimmedRaw.length > 0) {
-    return { sessionKey: trimmedRaw, resolvedVia: 'raw' }
+    return Promise.resolve({ sessionKey: trimmedRaw, resolvedVia: 'raw' })
   }
 
   const trimmedFriendly = friendlyId?.trim() ?? ''
   if (trimmedFriendly.length > 0) {
-    return { sessionKey: trimmedFriendly, resolvedVia: 'friendly' }
+    return Promise.resolve({ sessionKey: trimmedFriendly, resolvedVia: 'friendly' })
   }
 
-  return { sessionKey: defaultKey, resolvedVia: 'default' }
+  return Promise.resolve({ sessionKey: defaultKey, resolvedVia: 'default' })
 }

@@ -33,7 +33,7 @@ export function getMappedPhaseProfile(
   phaseProfiles: ConductorPhaseProfiles,
   phase: ConductorPhaseKey,
 ): string | null {
-  const value = phaseProfiles[phase]?.trim()
+  const value = phaseProfiles[phase].trim()
   return value ? value : null
 }
 
@@ -45,7 +45,7 @@ export function hasMappedPhaseProfiles(
 
 export function buildPhaseProfileRoutingInstructions(
   phaseProfiles: ConductorPhaseProfiles,
-): string[] {
+): Array<string> {
   const mappedEntries = CONDUCTOR_PHASE_KEYS.flatMap((phase) => {
     const profile = getMappedPhaseProfile(phaseProfiles, phase)
     return profile ? [[phase, profile] as const] : []
@@ -56,7 +56,7 @@ export function buildPhaseProfileRoutingInstructions(
   return [
     '## Phase → Hermes Profile Routing',
     'Route worker tasks to these Hermes profiles when the task clearly matches the phase:',
-    ...mappedEntries.map(([phase, profile]) => `- ${phase} tasks → Hermes profile \"${profile}\"`),
+    ...mappedEntries.map(([phase, profile]) => `- ${phase} tasks → Hermes profile "${profile}"`),
     '',
     'When a phase has a mapped profile, spawn that worker with delegate_task using ACP subprocess transport so it actually runs under that Hermes profile:',
     '- Ensure a matching Hermes profile alias exists first if the command is missing, e.g. `hermes profile alias <profile> --name <profile>`.',

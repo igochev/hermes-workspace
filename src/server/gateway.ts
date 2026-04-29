@@ -1,8 +1,10 @@
-import { randomUUID, generateKeyPairSync, createPrivateKey, createPublicKey, createHash, sign as cryptoSign } from 'node:crypto'
+import { createHash, createPrivateKey, createPublicKey, sign as cryptoSign, generateKeyPairSync, randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import WebSocket from 'ws'
+import { classifyConnectionError } from '../lib/connection-errors'
+import type { ConnectionErrorKind } from '../lib/connection-errors'
 import type { RawData } from 'ws'
 
 export type GatewayFrame =
@@ -123,11 +125,11 @@ export function getGatewayConfig() {
   // but the config file still has the correct token.
   if (!token) {
     try {
-      const os = require('node:os')
-      const fs = require('node:fs')
-      const path = require('node:path')
-      const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
-      const raw = fs.readFileSync(configPath, 'utf-8')
+      const nodeOs = require('node:os')
+      const nodeFs = require('node:fs')
+      const nodePath = require('node:path')
+      const configPath = nodePath.join(nodeOs.homedir(), '.openclaw', 'openclaw.json')
+      const raw = nodeFs.readFileSync(configPath, 'utf-8')
       const config = JSON.parse(raw)
       const fileToken = config?.gateway?.auth?.token
       if (fileToken) {
@@ -198,7 +200,7 @@ class GatewayClient {
   private reconnectAttempts = 0
   private authenticated = false
   private destroyed = false
-  private _lastErrorKind: import('../lib/connection-errors').ConnectionErrorKind | null = null
+  private _lastErrorKind: ConnectionErrorKind | null = null
 
   // Circuit breaker: prevent request floods when gateway is unreachable
   private circuitFailures = 0
@@ -218,7 +220,7 @@ class GatewayClient {
     }
   }
 
-  getConnectionSnapshot(): { readyState: number; authenticated: boolean; errorKind: import('../lib/connection-errors').ConnectionErrorKind | null } {
+  getConnectionSnapshot(): { readyState: number; authenticated: boolean; errorKind: ConnectionErrorKind | null } {
     return {
       readyState: this.ws?.readyState ?? WebSocket.CLOSED,
       authenticated: this.authenticated,
@@ -457,7 +459,6 @@ class GatewayClient {
         lastError = error instanceof Error ? error : new Error(String(error))
         // Classify the error for UI display
         try {
-          const { classifyConnectionError } = require('../lib/connection-errors') as typeof import('../lib/connection-errors')
           this._lastErrorKind = classifyConnectionError(lastError)
         } catch { /* module may not be available in all contexts */ }
         if (this.ws) {
@@ -484,7 +485,7 @@ class GatewayClient {
     })
 
     ws.on('close', (code: number, reason: Buffer) => {
-      const reasonText = reason?.toString() || 'n/a'
+      const reasonText = reason.toString() || 'n/a'
       this.handleDisconnect(
         new Error(`Gateway connection closed (code=${code}, reason=${reasonText})`),
       )
@@ -765,9 +766,7 @@ function rawDataToString(data: RawData): string {
 const GW_KEY = '__clawsuite_gateway_client__' as const
 const ACTIVE_SEND_RUNS_KEY = '__clawsuite_active_send_stream_runs__' as const
 declare global {
-  // eslint-disable-next-line no-var
   var __clawsuite_gateway_client__: GatewayClient | undefined
-  // eslint-disable-next-line no-var
   var __clawsuite_active_send_stream_runs__: Set<string> | undefined
 }
 const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined

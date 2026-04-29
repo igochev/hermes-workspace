@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { type ProjectRecord } from './projects-store'
 import { selectNextLaneWorkItem } from './project-autonomy-lane'
-import { type WorkItemRecord } from './work-items-store'
+import type {ProjectRecord} from './projects-store';
+import type {WorkItemRecord} from './work-items-store';
 
 function project(input: Partial<ProjectRecord> = {}): ProjectRecord {
   return {

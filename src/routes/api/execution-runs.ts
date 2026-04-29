@@ -82,7 +82,7 @@ function buildLegacyLookup(
 export const Route = createFileRoute('/api/execution-runs')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

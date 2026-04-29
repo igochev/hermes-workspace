@@ -133,9 +133,8 @@ type ChatState = {
 
   /** Sessions currently waiting for a response — survives component unmount */
   waitingSessionKeys: Set<string>
-  waitingSessionMeta: Record<
-    string,
-    { since: number; runId: string | null }
+  waitingSessionMeta: Partial<
+    Record<string, { since: number; runId: string | null }>
   >
   /** Mark a session as waiting for a response */
   setSessionWaiting: (sessionKey: string, runId?: string | null) => void
@@ -555,9 +554,7 @@ function messageMultipartSignature(
             return `t:${String((part as any).text ?? '').trim()}`
           if (part.type === 'thinking')
             return `h:${String((part as any).thinking ?? '').trim()}`
-          if (part.type === 'toolCall')
-            return `tc:${String((part as any).id ?? '')}:${String((part as any).name ?? '')}`
-          return `p:${String((part as any).type ?? '')}`
+          return `tc:${String((part as any).id ?? '')}:${String((part as any).name ?? '')}`
         })
         .join('|')
     : ''
@@ -618,8 +615,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setSessionWaiting: (sessionKey, runId) => {
+    const existingMeta = get().waitingSessionMeta[sessionKey]
     const meta = {
-      since: get().waitingSessionMeta[sessionKey]?.since ?? Date.now(),
+      since: existingMeta === undefined ? Date.now() : existingMeta.since,
       runId: runId ?? null,
     }
     const nextKeys = new Set(get().waitingSessionKeys)
@@ -976,7 +974,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // ToolCallPill can render them even after streaming state is cleared.
           // Fast tool runs clear streaming state before React renders — embedding
           // __streamToolCalls ensures pills survive in the history message.
-          const streamToolCallsToEmbed = streaming?.toolCalls?.length
+          const streamToolCallsToEmbed = streaming?.toolCalls.length
             ? streaming.toolCalls
             : undefined
           completeMessage = {

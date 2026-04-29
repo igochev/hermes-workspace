@@ -18,16 +18,17 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
-  HERMES_API,
   BEARER_TOKEN,
+  HERMES_API,
   dashboardFetch,
   ensureGatewayProbed,
 } from '../../server/gateway-capabilities'
 import {
+
   buildPhaseProfileRoutingInstructions,
-  normalizePhaseProfiles,
-  type ConductorPhaseProfiles,
+  normalizePhaseProfiles
 } from '../../lib/conductor-phase-profiles'
+import type {ConductorPhaseProfiles} from '../../lib/conductor-phase-profiles';
 
 let cachedSkill: string | null = null
 

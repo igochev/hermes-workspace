@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+
   PROJECT_ACTIVE_WIP_WARNING_THRESHOLD,
   PROJECT_BOARD_FLOW_ORDER,
+
+
   buildLabelAnalytics,
-  buildProjectBoardUrgencySummary,
   buildProjectAlwaysOnPolicySummary,
+  buildProjectBoardUrgencySummary,
   buildProjectLaneCockpit,
   buildProjectStatsLine,
   buildProjectWipHint,
@@ -17,11 +20,9 @@ import {
   getWorkItemUrgencyTone,
   groupWorkItemsByStatus,
   isProjectWipHigh,
-  sortWorkItemsForProjectBoard,
-  type LabelAnalytics,
-  type ProjectSummary,
-  type WorkItemRecord,
+  sortWorkItemsForProjectBoard
 } from './projects-view-model'
+import type {LabelAnalytics, ProjectSummary, WorkItemRecord} from './projects-view-model';
 
 describe('projects-view-model', () => {
   it('formats compact project stats for project cards', () => {

@@ -1,8 +1,8 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { type CronRun } from '../components/cron-manager/cron-types'
 import { getHermesJobRuns } from './hermes-jobs'
+import type {CronRun} from '../components/cron-manager/cron-types';
 
 export type HermesJobOutputSnapshot = {
   jobId: string
@@ -106,7 +106,7 @@ function stringArray(value: unknown): Array<string> {
 }
 
 function extractReferencedEvidenceJson(text: string): unknown | null {
-  const evidencePath = text.match(/(?:^|[\s`'\"])(\/[^\s`'\")]+evidence\.json)(?:\s|$|[`'\")])/m)?.[1]
+  const evidencePath = text.match(/(?:^|[\s`'"])(\/[^\s`'")]+evidence\.json)(?:\s|$|[`'")])/m)?.[1]
   if (!evidencePath || !existsSync(evidencePath)) return null
   try {
     return JSON.parse(readFileSync(evidencePath, 'utf8'))
@@ -154,7 +154,7 @@ export function parseBuilderEvidenceOutput(text: string): BuilderEvidenceParseRe
   if (record.phase !== 'build') return { ok: false, error: 'Builder evidence phase must be build.' }
   const status = record.status === 'failed' ? 'failed' : 'succeeded'
 
-  const artifactPath = extractReferencedEvidenceJson(text) ? text.match(/(?:^|[\s`'\"])(\/[^\s`'\")]+evidence\.json)(?:\s|$|[`'\")])/m)?.[1] : undefined
+  const artifactPath = extractReferencedEvidenceJson(text) ? text.match(/(?:^|[\s`'"])(\/[^\s`'")]+evidence\.json)(?:\s|$|[`'")])/m)?.[1] : undefined
   const commandRecords = Array.isArray(record.commands) ? record.commands.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object' && !Array.isArray(entry))) : []
   const passedCommand = commandRecords.find((entry) => entry.exitCode === 0) ?? commandRecords[0]
   const changedFiles = stringArray(record.changedFiles).filter((filePath) => !isIgnoredChange(filePath))
@@ -190,9 +190,9 @@ export function parseBuilderEvidenceOutput(text: string): BuilderEvidenceParseRe
       baseBranch: optionalString(record.baseBranch),
       headCommit: optionalString(record.headCommit) ?? optionalString(record.commit),
       changedFiles: normalizedChangedFiles,
-      testCommand: optionalString(record.testCommand) ?? optionalString(passedCommand?.command),
+      testCommand: optionalString(record.testCommand) ?? optionalString(passedCommand.command),
       testPassed,
-      testSummary: optionalString(record.testSummary) ?? optionalString(passedCommand?.summary),
+      testSummary: optionalString(record.testSummary) ?? optionalString(passedCommand.summary),
       artifactPaths: Array.from(new Set([
         ...stringArray(record.artifactPaths),
         optionalString(record.testLog),
@@ -212,11 +212,11 @@ function sortRunsNewestFirst(a: CronRun, b: CronRun): number {
   return bTime - aTime
 }
 
-export async function getLatestLocalCronOutput(
+export function getLatestLocalCronOutput(
   jobId: string,
 ): Promise<HermesJobOutputSnapshot | null> {
   const outputDir = join(getHermesHome(), 'cron', 'output', jobId)
-  if (!existsSync(outputDir)) return null
+  if (!existsSync(outputDir)) return Promise.resolve(null)
 
   const files = readdirSync(outputDir)
     .map((fileName) => {
@@ -227,15 +227,15 @@ export async function getLatestLocalCronOutput(
     .filter((entry) => entry.stat.isFile())
     .sort((a, b) => b.fileName.localeCompare(a.fileName) || b.stat.mtimeMs - a.stat.mtimeMs)
 
+  if (files.length === 0) return Promise.resolve(null)
   const latest = files[0]
-  if (!latest) return null
 
-  return {
+  return Promise.resolve({
     jobId,
     latestOutputText: readFileSync(latest.filePath, 'utf8'),
     latestOutputPath: latest.filePath,
     lastObservedAt: latest.stat.mtime.toISOString(),
-  }
+  })
 }
 
 export async function getLatestHermesJobOutput(

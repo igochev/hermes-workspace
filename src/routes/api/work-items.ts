@@ -2,14 +2,15 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProject } from '../../server/projects-store'
 import {
+
+
+
+
+
   createWorkItem,
-  listWorkItems,
-  type WorkItemPhase,
-  type WorkItemPriority,
-  type WorkItemRiskLevel,
-  type WorkItemBlockedReason,
-  type WorkItemStatus,
+  listWorkItems
 } from '../../server/work-items-store'
+import type {WorkItemBlockedReason, WorkItemPhase, WorkItemPriority, WorkItemRiskLevel, WorkItemStatus} from '../../server/work-items-store';
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -59,7 +60,7 @@ function isWorkItemBlockedReason(value: unknown): value is WorkItemBlockedReason
 export const Route = createFileRoute('/api/work-items')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

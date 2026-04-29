@@ -41,7 +41,7 @@ const autopilotPolicy: ProjectAutopilotPolicy = {
 }
 
 describe('project detail profile mapping clickability', () => {
-  it('offers a configure action from readiness when supervisor or autopilot scout is unmapped', async () => {
+  it('offers a configure action from readiness when supervisor or autopilot scout is unmapped', () => {
     const onConfigureProfileMappings = vi.fn()
 
     render(
@@ -62,7 +62,7 @@ describe('project detail profile mapping clickability', () => {
     expect(onConfigureProfileMappings).toHaveBeenCalledTimes(1)
   })
 
-  it('clicks through the profile workflow editor and saves all readiness role mappings without wiping autopilot policy', async () => {
+  it('clicks through the profile workflow editor and saves all readiness role mappings without wiping autopilot policy', () => {
     const onSave = vi.fn()
 
     render(

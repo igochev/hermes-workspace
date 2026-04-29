@@ -1,4 +1,4 @@
-import { WorkItemApprovalDecision } from './projects-api'
+import type { WorkItemApprovalDecision } from './projects-api'
 
 const WORK_ITEM_APPROVALS_BASE = '/api/work-item-approvals'
 

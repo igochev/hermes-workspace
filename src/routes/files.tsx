@@ -72,7 +72,7 @@ function FilesRoute() {
     setFileExplorerCollapsed(true)
   }, [isMobile])
 
-  const handleInsertReference = useCallback(function handleInsertReference(
+  const handleInsertReference = useCallback(function handleInsertReferenceCallback(
     reference: string,
   ) {
     setEditorValue((prev) => `${prev}\n${reference}\n`)

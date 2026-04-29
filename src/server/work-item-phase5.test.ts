@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createProject } from './projects-store'
+import { createWorkItem, getWorkItem } from './work-items-store'
+import { launchWorkItemIntoConductor } from './work-item-launch'
+import { syncWorkItemExecutionState } from './work-item-execution'
+
 const { launchConductorMission, buildMissionLink, getHermesJobById, listHermesJobs, getHermesJobRuns } = vi.hoisted(() => ({
   launchConductorMission: vi.fn(),
   buildMissionLink: (jobId: string) => `/jobs?jobId=${encodeURIComponent(jobId)}`,
@@ -18,11 +23,6 @@ vi.mock('./hermes-jobs', () => ({
   listHermesJobs,
   getHermesJobRuns,
 }))
-
-import { createProject } from './projects-store'
-import { createWorkItem, getWorkItem } from './work-items-store'
-import { launchWorkItemIntoConductor } from './work-item-launch'
-import { syncWorkItemExecutionState } from './work-item-execution'
 
 describe('work-item phase 5 execution linkage', () => {
   let tempHome: string

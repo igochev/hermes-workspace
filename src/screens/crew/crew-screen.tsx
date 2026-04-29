@@ -10,12 +10,13 @@ import {
   Wifi01Icon,
   WifiOffIcon,
 } from '@hugeicons/core-free-icons'
+import type {CrewMember, CrewOnlineStatus} from '@/hooks/use-crew-status';
 import { cn } from '@/lib/utils'
 import {
-  useCrewStatus,
+
+
   getOnlineStatus,
-  type CrewMember,
-  type CrewOnlineStatus,
+  useCrewStatus
 } from '@/hooks/use-crew-status'
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -157,7 +158,7 @@ function AgentCard({ member }: { member: CrewMember }) {
           <p className="text-xs text-[var(--theme-muted)] mt-0.5">
             {member.model} · {member.provider}
           </p>
-          {telegramPlatform && (
+          {(
             <div className="flex items-center gap-1 mt-1">
               <HugeiconsIcon
                 icon={telegramPlatform.state === 'connected' ? Wifi01Icon : WifiOffIcon}

@@ -17,7 +17,7 @@ function asPatchStatus(value: unknown): 'revision_requested' | 'cancelled' | und
 export const Route = createFileRoute('/api/planning-drafts/$draftId')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
 
         const draft = getPlanningDraft(params.draftId)

@@ -8,7 +8,7 @@ export type SessionTelemetryResponse = {
   source?: string
   message?: string
   summary: SessionTelemetrySummary
-  items: SessionTelemetryItem[]
+  items: Array<SessionTelemetryItem>
   generatedAt: string
 }
 

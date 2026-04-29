@@ -3,17 +3,18 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type {ProjectAutopilotScoutSource} from '@/lib/projects-api';
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { fetchAutopilotSuggestions } from '@/lib/autopilot-suggestions-api'
 import {
-  disableProjectAutopilotSchedule,
-  fetchProjectAutopilotSchedule,
   PROJECT_AUTOPILOT_SCHEDULE_PRESET_LABELS,
   PROJECT_AUTOPILOT_SCOUT_SOURCE_LABELS,
+  disableProjectAutopilotSchedule,
+  fetchProjectAutopilotSchedule,
   saveProjectAutopilotSchedule,
 } from '@/lib/project-autopilot-api'
-import { fetchProject, type ProjectAutopilotScoutSource } from '@/lib/projects-api'
+import {  fetchProject } from '@/lib/projects-api'
 
 export const PROJECT_AUTOPILOT_SAFETY_COPY =
   'Autopilot is suggestions only — no direct code changes, commits, branches, PRs, or automatic work-item creation.'
@@ -110,7 +111,7 @@ export function ProjectAutopilotScreen({ projectId }: { projectId: string }) {
     },
   })
 
-  const projectName = projectQuery.data?.project?.name ?? projectId
+  const projectName = projectQuery.data?.project.name ?? projectId
   const suggestions = suggestionsQuery.data ?? []
 
   return (

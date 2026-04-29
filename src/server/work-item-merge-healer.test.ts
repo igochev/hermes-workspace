@@ -8,7 +8,7 @@ import { runWorkItemMergeHealer } from './work-item-merge-healer'
 import type { ProjectAutonomyAlwaysOnPolicy } from './projects-store'
 import type { WorkItemRecord } from './work-items-store'
 
-function git(repoPath: string, args: string[]): string {
+function git(repoPath: string, args: Array<string>): string {
   return execFileSync('git', args, { cwd: repoPath, encoding: 'utf8' }).trim()
 }
 
@@ -154,8 +154,8 @@ describe('work-item-merge-healer', () => {
       mergeArtifactPaths: [expect.stringContaining('merge-healer')],
     })
     expect(result.mergeBlockedReason).toMatch(/test/i)
-    expect(existsSync(result.mergeArtifactPaths[0]!)).toBe(true)
-    expect(readFileSync(result.mergeArtifactPaths[0]!, 'utf8')).toContain('boom')
+    expect(existsSync(result.mergeArtifactPaths[0])).toBe(true)
+    expect(readFileSync(result.mergeArtifactPaths[0], 'utf8')).toContain('boom')
   })
 
   it('is idempotent when merge evidence already marks the work item merged', async () => {

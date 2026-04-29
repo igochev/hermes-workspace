@@ -124,7 +124,7 @@ function parseJsonCandidate(raw: string):
 }
 
 function formatSchemaError(error: z.ZodError): string {
-  const first = error.issues[0]
+  const first = error.issues.at(0)
   if (!first) return 'Invalid planner structured output.'
   const path = first.path.join('.') || 'root'
   return `Invalid planner structured output at ${path}: ${first.message}`

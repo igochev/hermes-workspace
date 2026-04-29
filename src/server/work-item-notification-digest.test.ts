@@ -6,9 +6,9 @@ import { requestWorkItemApproval } from './work-item-approvals'
 import {
   buildStatusDigest,
   digestStateHasChanged,
+  formatDigestAge,
   formatDigestForDiscord,
   persistDigestHash,
-  formatDigestAge,
 } from './work-item-notification-digest'
 
 describe('work-item-notification-digest', () => {

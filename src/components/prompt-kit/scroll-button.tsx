@@ -46,8 +46,6 @@ function ScrollButton({
     }
 
     const observer = new MutationObserver(() => {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-      if (!element) return
       if (element.scrollTop !== lastScrollTopRef.current) {
         lastScrollTopRef.current = element.scrollTop
       }

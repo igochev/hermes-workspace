@@ -1,15 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { syncWorkItemExecutionState } = vi.hoisted(() => ({
-  syncWorkItemExecutionState: vi.fn(),
-}))
-
-vi.mock('./work-item-execution', () => ({
-  syncWorkItemExecutionState,
-}))
-
-import { createProject, type ProjectRecord } from './projects-store'
-import { createWorkItem, getWorkItem, type WorkItemRecord } from './work-items-store'
+import {  createProject } from './projects-store'
+import {  createWorkItem, getWorkItem } from './work-items-store'
 import { upsertExecutionRun } from './execution-runs-store'
 import {
   DEFAULT_SUPERVISOR_THRESHOLDS,
@@ -19,6 +11,16 @@ import {
   reconcileAllWorkItemExecutions,
   reconcileWorkItemExecution,
 } from './work-item-supervisor'
+import type {WorkItemRecord} from './work-items-store';
+import type {ProjectRecord} from './projects-store';
+
+const { syncWorkItemExecutionState } = vi.hoisted(() => ({
+  syncWorkItemExecutionState: vi.fn(),
+}))
+
+vi.mock('./work-item-execution', () => ({
+  syncWorkItemExecutionState,
+}))
 
 describe('work-item-supervisor', () => {
   let tempHome: string
@@ -245,7 +247,7 @@ describe('work-item-supervisor', () => {
     createDemoWorkItem({ status: 'done', phase: 'deploy' })
     const review = createDemoWorkItem({ status: 'ready', phase: 'review', reviewJobId: 'job-review', reviewState: 'scheduled' })
 
-    syncWorkItemExecutionState.mockImplementation(async (workItemId: string) => ({
+    syncWorkItemExecutionState.mockImplementation((workItemId: string) => ({
       workItem: getWorkItem(workItemId),
     }))
 
@@ -315,7 +317,7 @@ describe('work-item-supervisor', () => {
     const decision = decideAlwaysOnLaneRecovery({
       project,
       workItem,
-      finding: finding!,
+      finding: finding,
       repoSafety: { safe: true },
       now: new Date('2026-04-25T10:31:00.000Z'),
     })
@@ -359,7 +361,7 @@ describe('work-item-supervisor', () => {
         },
       ],
       now: new Date('2026-04-25T10:31:00.000Z'),
-    })[0]!
+    })[0]
 
     const decision = decideAlwaysOnLaneRecovery({
       project,

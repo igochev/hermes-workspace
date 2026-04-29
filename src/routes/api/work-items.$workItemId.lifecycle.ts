@@ -4,9 +4,10 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { getProject } from '../../server/projects-store'
 import { listWorkItemApprovals } from '../../server/work-item-approvals'
 import {
-  applyWorkItemLifecycleTransition,
-  type WorkItemLifecycleAction,
+
+  applyWorkItemLifecycleTransition
 } from '../../server/work-item-lifecycle'
+import type {WorkItemLifecycleAction} from '../../server/work-item-lifecycle';
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {

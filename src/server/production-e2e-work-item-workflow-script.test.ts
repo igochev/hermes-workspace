@@ -359,7 +359,7 @@ describe('always-on policy gauntlet script contract', () => {
 
     expect(source).not.toMatch(/\/lifecycle/)
     expect(source).not.toMatch(/method:\s*['"]PATCH['"][\s\S]{0,240}(status|phase)/)
-    expect(source).not.toMatch(/git\([^\)]*['"]worktree['"]/)
+    expect(source).not.toMatch(/git\([^)]*['"]worktree['"]/)
   })
 
   it('validates safe always-on policy evidence and final supervised verdict', async () => {
@@ -431,7 +431,7 @@ describe('single-lane sequential gauntlet script contract', () => {
 
     expect(source).not.toMatch(/\/lifecycle/)
     expect(source).not.toMatch(/method:\s*['"]PATCH['"][\s\S]{0,240}status/)
-    expect(source).not.toMatch(/git\([^\)]*['"]worktree['"]/) 
+    expect(source).not.toMatch(/git\([^)]*['"]worktree['"]/)
   })
 
   it('validates exactly three sequential done lane items without hidden parallelism', async () => {
@@ -504,7 +504,7 @@ describe('branch-based single-lane autonomy E2E script contract', () => {
 
     expect(source).not.toMatch(/\/api\/work-items\/\$\{workItemId\}\/lifecycle/)
     expect(source).not.toMatch(/method:\s*['"]PATCH['"][\s\S]{0,240}\/api\/work-items\/[\s\S]{0,240}(status|phase)/)
-    expect(source).not.toMatch(/git\([^\)]*['"]worktree['"]/) 
+    expect(source).not.toMatch(/git\([^)]*['"]worktree['"]/)
   })
 
   it('validates a same-work-item PASS with branch, product/test evidence, tests, and Merge-Healer integration', async () => {
@@ -554,7 +554,7 @@ describe('branch-based single-lane autonomy E2E script contract', () => {
 })
 
 describe('autonomous work item E2E script contract', () => {
-  it('uses only create, orchestrator reconcile, read polling, and candidate diff evidence', async () => {
+  it('uses only create, orchestrator reconcile, read polling, and candidate diff evidence', () => {
     const source = readFileSync(autonomousScriptPath, 'utf8')
 
     expect(source).toContain('process.env.HERMES_AUTONOMOUS_E2E_TARGET_REPO')

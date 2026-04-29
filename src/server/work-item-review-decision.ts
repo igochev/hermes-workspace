@@ -97,7 +97,9 @@ function asTestResultArray(
 
 function extractDecisionLine(text: string): string | null {
   const match = text.match(/^\s*DECISION:\s*(\S+)/im)
-  return match ? match[1]?.trim().toUpperCase() ?? null : null
+  if (!match) return null
+  const [, decision = ''] = match
+  return decision.trim().toUpperCase()
 }
 
 function extractJsonBlock(text: string): string | null {
@@ -112,7 +114,7 @@ function extractJsonBlock(text: string): string | null {
     const afterColon = text.indexOf('{', braceStartIndex)
     if (afterColon !== -1) {
       let depth = 0
-      let start = afterColon
+      const start = afterColon
       for (let i = start; i < text.length; i++) {
         if (text[i] === '{') depth++
         else if (text[i] === '}') {
@@ -319,9 +321,14 @@ export function evaluateReviewQualityGate(params: {
   if (riskLevel === 'low') {
     // Low-risk: require confidence medium+ and at least one evidence type
     if (parsed.confidence === 'low') missing.push('confidence level must be medium or higher for auto-approval')
-    const hasEvidence = Object.values(parsed.evidence).some(
-      (v) => v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0) && v !== false,
-    )
+    const hasEvidence =
+      Boolean(parsed.evidence.branchName) ||
+      Boolean(parsed.evidence.prUrl) ||
+      (parsed.evidence.artifactPaths?.length ?? 0) > 0 ||
+      (parsed.evidence.testCommands?.length ?? 0) > 0 ||
+      (parsed.evidence.testResults?.length ?? 0) > 0 ||
+      (parsed.evidence.filesReviewed?.length ?? 0) > 0 ||
+      parsed.evidence.planReviewed === true
     if (!hasEvidence) missing.push('at least one evidence field must be populated')
   } else if (riskLevel === 'medium') {
     // Medium-risk: require high confidence, all criteria met, plan reviewed, test evidence
@@ -345,11 +352,11 @@ export function evaluateReviewQualityGate(params: {
   const policyEnabled = policy.enabled !== false
   const policyMaxPriorityRank = priorityRank(policy.maxPriority ?? 'low')
 
-  if (policyEnabled && priority) {
+  if (policyEnabled) {
     if (priorityRank(priority) > policyMaxPriorityRank) {
       missing.push(`priority "${priority}" exceeds policy maxPriority "${policy.maxPriority ?? 'low'}"`)
     }
-  } else if (!policyEnabled) {
+  } else {
     missing.push('project review auto-approval policy is disabled')
   }
 

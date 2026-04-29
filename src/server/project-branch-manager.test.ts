@@ -9,15 +9,15 @@ import {
   buildLaneCleanupPlan,
   buildPrPublishingPreflight,
   buildWorkItemBranchName,
-  collectProjectRepoHygiene,
   collectProjectLaneCleanupInventory,
+  collectProjectRepoHygiene,
   ensureWorkItemBranch,
   inspectProjectRepoState,
 } from './project-branch-manager'
 import type { ProjectAutonomyAlwaysOnPolicy } from './projects-store'
 import type { WorkItemRecord } from './work-items-store'
 
-function git(repoPath: string, args: string[]): string {
+function git(repoPath: string, args: Array<string>): string {
   return execFileSync('git', args, { cwd: repoPath, encoding: 'utf8' }).trim()
 }
 

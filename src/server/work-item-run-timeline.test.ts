@@ -6,11 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createPlanningDraft } from './planning-drafts-store'
 import { createProject } from './projects-store'
 import { upsertExecutionRun } from './execution-runs-store'
-import { createWorkItem, type WorkItemRecord } from './work-items-store'
+import {  createWorkItem } from './work-items-store'
 import {
   buildExecutionTraceHref,
   buildWorkItemRunTimeline,
 } from './work-item-run-timeline'
+import type {WorkItemRecord} from './work-items-store';
 
 describe('work-item-run-timeline', () => {
   let tempHome: string

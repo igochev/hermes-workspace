@@ -96,7 +96,7 @@ describe('work item supervisor reconcile route', () => {
   it('reconciles a single work item when workItemId is provided', async () => {
     const workItem = createSupervisorCandidate()
     syncWorkItemExecutionState.mockImplementation(
-      async (workItemId: string) => ({
+      (workItemId: string) => ({
         workItem: getWorkItem(workItemId),
       }),
     )
@@ -130,7 +130,7 @@ describe('work item supervisor reconcile route', () => {
       repoPathSnapshot: '/repos/mission-control',
     })
     syncWorkItemExecutionState.mockImplementation(
-      async (workItemId: string) => ({
+      (workItemId: string) => ({
         workItem: getWorkItem(workItemId),
       }),
     )

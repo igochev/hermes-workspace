@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import {  useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -11,6 +11,7 @@ import {
   PlayIcon,
   RefreshIcon,
 } from '@hugeicons/core-free-icons'
+import type {ReactNode} from 'react';
 import type {
   ProfileReadinessReport,
   ProfileReadinessRoleReport,

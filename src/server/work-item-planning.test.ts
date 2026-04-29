@@ -1,4 +1,18 @@
+
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { createProject } from './projects-store'
+import { createPlanningDraft, getPlanningDraft } from './planning-drafts-store'
+import { createWorkItem, getWorkItem, updateWorkItem } from './work-items-store'
+import {
+  applyPlanningDraftToWorkItem,
+  buildPlannerEnrichmentGoal,
+  prepareWorkItemWithPlanner,
+  recordPlannerOutput,
+} from './work-item-planning'
 
 const { launchConductorMission } = vi.hoisted(() => ({
   launchConductorMission: vi.fn(),
@@ -7,20 +21,6 @@ const { launchConductorMission } = vi.hoisted(() => ({
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
 }))
-
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-
-import { createProject } from './projects-store'
-import { createPlanningDraft, getPlanningDraft } from './planning-drafts-store'
-import { getWorkItem, createWorkItem, updateWorkItem } from './work-items-store'
-import {
-  applyPlanningDraftToWorkItem,
-  buildPlannerEnrichmentGoal,
-  prepareWorkItemWithPlanner,
-  recordPlannerOutput,
-} from './work-item-planning'
 
 describe('work-item-planning', () => {
   let tempHome: string
@@ -181,7 +181,7 @@ describe('work-item-planning', () => {
     expect(persisted?.acceptanceCriteria).toEqual(['Existing criterion'])
   })
 
-  it('recordPlannerOutput stores structured_ready for valid output', async () => {
+  it('recordPlannerOutput stores structured_ready for valid output', () => {
     const project = createProject({
       name: 'Mission Control Demo',
       repoPath: '/repos/mission-control-demo',

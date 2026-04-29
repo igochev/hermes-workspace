@@ -45,6 +45,7 @@ describe('gateway-capabilities dashboard probing', () => {
 
   it('treats dashboard as unavailable when status works but root token bootstrap fails', async () => {
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      await Promise.resolve()
       const url = String(input)
 
       if (url === 'http://gateway.test/health') return jsonResponse({ body: { status: 'ok' } })
@@ -74,6 +75,7 @@ describe('gateway-capabilities dashboard probing', () => {
 
   it('keeps dashboard available when status and token bootstrap both succeed', async () => {
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      await Promise.resolve()
       const url = String(input)
 
       if (url === 'http://gateway.test/health') return jsonResponse({ body: { status: 'ok' } })

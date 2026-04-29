@@ -1,32 +1,38 @@
 import {
+
+
   getMappedPhaseProfile,
-  normalizePhaseProfiles,
-  type ConductorPhaseProfiles,
-  type ConductorPhaseKey,
+  normalizePhaseProfiles
 } from '../lib/conductor-phase-profiles'
-import { getProject, type ProjectRecord } from './projects-store'
+import {  getProject } from './projects-store'
 import {
+
+
+
   appendWorkItemHistoryEntry,
   getWorkItem,
-  updateWorkItem,
-  type WorkItemPhase,
-  type WorkItemRecord,
-  type WorkItemReviewDecision,
+  updateWorkItem
 } from './work-items-store'
 import {
+
   buildMissionLink,
-  launchConductorMission,
-  type ConductorLaunchResult,
+  launchConductorMission
 } from './conductor-launch'
 import { upsertExecutionRun } from './execution-runs-store'
-import { evaluateLaunchCapacity, type LaunchCapacityDecision } from './role-capacity-policy'
+import {  evaluateLaunchCapacity } from './role-capacity-policy'
 import { refreshAttentionQueue } from './attention-queue'
 import {
-  evaluateProfileReadiness,
-  type ProfileReadinessReport,
-  type ProfileReadinessRoleReport,
+
+
+  evaluateProfileReadiness
 } from './profile-readiness'
 import { listProfiles } from './profiles-browser'
+import type {ProfileReadinessReport, ProfileReadinessRoleReport} from './profile-readiness';
+import type {LaunchCapacityDecision} from './role-capacity-policy';
+import type {ConductorLaunchResult} from './conductor-launch';
+import type {WorkItemPhase, WorkItemRecord, WorkItemReviewDecision} from './work-items-store';
+import type {ProjectRecord} from './projects-store';
+import type {ConductorPhaseKey, ConductorPhaseProfiles} from '../lib/conductor-phase-profiles';
 
 export type WorkItemLaunchRequest = {
   phase?: unknown
@@ -143,12 +149,12 @@ function joinLaunchAdvisories(baseNote: string, advisories: Array<string | null>
   )
 }
 
-function buildAcceptanceCriteriaBlock(workItem: WorkItemRecord): string[] {
+function buildAcceptanceCriteriaBlock(workItem: WorkItemRecord): Array<string> {
   if (workItem.acceptanceCriteria.length === 0) return ['Acceptance criteria: none recorded.']
   return ['Acceptance criteria:', ...workItem.acceptanceCriteria.map((item) => `- ${item}`)]
 }
 
-function buildNotesBlock(workItem: WorkItemRecord): string[] {
+function buildNotesBlock(workItem: WorkItemRecord): Array<string> {
   if (workItem.notes.length === 0) return []
   return ['Operator notes:', ...workItem.notes.map((item) => `- ${item}`)]
 }
@@ -224,7 +230,7 @@ function buildTwoPhaseLaunchGoal(params: {
   ].join('\n')
 }
 
-function buildPhaseOutcomeBlock(phase: WorkItemPhase): string[] {
+function buildPhaseOutcomeBlock(phase: WorkItemPhase): Array<string> {
   if (phase === 'research') {
     return [
       'Primary outcome for this research/planning launch:',
@@ -365,7 +371,7 @@ export function buildWorkItemLaunchGoal(params: {
   const { workItem, project, phase, profile } = params
   const repoPath = readOptionalString(workItem.repoPathSnapshot) || project.repoPath
   return [
-    `Execute Mission Control work item \"${workItem.title}\" for project \"${project.name}\".`,
+    `Execute Mission Control work item "${workItem.title}" for project "${project.name}".`,
     `Work item ID: ${workItem.id}`,
     `Launch phase: ${phase}`,
     `Repository path: ${repoPath}`,

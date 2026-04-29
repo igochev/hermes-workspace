@@ -74,9 +74,10 @@ function safeReadOptionalText(filePath: string): string | undefined {
 function readYamlConfig(configPath: string): Record<string, unknown> {
   if (!fs.existsSync(configPath)) return {}
   try {
-    return (
-      (YAML.parse(safeReadText(configPath)) as Record<string, unknown>) || {}
-    )
+    const parsed = YAML.parse(safeReadText(configPath)) as unknown
+    return parsed !== null && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>)
+      : {}
   } catch {
     return {}
   }

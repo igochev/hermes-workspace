@@ -9,8 +9,8 @@ import {
   toChatMessage,
 } from '../../server/hermes-api'
 import { resolveSessionKey } from '../../server/session-utils'
+import { getLocalMessages, getLocalSession } from '../../server/local-session-store'
 import { isAuthenticated } from '@/server/auth-middleware'
-import { getLocalSession, getLocalMessages } from '../../server/local-session-store'
 
 export const Route = createFileRoute('/api/history')({
   server: {

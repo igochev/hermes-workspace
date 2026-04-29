@@ -16,7 +16,7 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/work-items/$workItemId/approvals')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) return jsonResponse({ error: 'Unauthorized' }, 401)
         return jsonResponse({ approvals: listWorkItemApprovals(params.workItemId) })
       },

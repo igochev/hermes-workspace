@@ -3,16 +3,17 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
+
+  buildPhaseProfileRoutingInstructions,
+  normalizePhaseProfiles
+} from '../lib/conductor-phase-profiles'
+import {
+  BEARER_TOKEN,
+  HERMES_API,
   dashboardFetch,
   ensureGatewayProbed,
-  HERMES_API,
-  BEARER_TOKEN,
 } from './gateway-capabilities'
-import {
-  buildPhaseProfileRoutingInstructions,
-  normalizePhaseProfiles,
-  type ConductorPhaseProfiles,
-} from '../lib/conductor-phase-profiles'
+import type {ConductorPhaseProfiles} from '../lib/conductor-phase-profiles';
 
 let cachedSkill: string | null = null
 

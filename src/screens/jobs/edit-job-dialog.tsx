@@ -37,7 +37,7 @@ function readScheduleValue(job: HermesJob): string {
     return job.schedule_display.trim()
   }
   const schedule = job.schedule
-  if (schedule && typeof schedule === 'object') {
+  if (typeof schedule === 'object') {
     const record = schedule
     const candidates = [
       record.expression,

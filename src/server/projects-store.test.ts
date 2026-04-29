@@ -95,21 +95,21 @@ describe('projects-store', () => {
     expect(updated).not.toBeNull()
     if (!updated) throw new Error('Expected project update to succeed')
     expect(updated.name).toBe('Mission Control Next')
-    expect(updated?.slug).toBe('mission-control-next')
-    expect(updated?.description).toBe('Project detail copy')
-    expect(updated?.repoUrl).toBe('https://github.com/igochev/hermes-workspace')
-    expect(updated?.defaultBranch).toBe('develop')
-    expect(updated?.phaseProfiles).toEqual({
+    expect(updated.slug).toBe('mission-control-next')
+    expect(updated.description).toBe('Project detail copy')
+    expect(updated.repoUrl).toBe('https://github.com/igochev/hermes-workspace')
+    expect(updated.defaultBranch).toBe('develop')
+    expect(updated.phaseProfiles).toEqual({
       research: 'planner',
       build: 'project-builder',
       review: 'reviewer',
       deploy: '',
     })
-    expect(updated?.reviewAutoApproval).toEqual({
+    expect(updated.reviewAutoApproval).toEqual({
       enabled: true,
       maxPriority: 'medium',
     })
-    expect(updated?.updatedAt >= updated!.createdAt).toBe(true)
+    expect(updated.updatedAt >= updated.createdAt).toBe(true)
 
     expect(deleteProject(first.id)).toBe(true)
     expect(getProject(first.id)).toBeNull()
