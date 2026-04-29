@@ -2,7 +2,9 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md`
+> **Current active implementation plan:** `docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
+>
+> **Previous stabilization plan:** `docs/plans/2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md`
 >
 > **Previous stabilization plan:** `docs/plans/2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md`
 >
@@ -98,11 +100,12 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 | P3 | `2026-04-29-hermes-workspace-p3-morning-review-overnight-digest-plan.md` | Morning Review / overnight operator digest | Functionally shipped / Main-reviewed; H1 hardening complete |
 | H1 | `2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md` | Terminology, lint, changed-file type cleanup, and final merge-readiness evidence for P0-P3 Operator UX changes | Complete / Main-reviewed; accepted for merge-readiness packaging. Final review: `dogfood-output/operator-ux-merge-readiness-main-review-latest.md` |
 
-### TypeScript Baseline Stabilization — active
+### TypeScript / ESLint Baseline Stabilization — active
 
 | Order | Plan | Purpose | Status |
 |---:|---|---|---|
-| T1 | `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Clear repo-wide `pnpm exec tsc --noEmit` baseline debt so TypeScript can become a hard gate again | Active |
+| T1 | `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Clear repo-wide `pnpm exec tsc --noEmit` baseline debt so TypeScript can become a hard gate again | Shipped / Main-reviewed; committed at `840a67e`; final report `dogfood-output/typescript-baseline-stabilization-final-latest.md` |
+| E1 | `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Clear repo-wide ESLint baseline debt so `pnpm exec eslint . --max-warnings=0` can become a hard autonomous merge gate | Active |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -117,7 +120,7 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 Current inspected baseline:
 
 - Branch: `my-hermes-workspace-dev`
-- Commit inspected for this update: `5afe861` plus uncommitted P0/P1/P2 implementation changes and P3 planning docs under review
+- Commit inspected for this update: `840a67e` plus active ESLint Baseline Stabilization planning docs
 - Test command: `pnpm vitest run` or `pnpm test`
 - Build command: `pnpm build`
 - Service: `hermes-workspace.service`
@@ -200,7 +203,8 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Active stabilization plan | Builder executes now: baseline report, route-test typing cleanup, fixture normalization, product-code nullability/API type fixes, legacy Executions fallback link cleanup, final `tsc --noEmit` green evidence |
+| `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Active stabilization plan | Builder executes now: durable ESLint baseline report, config-friction cleanup, mechanical import/type/syntax cleanup, no-unnecessary-condition cleanup, warning policy, final `eslint . --max-warnings=0` green evidence |
+| `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Shipped / Main-reviewed stabilization plan | Historical; full `tsc --noEmit` is green and package committed at `840a67e`; final report `dogfood-output/typescript-baseline-stabilization-final-latest.md` |
 | `2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md` | Complete / Main-reviewed stabilization plan | Historical; Operator UX accepted and pushed at `3384ccb`; final review `dogfood-output/operator-ux-merge-readiness-main-review-latest.md` |
 | `2026-04-29-hermes-workspace-p3-morning-review-overnight-digest-plan.md` | Functionally shipped / Main-reviewed Operator UX Clarity P3 plan | Historical until hardening passes; Morning Review server view model, `/api/morning-review`, Dashboard overnight digest card, next-attention action, live Dashboard verification |
 | `2026-04-29-hermes-workspace-p2-dedicated-runs-executions-architecture-plan.md` | Shipped / Main-reviewed Operator UX Clarity P2 plan | Historical; dedicated `/executions` list/detail surfaces, legacy jobId trace fallback, Work Item trace links moved off Scheduled Jobs |
@@ -242,7 +246,10 @@ P3: Morning Review / overnight digest
   └─ functionally shipped; Main review found merge-readiness hardening needed
 
 T1: TypeScript baseline stabilization
-  └─ active; clears full `pnpm exec tsc --noEmit` baseline debt so future slices can use typecheck as a hard gate
+  └─ shipped/Main-reviewed at `840a67e`; full `pnpm exec tsc --noEmit` is now green
+
+E1: ESLint baseline stabilization
+  └─ active; clears repo-wide `pnpm exec eslint . --max-warnings=0` debt so future slices can use lint as a hard gate
 ```
 
 ---
@@ -266,10 +273,10 @@ A plan is not shipped until:
 
 Start with:
 
-`docs/plans/2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md`
+`docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
 
-Builder should execute Task 1 first: create a durable `tsc --noEmit` baseline report from current output, group error families, and update `docs/handoff/current-slice-status.md` before fixing route-test typing errors.
+Builder should execute Task 1 first: create a durable ESLint baseline report from current `pnpm exec eslint . --max-warnings=0` output, group rule/file families, and update `docs/handoff/current-slice-status.md` before config-friction cleanup.
 
-## 10. After T1 ships
+## 10. After E1 ships
 
-When T1 is complete, Builder should update the handoff with full `pnpm exec tsc --noEmit --pretty false` result, focused tests, full regression, build, targeted ESLint, service/root smoke, final report path, and any remaining blockers. Main/CEO should then review whether the quality baseline is clean enough to authorize the next product cycle.
+When E1 is complete, Builder should update the handoff with full `pnpm exec eslint . --max-warnings=0`, `pnpm exec tsc --noEmit --pretty false`, focused tests, full regression, build, service/root smoke, live browser smoke, final report path, and any remaining blockers. Main/CEO should then review whether the full quality baseline is clean enough to authorize the next product cycle.
