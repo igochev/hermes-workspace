@@ -1,40 +1,37 @@
 # Current Slice Execution Status
 
-> Canonical continuation handoff for Builder sessions. Updated by Main/CEO after committing Always-On readiness and preparing the Operator UX Clarity P0 plan.
+> Canonical continuation handoff for Builder sessions. Updated by Main/CEO after final H1 merge-readiness review; keep compact.
 
 ## Active Plan
 
 - **Project:** Hermes Workspace — Operator UX Clarity Cycle
-- **Active implementation plan:** `docs/plans/2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md`
+- **Last implementation plan:** `docs/plans/2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md`
 - **Plan index:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
-- **Source UX roadmap:** `docs/plans/2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md`
-- **Recently shipped plan:** `docs/plans/2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md`
-- **Latest shipped readiness report:** `dogfood-output/always-on-merge-readiness-final-latest.md`
+- **Final Main review:** `dogfood-output/operator-ux-merge-readiness-main-review-latest.md`
 
 ## Current State / Evidence
 
-- Always-On Operator Policy and Merge Readiness are shipped, committed, and pushed at `d3026c4` on `my-hermes-workspace-dev`.
-- Final Always-On verification remained green: policy contract test ✅; `pnpm vitest run` ✅ (72 files / 464 tests); `pnpm build` ✅; service/root smoke/browser DOM ✅; changed-file ESLint subset ✅; broad legacy `pnpm lint`/`tsc --noEmit` debt remains classified in `dogfood-output/always-on-merge-readiness-final-latest.md`.
-- Main/CEO inspected the roadmap and current code and selected the next bounded Builder task: P0 terminology cleanup and `/jobs?jobId=...` deep-link sanity.
-- Future queue is prepared but not active: P1 Work Item Cockpit progressive disclosure, P2 dedicated Runs/Executions surface, P3 Morning Review / overnight digest.
+- P0 terminology/deep-link sanity, P1 Work Item Cockpit progressive disclosure, P2 Dedicated Executions surface, P3 Morning Review / overnight digest, and H1 merge-readiness hardening are complete.
+- Builder H1 evidence: `dogfood-output/operator-ux-merge-readiness-hardening-latest.md`.
+- Main/CEO final review (2026-04-29): **ACCEPTED FOR MERGE-READINESS PACKAGING**.
+- Main reran focused P3/H1 tests ✅ `4 files / 34 tests`; full `pnpm vitest run` ✅ `79 files / 508 tests`; `pnpm build` ✅ with existing Vite warnings; `git diff --check` ✅; targeted P3/H1 ESLint ✅ (only `.eslintignore` deprecation warning); service/API smoke ✅ after one transient readiness refusal; live Dashboard DOM ✅; static security scan ✅ with one test-only password false positive; independent review ✅ no merge blockers.
+- Full `pnpm exec tsc --noEmit --pretty false` still fails from baseline/broad files outside the current changed/untracked Operator UX package. Main parsed the tsc output and found **0** TypeScript error files in the current changed/untracked diff.
+- Non-blocking follow-up: independent review noted a legacy Executions no-record fallback can build an unscoped `/work-items/:id` href when only `workItemId` is known; it does not affect verified Morning Review/execution links and can be handled later.
 
 ## Next Builder Task
 
-Implement `docs/plans/2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md`, starting with Task 1: add visible copy constants and baseline tests for terminology.
+No further Builder implementation task in this cycle. **Next owner action:** D3n13r/Main decides packaging: commit/push the accepted Operator UX package, or ask Main/CEO for the next product cycle plan. Do not start P4/new product work from Builder without a new Main plan.
 
-Implementation order:
+Suggested commit message if D3n13r authorizes commit/push:
 
-1. Add visible copy constants and baseline tests for terminology.
-2. Implement `/jobs?jobId=...` deep-link behavior.
-3. Rename visible Work Item execution labels without changing model fields.
-4. Rename dashboard/navigation copy where visible.
-5. Run full functional verification, live UI checks, and update this handoff.
+```text
+operator UX merge-readiness hardening for work items, executions, and morning review
+```
 
 ## Verification Rules
 
-- P0 changes labels/helper copy/deep-link behavior only; do not rename internal `mission*` model fields.
-- Do not implement P1/P2/P3 in this Builder slice.
+- Work Item remains source of truth; Scheduled Jobs are definitions only; Executions are actual work-item attempts.
+- Morning Review remains read-only and computed from existing stores; do not add an auto-send Discord loop.
 - Preserve PATCH partial-update safety; never send undefined fields that wipe arrays like `acceptanceCriteria`.
-- Preserve single-lane default; do not implement parallel worktrees.
-- Constants-only tests are insufficient; final report must include live browser/DOM verification.
-- Update this handoff after each completed task.
+- Preserve single-lane default; do not implement parallel worktrees or swarm/run-theater extras.
+- Constants-only tests are insufficient; final reports must include live browser/DOM Dashboard evidence.

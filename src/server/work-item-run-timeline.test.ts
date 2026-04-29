@@ -7,7 +7,10 @@ import { createPlanningDraft } from './planning-drafts-store'
 import { createProject } from './projects-store'
 import { upsertExecutionRun } from './execution-runs-store'
 import { createWorkItem, type WorkItemRecord } from './work-items-store'
-import { buildWorkItemRunTimeline } from './work-item-run-timeline'
+import {
+  buildExecutionTraceHref,
+  buildWorkItemRunTimeline,
+} from './work-item-run-timeline'
 
 describe('work-item-run-timeline', () => {
   let tempHome: string
@@ -25,7 +28,9 @@ describe('work-item-run-timeline', () => {
     rmSync(tempHome, { recursive: true, force: true })
   })
 
-  function createDemoWorkItem(input: Partial<WorkItemRecord> = {}): WorkItemRecord {
+  function createDemoWorkItem(
+    input: Partial<WorkItemRecord> = {},
+  ): WorkItemRecord {
     const project = createProject({
       name: 'Timeline Demo',
       repoPath: '/repos/timeline-demo',
@@ -70,13 +75,19 @@ describe('work-item-run-timeline', () => {
 
     const timeline = buildWorkItemRunTimeline(workItem)
 
-    expect(timeline.rows.map((row) => row.phase)).toEqual(['research', 'build', 'review', 'deploy'])
+    expect(timeline.rows.map((row) => row.phase)).toEqual([
+      'research',
+      'build',
+      'review',
+      'deploy',
+    ])
     expect(timeline.rows[0]).toMatchObject({
       phase: 'research',
       profileRole: 'planner',
       state: 'not_started',
       summary: 'No job launched',
-      nextExpectedAction: 'Orchestrator should launch Planner for inbox research.',
+      nextExpectedAction:
+        'Orchestrator should launch Planner for inbox research.',
     })
   })
 
@@ -109,8 +120,12 @@ describe('work-item-run-timeline', () => {
   })
 
   it('shows active build execution run with job id, session key, and heartbeat label', () => {
-    const workItem = createDemoWorkItem({ status: 'active', phase: 'build', missionJobId: 'job-builder-1' })
-    upsertExecutionRun({
+    const workItem = createDemoWorkItem({
+      status: 'active',
+      phase: 'build',
+      missionJobId: 'job-builder-1',
+    })
+    const run = upsertExecutionRun({
       workItemId: workItem.id,
       projectId: workItem.projectId,
       role: 'mission',
@@ -130,6 +145,7 @@ describe('work-item-run-timeline', () => {
     expect(timeline.rows[1]).toMatchObject({
       phase: 'build',
       profileRole: 'builder',
+      executionRunId: run.id,
       state: 'running',
       jobId: 'job-builder-1',
       runId: 'run-builder-1',
@@ -141,7 +157,11 @@ describe('work-item-run-timeline', () => {
   })
 
   it('shows stale Builder heartbeat as stale with recovery guidance', () => {
-    const workItem = createDemoWorkItem({ status: 'active', phase: 'build', missionJobId: 'job-builder-stale' })
+    const workItem = createDemoWorkItem({
+      status: 'active',
+      phase: 'build',
+      missionJobId: 'job-builder-stale',
+    })
     upsertExecutionRun({
       workItemId: workItem.id,
       projectId: workItem.projectId,
@@ -161,7 +181,8 @@ describe('work-item-run-timeline', () => {
       profileRole: 'builder',
       state: 'stale',
       summary: 'Builder is stale.',
-      nextExpectedAction: 'Inspect the run heartbeat and recover or retry if needed.',
+      nextExpectedAction:
+        'Inspect the run heartbeat and recover or retry if needed.',
       heartbeatLabel: 'Last observed 2026-04-27T18:00:00.000Z',
     })
   })
@@ -193,7 +214,8 @@ describe('work-item-run-timeline', () => {
       state: 'failed',
       error: 'Tests failed',
       summary: 'Builder failed: Tests failed',
-      nextExpectedAction: 'Review the error, then retry or unblock the work item.',
+      nextExpectedAction:
+        'Review the error, then retry or unblock the work item.',
     })
   })
 
@@ -234,10 +256,12 @@ describe('work-item-run-timeline', () => {
       missionJobId: 'job-invalid-builder-evidence',
       missionJobName: 'Builder: invalid evidence',
       missionState: 'failed',
-      missionLastError: 'Builder evidence workItemId did not match this work item.',
+      missionLastError:
+        'Builder evidence workItemId did not match this work item.',
       laneState: 'blocked',
       laneParkedAt: '2026-04-27T21:00:00.000Z',
-      laneBlockedReason: 'Builder evidence workItemId did not match this work item.',
+      laneBlockedReason:
+        'Builder evidence workItemId did not match this work item.',
       artifactPaths: ['/tmp/invalid-builder-evidence.json'],
     })
 
@@ -248,11 +272,33 @@ describe('work-item-run-timeline', () => {
       profileRole: 'builder',
       state: 'failed',
       jobId: 'job-invalid-builder-evidence',
-      summary: 'Builder parked: Builder evidence workItemId did not match this work item.',
-      nextExpectedAction: 'Review Builder evidence, clean or stash the repo, then retry or unpark this work item.',
+      summary:
+        'Builder parked: Builder evidence workItemId did not match this work item.',
+      nextExpectedAction:
+        'Review Builder evidence, clean or stash the repo, then retry or unpark this work item.',
       artifacts: ['/tmp/invalid-builder-evidence.json'],
       error: 'Builder evidence workItemId did not match this work item.',
     })
+  })
+
+  it('builds execution trace hrefs with durable execution IDs taking priority over legacy job data', () => {
+    expect(
+      buildExecutionTraceHref({
+        executionRunId: 'run/id with spaces',
+        jobId: 'legacy-job-1',
+        workItemId: 'work-item-1',
+      }),
+    ).toBe('/executions/run%2Fid%20with%20spaces')
+  })
+
+  it('builds legacy execution trace hrefs from job and work-item context', () => {
+    expect(
+      buildExecutionTraceHref({ jobId: 'job 1/2', workItemId: 'work item 3' }),
+    ).toBe('/executions?jobId=job+1%2F2&workItemId=work+item+3')
+  })
+
+  it('does not emit an execution trace href when no execution or job data exists', () => {
+    expect(buildExecutionTraceHref({ workItemId: 'work-item-1' })).toBeNull()
   })
 
   it('shows Merge-Healer merge and conflict evidence on the deploy row', () => {
@@ -282,8 +328,10 @@ describe('work-item-run-timeline', () => {
       phase: 'deploy',
       profileRole: 'deployer',
       state: 'succeeded',
-      summary: 'Merge-Healer merged into main at abc123de. Cleanup dry-run recommended for mission/84bfe2c2-cleanup-ready after retention policy review.',
-      nextExpectedAction: 'Review branch/stash cleanup recommendations; deletion is dry-run/non-destructive unless explicitly enabled by policy.',
+      summary:
+        'Merge-Healer merged into main at abc123de. Cleanup dry-run recommended for mission/84bfe2c2-cleanup-ready after retention policy review.',
+      nextExpectedAction:
+        'Review branch/stash cleanup recommendations; deletion is dry-run/non-destructive unless explicitly enabled by policy.',
       artifacts: [],
     })
     expect(buildWorkItemRunTimeline(conflict).rows[3]).toMatchObject({
@@ -291,7 +339,8 @@ describe('work-item-run-timeline', () => {
       profileRole: 'deployer',
       state: 'failed',
       summary: 'Merge-Healer blocked by conflicts: shared.txt',
-      nextExpectedAction: 'Resolve merge conflicts, reset/clean the repo, then retry Merge-Healer.',
+      nextExpectedAction:
+        'Resolve merge conflicts, reset/clean the repo, then retry Merge-Healer.',
       artifacts: ['.hermes/merge-healer/test.log'],
     })
   })

@@ -1,8 +1,11 @@
-import {   listExecutionRuns } from './execution-runs-store'
-import {  getLatestPlanningDraftForWorkItem } from './planning-drafts-store'
+import { listExecutionRuns } from './execution-runs-store'
+import { getLatestPlanningDraftForWorkItem } from './planning-drafts-store'
 import { listWorkItemApprovals } from './work-item-approvals'
-import type {ExecutionRunRecord, ExecutionRunState} from './execution-runs-store';
-import type {PlanningDraftRecord} from './planning-drafts-store';
+import type {
+  ExecutionRunRecord,
+  ExecutionRunState,
+} from './execution-runs-store'
+import type { PlanningDraftRecord } from './planning-drafts-store'
 import type { WorkItemPhase, WorkItemRecord } from './work-items-store'
 
 export type WorkItemRunTimelineState =
@@ -15,7 +18,11 @@ export type WorkItemRunTimelineState =
   | 'stale'
   | 'waiting'
 
-export type WorkItemRunProfileRole = 'planner' | 'builder' | 'reviewer' | 'deployer'
+export type WorkItemRunProfileRole =
+  | 'planner'
+  | 'builder'
+  | 'reviewer'
+  | 'deployer'
 
 export type WorkItemRunTimelineRow = {
   phase: WorkItemPhase
@@ -26,6 +33,7 @@ export type WorkItemRunTimelineRow = {
   state: WorkItemRunTimelineState
   summary: string
   nextExpectedAction?: string
+  executionRunId?: string
   jobId?: string
   jobName?: string
   runId?: string
@@ -45,14 +53,21 @@ export type WorkItemRunTimeline = {
   rows: Array<WorkItemRunTimelineRow>
 }
 
-const PHASES: Array<{ phase: WorkItemPhase; phaseLabel: string; profileRole: WorkItemRunProfileRole }> = [
+const PHASES: Array<{
+  phase: WorkItemPhase
+  phaseLabel: string
+  profileRole: WorkItemRunProfileRole
+}> = [
   { phase: 'research', phaseLabel: 'Research', profileRole: 'planner' },
   { phase: 'build', phaseLabel: 'Build', profileRole: 'builder' },
   { phase: 'review', phaseLabel: 'Review', profileRole: 'reviewer' },
   { phase: 'deploy', phaseLabel: 'Deploy', profileRole: 'deployer' },
 ]
 
-const RUN_STATE_TO_TIMELINE_STATE: Record<ExecutionRunState, WorkItemRunTimelineState> = {
+const RUN_STATE_TO_TIMELINE_STATE: Record<
+  ExecutionRunState,
+  WorkItemRunTimelineState
+> = {
   scheduled: 'scheduled',
   running: 'running',
   succeeded: 'succeeded',
@@ -61,15 +76,37 @@ const RUN_STATE_TO_TIMELINE_STATE: Record<ExecutionRunState, WorkItemRunTimeline
   unknown: 'scheduled',
 }
 
+export function buildExecutionTraceHref(input: {
+  executionRunId?: string
+  jobId?: string
+  workItemId?: string
+}): string | null {
+  if (input.executionRunId)
+    return `/executions/${encodeURIComponent(input.executionRunId)}`
+  if (input.jobId) {
+    const params = new URLSearchParams({ jobId: input.jobId })
+    if (input.workItemId) params.set('workItemId', input.workItemId)
+    return `/executions?${params.toString()}`
+  }
+  return null
+}
+
 function heartbeatLabel(lastObservedAt?: string): string | undefined {
   return lastObservedAt ? `Last observed ${lastObservedAt}` : undefined
 }
 
-function newestRunForPhase(runs: Array<ExecutionRunRecord>, phase: WorkItemPhase): ExecutionRunRecord | null {
+function newestRunForPhase(
+  runs: Array<ExecutionRunRecord>,
+  phase: WorkItemPhase,
+): ExecutionRunRecord | null {
   return (
     runs
       .filter((run) => run.phase === phase)
-      .sort((a, b) => b.lastObservedAt.localeCompare(a.lastObservedAt) || b.updatedAt.localeCompare(a.updatedAt))[0] ?? null
+      .sort(
+        (a, b) =>
+          b.lastObservedAt.localeCompare(a.lastObservedAt) ||
+          b.updatedAt.localeCompare(a.updatedAt),
+      )[0] ?? null
   )
 }
 
@@ -81,7 +118,8 @@ function rowFromRun(
   run: ExecutionRunRecord,
 ): WorkItemRunTimelineRow {
   const state = RUN_STATE_TO_TIMELINE_STATE[run.state]
-  const error = run.error ?? (phase === 'build' ? workItem.missionLastError : undefined)
+  const error =
+    run.error ?? (phase === 'build' ? workItem.missionLastError : undefined)
   const summary = buildRunSummary(profileRole, state, error)
 
   return {
@@ -93,11 +131,13 @@ function rowFromRun(
     state,
     summary,
     nextExpectedAction: nextActionForState(profileRole, state),
+    executionRunId: run.id,
     jobId: run.jobId,
     jobName: run.jobName,
     runId: run.runId,
     sessionKey: run.sessionKey,
     sessionKeyPrefix: run.sessionKeyPrefix,
+    link: buildExecutionTraceHref({ executionRunId: run.id, jobId: run.jobId, workItemId: workItem.id }) ?? undefined,
     heartbeatLabel: heartbeatLabel(run.lastObservedAt),
     lastObservedAt: run.lastObservedAt,
     startedAt: run.startedAt,
@@ -133,11 +173,16 @@ function nextActionForState(
   profileRole: WorkItemRunProfileRole,
   state: WorkItemRunTimelineState,
 ): string | undefined {
-  if (state === 'failed') return 'Review the error, then retry or unblock the work item.'
-  if (state === 'stale') return 'Inspect the run heartbeat and recover or retry if needed.'
-  if (state === 'output_ready') return 'Orchestrator should ingest the agent output.'
-  if (state === 'not_started' && profileRole === 'planner') return 'Orchestrator should launch Planner for inbox research.'
-  if (state === 'scheduled' && profileRole === 'builder') return 'Orchestrator should launch Builder for ready build.'
+  if (state === 'failed')
+    return 'Review the error, then retry or unblock the work item.'
+  if (state === 'stale')
+    return 'Inspect the run heartbeat and recover or retry if needed.'
+  if (state === 'output_ready')
+    return 'Orchestrator should ingest the agent output.'
+  if (state === 'not_started' && profileRole === 'planner')
+    return 'Orchestrator should launch Planner for inbox research.'
+  if (state === 'scheduled' && profileRole === 'builder')
+    return 'Orchestrator should launch Builder for ready build.'
   return undefined
 }
 
@@ -160,7 +205,9 @@ function researchRowFromDraft(
       profileName: draft.plannerProfile ?? 'planner',
       profileSource: 'planning-draft',
       link: draft.plannerLink,
-      artifacts: [draft.planFilePath].filter((item): item is string => Boolean(item)),
+      artifacts: [draft.planFilePath].filter((item): item is string =>
+        Boolean(item),
+      ),
     }
   }
 
@@ -196,7 +243,9 @@ function researchRowFromDraft(
     profileName: draft.plannerProfile ?? 'planner',
     profileSource: 'planning-draft',
     link: draft.plannerLink,
-    artifacts: [draft.planFilePath].filter((item): item is string => Boolean(item)),
+    artifacts: [draft.planFilePath].filter((item): item is string =>
+      Boolean(item),
+    ),
     error: draft.parseError,
   }
 }
@@ -218,7 +267,10 @@ function baseRow(
   }
 }
 
-function applyReadyBuildHint(row: WorkItemRunTimelineRow, workItem: WorkItemRecord): WorkItemRunTimelineRow {
+function applyReadyBuildHint(
+  row: WorkItemRunTimelineRow,
+  workItem: WorkItemRecord,
+): WorkItemRunTimelineRow {
   if (row.phase !== 'build') return row
   if (workItem.status !== 'ready' || workItem.phase !== 'build') return row
   if (row.state !== 'not_started') return row
@@ -227,15 +279,36 @@ function applyReadyBuildHint(row: WorkItemRunTimelineRow, workItem: WorkItemReco
     state: 'scheduled',
     summary: 'Builder launch pending.',
     nextExpectedAction: 'Orchestrator should launch Builder for ready build.',
-    artifacts: [workItem.planFilePath].filter((item): item is string => Boolean(item)),
+    artifacts: [workItem.planFilePath].filter((item): item is string =>
+      Boolean(item),
+    ),
   }
 }
 
-function applyWorkItemMissionFallback(row: WorkItemRunTimelineRow, workItem: WorkItemRecord): WorkItemRunTimelineRow {
-  if (row.phase !== 'build' || row.state !== 'not_started' || !workItem.missionJobId) return row
-  const state: WorkItemRunTimelineState = workItem.missionState === 'failed' ? 'failed' : workItem.missionState === 'running' ? 'running' : 'scheduled'
-  const error = workItem.laneState === 'blocked' && workItem.laneBlockedReason ? workItem.laneBlockedReason : workItem.missionLastError
-  const isParkedLaneBlocker = workItem.status === 'blocked' && workItem.laneState === 'blocked' && Boolean(workItem.laneParkedAt)
+function applyWorkItemMissionFallback(
+  row: WorkItemRunTimelineRow,
+  workItem: WorkItemRecord,
+): WorkItemRunTimelineRow {
+  if (
+    row.phase !== 'build' ||
+    row.state !== 'not_started' ||
+    !workItem.missionJobId
+  )
+    return row
+  const state: WorkItemRunTimelineState =
+    workItem.missionState === 'failed'
+      ? 'failed'
+      : workItem.missionState === 'running'
+        ? 'running'
+        : 'scheduled'
+  const error =
+    workItem.laneState === 'blocked' && workItem.laneBlockedReason
+      ? workItem.laneBlockedReason
+      : workItem.missionLastError
+  const isParkedLaneBlocker =
+    workItem.status === 'blocked' &&
+    workItem.laneState === 'blocked' &&
+    Boolean(workItem.laneParkedAt)
   return {
     ...row,
     state,
@@ -250,7 +323,7 @@ function applyWorkItemMissionFallback(row: WorkItemRunTimelineRow, workItem: Wor
     jobId: workItem.missionJobId,
     jobName: workItem.missionJobName,
     sessionKeyPrefix: workItem.missionSessionKeyPrefix,
-    link: workItem.missionLink,
+    link: buildExecutionTraceHref({ jobId: workItem.missionJobId, workItemId: workItem.id }) ?? undefined,
     heartbeatLabel: heartbeatLabel(workItem.missionLastRunAt),
     lastObservedAt: workItem.missionLastRunAt,
     artifacts: workItem.artifactPaths,
@@ -258,7 +331,10 @@ function applyWorkItemMissionFallback(row: WorkItemRunTimelineRow, workItem: Wor
   }
 }
 
-function applyApprovalHint(row: WorkItemRunTimelineRow, workItem: WorkItemRecord): WorkItemRunTimelineRow {
+function applyApprovalHint(
+  row: WorkItemRunTimelineRow,
+  workItem: WorkItemRecord,
+): WorkItemRunTimelineRow {
   const latestApproval = listWorkItemApprovals(workItem.id)
     .filter((approval) => approval.phase === row.phase)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -266,19 +342,34 @@ function applyApprovalHint(row: WorkItemRunTimelineRow, workItem: WorkItemRecord
   if (!latestApproval) return row
   return {
     ...row,
-    state: latestApproval.status === 'pending' ? 'waiting' : latestApproval.status === 'approved' ? 'succeeded' : 'failed',
+    state:
+      latestApproval.status === 'pending'
+        ? 'waiting'
+        : latestApproval.status === 'approved'
+          ? 'succeeded'
+          : 'failed',
     summary:
       latestApproval.status === 'pending'
         ? `${row.phaseLabel} approval pending.`
         : `${row.phaseLabel} approval ${latestApproval.status}.`,
-    nextExpectedAction: latestApproval.status === 'pending' ? `Resolve ${row.phase} approval.` : undefined,
+    nextExpectedAction:
+      latestApproval.status === 'pending'
+        ? `Resolve ${row.phase} approval.`
+        : undefined,
     lastObservedAt: latestApproval.updatedAt,
     heartbeatLabel: heartbeatLabel(latestApproval.updatedAt),
-    error: latestApproval.status === 'approved' || latestApproval.status === 'pending' ? undefined : latestApproval.resolutionNotes,
+    error:
+      latestApproval.status === 'approved' ||
+      latestApproval.status === 'pending'
+        ? undefined
+        : latestApproval.resolutionNotes,
   }
 }
 
-function applyMergeHealerHint(row: WorkItemRunTimelineRow, workItem: WorkItemRecord): WorkItemRunTimelineRow {
+function applyMergeHealerHint(
+  row: WorkItemRunTimelineRow,
+  workItem: WorkItemRecord,
+): WorkItemRunTimelineRow {
   if (row.phase !== 'deploy') return row
   if (!workItem.mergeState || workItem.mergeState === 'not_started') return row
 
@@ -298,7 +389,8 @@ function applyMergeHealerHint(row: WorkItemRunTimelineRow, workItem: WorkItemRec
   }
 
   const conflictFiles = workItem.mergeConflictFiles ?? []
-  const conflictSummary = conflictFiles.length > 0 ? `: ${conflictFiles.join(', ')}` : '.'
+  const conflictSummary =
+    conflictFiles.length > 0 ? `: ${conflictFiles.join(', ')}` : '.'
   return {
     ...row,
     state: workItem.mergeState === 'running' ? 'running' : 'failed',
@@ -317,7 +409,9 @@ function applyMergeHealerHint(row: WorkItemRunTimelineRow, workItem: WorkItemRec
   }
 }
 
-export function buildWorkItemRunTimeline(workItem: WorkItemRecord): WorkItemRunTimeline {
+export function buildWorkItemRunTimeline(
+  workItem: WorkItemRecord,
+): WorkItemRunTimeline {
   const draft = getLatestPlanningDraftForWorkItem(workItem.id)
   const runs = listExecutionRuns({ workItemId: workItem.id })
 

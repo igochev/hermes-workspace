@@ -42,7 +42,7 @@ type TabItem = {
   match: (path: string) => boolean
 }
 
-const TABS: Array<TabItem> = [
+export const MOBILE_TABS: Array<TabItem> = [
   {
     id: 'dashboard',
     label: 'Home',
@@ -73,10 +73,17 @@ const TABS: Array<TabItem> = [
   },
   {
     id: 'jobs',
-    label: 'Jobs',
+    label: 'Scheduled Jobs',
     icon: Clock01Icon,
     to: '/jobs',
     match: (p) => p.startsWith('/jobs'),
+  },
+  {
+    id: 'executions',
+    label: 'Executions',
+    icon: Clock01Icon,
+    to: '/executions',
+    match: (p) => p.startsWith('/executions'),
   },
   {
     id: 'projects',
@@ -162,15 +169,19 @@ export function MobileTabBar() {
 
       if (Math.abs(delta) < threshold) return
 
-      const currentIdx = TABS.findIndex((tab) => tab.match(pathname))
+      const currentIdx = MOBILE_TABS.findIndex((tab) => tab.match(pathname))
       const nextIdx =
         delta < 0
-          ? Math.min(currentIdx + 1, TABS.length - 1) // swipe left → next tab
+          ? Math.min(currentIdx + 1, MOBILE_TABS.length - 1) // swipe left → next tab
           : Math.max(currentIdx - 1, 0) // swipe right → prev tab
 
-      if (nextIdx !== currentIdx && nextIdx >= 0 && nextIdx < TABS.length) {
+      if (
+        nextIdx !== currentIdx &&
+        nextIdx >= 0 &&
+        nextIdx < MOBILE_TABS.length
+      ) {
         hapticTap()
-        void navigate({ to: TABS[nextIdx].to })
+        void navigate({ to: MOBILE_TABS[nextIdx].to })
       }
     },
     [navigate, pathname],
@@ -254,7 +265,7 @@ export function MobileTabBar() {
         onTouchEnd={handlePillTouchEnd}
       >
         <div className="flex items-center gap-1">
-          {TABS.map((tab, idx) => {
+          {MOBILE_TABS.map((tab, idx) => {
             const isActive = tab.match(pathname)
             const isCenter = tab.id === 'chat'
             const circleSize =

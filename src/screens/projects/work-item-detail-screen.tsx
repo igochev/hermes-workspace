@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -77,10 +77,29 @@ export const WORK_ITEM_BLOCKED_REASON_FIELD_LABEL = 'Blocked reason'
 export const WORK_ITEM_BLOCKED_REASON_HELP_TEXT =
   'Classify why this work item is blocked so board triage and recovery guidance stay actionable.'
 export const WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL = 'Open Conductor'
+export const WORK_ITEM_EXECUTION_SUMMARY_TITLE = 'Execution Summary'
+export const WORK_ITEM_OPERATOR_SUMMARY_TITLE = 'Operator Summary'
+export const WORK_ITEM_EXECUTION_EVIDENCE_TITLE = 'Execution Evidence'
+export const WORK_ITEM_ADVANCED_EXECUTION_METADATA_TITLE = 'Advanced execution metadata'
+export const WORK_ITEM_ADVANCED_METADATA_DEFAULT_OPEN = false
+export const WORK_ITEM_EXECUTION_TRACE_LABEL = 'Execution Trace'
+export const WORK_ITEM_EXECUTION_STATE_LABEL = 'Execution State'
+export const WORK_ITEM_LAST_EXECUTION_LABEL = 'Last Execution'
+export const WORK_ITEM_EXECUTION_ERROR_LABEL = 'Execution Error'
+export const WORK_ITEM_EXECUTION_DETAIL_LABELS = {
+  missionId: 'Execution ID',
+  missionJobId: 'Scheduled Job ID',
+  missionJobName: 'Execution Job Name',
+  missionSessionKeyPrefix: 'Execution Session Prefix',
+  missionLink: WORK_ITEM_EXECUTION_TRACE_LABEL,
+  missionState: WORK_ITEM_EXECUTION_STATE_LABEL,
+  missionLastRunAt: WORK_ITEM_LAST_EXECUTION_LABEL,
+  missionLastError: WORK_ITEM_EXECUTION_ERROR_LABEL,
+} as const
 export const WORK_ITEM_EXECUTION_SYNC_WARNING_TITLE = 'Execution sync warning'
 export const WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE = 'Profile Preflight'
 export const WORK_ITEM_RECOVERY_PANEL_TITLE = 'Recovery Actions'
-export const WORK_ITEM_RUNS_SECTION_TITLE = 'Runs / Agents'
+export const WORK_ITEM_RUNS_SECTION_TITLE = WORK_ITEM_EXECUTION_EVIDENCE_TITLE
 export const WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE = 'Always-on policy evidence'
 export const WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS = {
   decision: 'Recovery decision',
@@ -109,6 +128,7 @@ export const WORK_ITEM_DETAIL_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescrip
   { surface: 'execution-sync', label: 'Sync Execution', kind: 'button', target: 'sync work item execution evidence' },
   { surface: 'execution-launch', label: 'Launch/Relaunch phase', kind: 'button', target: 'launch selected work item phase' },
   { surface: 'profile-preflight-card', label: WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE, kind: 'static', target: null },
+  { surface: 'operator-summary-cockpit', label: WORK_ITEM_OPERATOR_SUMMARY_TITLE, kind: 'static', target: null },
   { surface: 'runs-agents-cockpit', label: WORK_ITEM_RUNS_SECTION_TITLE, kind: 'link', target: 'job/session deep links from run timeline' },
   {
     surface: 'open-conductor',
@@ -118,7 +138,7 @@ export const WORK_ITEM_DETAIL_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescrip
   },
   { surface: 'recovery-actions', label: WORK_ITEM_RECOVERY_PANEL_TITLE, kind: 'button', target: 'execute selected recovery action' },
   { surface: 'approvals-attention-card', label: 'Approvals Attention', kind: 'static', target: null },
-  { surface: 'mission-control-summary', label: 'Mission Control Summary', kind: 'static', target: null },
+  { surface: 'mission-control-summary', label: WORK_ITEM_EXECUTION_SUMMARY_TITLE, kind: 'static', target: null },
 ]
 
 type WorkItemRecoveryPanelSourceItem = Pick<
@@ -140,6 +160,179 @@ export type WorkItemMergeEvidenceSummary = {
   mergeCommit: string
   mergeTest: string
   mergeArtifacts: string
+}
+
+export type WorkItemCockpitSummary = {
+  rows: Array<{ label: string; value: string }>
+  recommendedNextAction: string
+}
+
+export type WorkItemEvidenceSnapshotRow = {
+  role: 'Planner' | 'Builder' | 'Reviewer' | 'Merge-Healer'
+  state: string
+  summary: string
+  evidence: string
+}
+
+function formatWorkItemStatusPhase(value: string | undefined, labels: Record<string, string>): string {
+  if (!value) return '—'
+  return labels[value] ?? value
+}
+
+export function getWorkItemCockpitSummary(state: {
+  status: WorkItemStatus
+  phase: 'research' | 'build' | 'review' | 'deploy' | undefined
+  missionState?: 'scheduled' | 'running' | 'succeeded' | 'failed' | 'unknown'
+  latestRunStatus?: string | null
+  riskLevel?: WorkItemRiskLevel
+  assignedProfile?: string
+  blockedReason?: WorkItemBlockedReason
+  acceptanceCriteriaProgress?: { metCount: number; totalCount: number }
+  approvals?: Array<{ status?: string; phase?: string }>
+  baseBranch?: string
+  branchName?: string
+  mergeTargetBranch?: string
+  mergeTestCommand?: string
+  mergeTestPassed?: boolean
+  mergeArtifactPaths?: Array<string>
+  mergeCommit?: string
+  prUrl?: string
+  planFilePath?: string
+}): WorkItemCockpitSummary {
+  const mergeEvidence = getWorkItemMergeEvidenceSummary({
+    baseBranch: state.baseBranch,
+    branchName: state.branchName,
+    mergeTargetBranch: state.mergeTargetBranch,
+    mergeCommit: state.mergeCommit,
+    mergeTestCommand: state.mergeTestCommand,
+    mergeTestPassed: state.mergeTestPassed,
+    mergeArtifactPaths: state.mergeArtifactPaths,
+  })
+  const phaseLabel = formatWorkItemStatusPhase(state.phase, WORK_ITEM_PHASE_LABELS)
+  const riskLabel = state.riskLevel ? WORK_ITEM_RISK_LEVEL_LABELS[state.riskLevel].replace(/ risk$/i, '') : 'Unknown'
+  const profileLabel = state.assignedProfile ?? 'no profile selected'
+
+  return {
+    rows: [
+      {
+        label: 'Status / phase',
+        value: `${WORK_ITEM_STATUS_LABELS[state.status]} / ${phaseLabel}`,
+      },
+      {
+        label: 'Lane / execution',
+        value: state.missionState ? getRunTimelineStateLabel(state.missionState === 'unknown' ? 'not_started' : state.missionState) : 'No job launched',
+      },
+      {
+        label: 'Risk / profile',
+        value: `${riskLabel} risk · ${profileLabel}`,
+      },
+      {
+        label: 'Branch snapshot',
+        value: `${mergeEvidence.featureBranch} → ${mergeEvidence.mergeTarget} (base ${mergeEvidence.baseBranch})`,
+      },
+      {
+        label: 'Latest evidence',
+        value: mergeEvidence.mergeTest,
+      },
+      {
+        label: 'Pull request',
+        value: state.prUrl ?? 'No PR recorded',
+      },
+      {
+        label: 'Plan file',
+        value: state.planFilePath ?? 'No plan file recorded',
+      },
+      {
+        label: 'Attention',
+        value: getWorkItemApprovalSummary(state.approvals ?? []),
+      },
+    ],
+    recommendedNextAction: getWorkItemOperatorGuidance({
+      status: state.status,
+      phase: state.phase,
+      missionState: state.missionState,
+      riskLevel: state.riskLevel,
+      blockedReason: state.blockedReason,
+      acceptanceCriteriaProgress: state.acceptanceCriteriaProgress,
+    }),
+  }
+}
+
+export function getWorkItemEvidenceSnapshot(timeline: {
+  rows: Array<Partial<WorkItemRunTimelineRow> & Pick<WorkItemRunTimelineRow, 'profileRole' | 'state' | 'summary' | 'artifacts'>>
+}): Array<WorkItemEvidenceSnapshotRow> {
+  const roleLabels = {
+    planner: 'Planner',
+    builder: 'Builder',
+    reviewer: 'Reviewer',
+  } as const
+  const rowsByRole = new Map(timeline.rows.map((row) => [row.profileRole, row]))
+  const snapshot = (role: keyof typeof roleLabels): WorkItemEvidenceSnapshotRow => {
+    const row = rowsByRole.get(role)
+    return {
+      role: roleLabels[role],
+      state: row ? getRunTimelineStateLabel(row.state) : 'No job launched',
+      summary: row?.summary ?? `No ${roleLabels[role].toLowerCase()} evidence yet.`,
+      evidence: row ? getWorkItemRunTimelineArtifactCopy(row.artifacts) : 'No code evidence yet',
+    }
+  }
+
+  return [
+    snapshot('planner'),
+    snapshot('builder'),
+    snapshot('reviewer'),
+    {
+      role: 'Merge-Healer',
+      state: 'No job launched',
+      summary: 'No merge-healer evidence yet.',
+      evidence: 'No merge evidence yet',
+    },
+  ]
+}
+
+export function getWorkItemExecutionTraceHref(
+  workItem: Pick<WorkItemRecord, 'id' | 'missionJobId'>,
+): string | null {
+  if (!workItem.missionJobId) return null
+  const params = new URLSearchParams({ jobId: workItem.missionJobId })
+  params.set('workItemId', workItem.id)
+  return `/executions?${params.toString()}`
+}
+
+export function getWorkItemAdvancedExecutionMetadataRows(
+  workItem: Pick<
+    WorkItemRecord,
+    | 'id'
+    | 'missionId'
+    | 'missionJobId'
+    | 'missionJobName'
+    | 'missionSessionKeyPrefix'
+    | 'missionLink'
+    | 'missionState'
+    | 'missionLastRunAt'
+    | 'missionLastError'
+    | 'sessionKeys'
+    | 'createdAt'
+    | 'updatedAt'
+  >,
+): Array<{ label: string; value: string }> {
+  const traceHref = getWorkItemExecutionTraceHref(workItem)
+  return [
+    { label: WORK_ITEM_EXECUTION_DETAIL_LABELS.missionId, value: workItem.missionId ?? '—' },
+    { label: WORK_ITEM_EXECUTION_DETAIL_LABELS.missionJobId, value: workItem.missionJobId ?? '—' },
+    { label: WORK_ITEM_EXECUTION_DETAIL_LABELS.missionJobName, value: workItem.missionJobName ?? '—' },
+    {
+      label: WORK_ITEM_EXECUTION_DETAIL_LABELS.missionSessionKeyPrefix,
+      value: workItem.missionSessionKeyPrefix ?? '—',
+    },
+    { label: WORK_ITEM_EXECUTION_DETAIL_LABELS.missionLink, value: traceHref ?? '—' },
+    { label: WORK_ITEM_EXECUTION_DETAIL_LABELS.missionState, value: workItem.missionState ?? '—' },
+    { label: WORK_ITEM_EXECUTION_DETAIL_LABELS.missionLastRunAt, value: workItem.missionLastRunAt ?? '—' },
+    { label: WORK_ITEM_EXECUTION_DETAIL_LABELS.missionLastError, value: workItem.missionLastError ?? '—' },
+    { label: 'Launch Sessions', value: workItem.sessionKeys.length > 0 ? workItem.sessionKeys.join(', ') : '—' },
+    { label: 'Created', value: workItem.createdAt },
+    { label: 'Updated', value: workItem.updatedAt },
+  ]
 }
 
 export function getWorkItemMergeEvidenceSummary(
@@ -265,7 +458,7 @@ export function getWorkItemBlockedReasonGuidance(
   }
 
   if (blockedReason === 'mission_failed') {
-    return 'Mission failed — capture the failing run details, record fix notes, then resume build and relaunch.'
+    return 'Execution failed — capture the failing run details, record fix notes, then resume build and relaunch.'
   }
   if (blockedReason === 'review_feedback') {
     return 'review feedback is blocking progress — capture requested changes and route back to build after updates.'
@@ -282,6 +475,27 @@ export function getWorkItemBlockedReasonGuidance(
 
 export function buildWorkItemConductorHref(workItemId: string): string {
   return `/conductor?mode=work-item&id=${encodeURIComponent(workItemId)}`
+}
+
+function isWorkItemExecutionTraceHref(value?: string | null): value is string {
+  return typeof value === 'string' && value.startsWith('/executions')
+}
+
+function ExecutionTraceValue({ href }: { href?: string | null }) {
+  if (!href) return <>—</>
+  if (!isWorkItemExecutionTraceHref(href)) return <>{href}</>
+  return (
+    <span className="space-y-1">
+      <a
+        href={href}
+        className="inline-flex rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card)]/80"
+        title={href}
+      >
+        Open execution trace
+      </a>
+      <span className="block break-all text-xs text-[var(--theme-muted)]">{href}</span>
+    </span>
+  )
 }
 
 export type WorkItemDetailLifecycleAction =
@@ -472,8 +686,20 @@ export function getWorkItemRunTimelineArtifactCopy(artifacts: Array<string>): st
 }
 
 export function getWorkItemRunTimelineLinkLabel(row: Partial<WorkItemRunTimelineRow>): string | null {
+  if (row.executionRunId || row.jobId) return 'Open execution trace'
   if (row.link) return 'Open run'
   if (row.sessionKey) return 'Open session'
+  return null
+}
+
+export function getWorkItemRunTimelineLinkHref(row: Partial<WorkItemRunTimelineRow>): string | null {
+  if (row.executionRunId) return `/executions/${encodeURIComponent(row.executionRunId)}`
+  if (row.link?.startsWith('/executions')) return row.link
+  if (row.jobId) {
+    const params = new URLSearchParams({ jobId: row.jobId })
+    return `/executions?${params.toString()}`
+  }
+  if (row.sessionKey) return `/conductor?session=${encodeURIComponent(row.sessionKey)}`
   return null
 }
 
@@ -492,7 +718,7 @@ export function getWorkItemOperatorGuidance(state: {
   acceptanceCriteriaProgress?: { metCount: number; totalCount: number }
 }): string {
   if (state.status === 'blocked' && state.phase === 'build' && state.missionState === 'failed') {
-    return 'This work item is blocked by a failed build mission. Capture fixes, run Resume Build, and relaunch Build to continue delivery.'
+    return 'This work item is blocked by a failed build execution. Capture fixes, run Resume Build, and relaunch Build to continue delivery.'
   }
   if (state.status === 'blocked') {
     return getWorkItemBlockedReasonGuidance(state.blockedReason)
@@ -515,7 +741,7 @@ export function getWorkItemOperatorGuidance(state: {
     return `Planning is complete. Launch Build triggers the two-phase pipeline (Planner writes a plan, then Builder implements per the plan).${progressSuffix}`
   }
   if (state.status === 'active' && state.phase === 'build' && state.missionState === 'running') {
-    return 'Build mission is in flight. Sync execution for fresh evidence or request review once implementation is ready.'
+    return 'Build execution is in flight. Sync execution for fresh evidence or request review once implementation is ready.'
   }
   if (state.status === 'active' && state.phase === 'build') {
     return 'Implementation is active. Sync execution for fresh evidence or request review once implementation is ready.'
@@ -540,16 +766,16 @@ export function getWorkItemExecutionSummary(state: {
   latestRunStatus?: string | null
 }): string {
   if (state.missionState === 'failed' || state.latestRunStatus === 'failed') {
-    return 'Mission failed — inspect the latest run, capture follow-up notes, run Resume Build, and relaunch Build when ready.'
+    return 'Execution failed — inspect the latest run, capture follow-up notes, run Resume Build, and relaunch Build when ready.'
   }
   if (state.missionState === 'running') {
-    return 'Mission is currently running — sync execution to refresh run data, session linkage, and delivery evidence.'
+    return 'Execution is currently running — sync execution to refresh run data, session linkage, and delivery evidence.'
   }
   if (state.missionState === 'scheduled') {
-    return 'Mission is scheduled — wait for execution to start or sync if the job state looks stale.'
+    return 'Execution is scheduled — wait for execution to start or sync if the job state looks stale.'
   }
   if (state.missionState === 'succeeded' || state.latestRunStatus === 'succeeded') {
-    return 'Mission succeeded — review artifacts, branch/PR evidence, and move the workflow into the next approval or deploy step.'
+    return 'Execution succeeded — review artifacts, branch/PR evidence, and move the workflow into the next approval or deploy step.'
   }
   return 'No decisive execution signal yet — launch or sync when you need fresh execution evidence.'
 }
@@ -1012,7 +1238,30 @@ export function WorkItemDetailScreen({
   )
   const latestPlanningDraft: PlanningDraftRecord | null = workItem?.latestPlanningDraft ?? null
   const mergeEvidenceSummary = workItem ? getWorkItemMergeEvidenceSummary(workItem) : null
+  const cockpitSummary = workItem
+    ? getWorkItemCockpitSummary({
+        status: workItem.status,
+        phase: workItem.phase,
+        missionState: workItem.missionState,
+        latestRunStatus: execution?.latestRun?.status ?? null,
+        riskLevel: workItem.riskLevel,
+        assignedProfile: workItem.assignedProfile,
+        blockedReason: workItem.blockedReason,
+        acceptanceCriteriaProgress,
+        approvals: workItem.approvals ?? [],
+        baseBranch: workItem.baseBranch,
+        branchName: workItem.branchName,
+        mergeTargetBranch: workItem.mergeTargetBranch,
+        mergeTestCommand: workItem.mergeTestCommand,
+        mergeTestPassed: workItem.mergeTestPassed,
+        mergeArtifactPaths: workItem.mergeArtifactPaths,
+        mergeCommit: workItem.mergeCommit,
+        prUrl: workItem.prUrl,
+        planFilePath: workItem.planFilePath,
+      })
+    : null
   const alwaysOnEvidenceRows = workItem ? getWorkItemAlwaysOnEvidenceRows(workItem) : []
+  const advancedExecutionMetadataRows = workItem ? getWorkItemAdvancedExecutionMetadataRows(workItem) : []
   const planningDraftStatusLabel = getPlanningDraftStatusLabel(latestPlanningDraft?.status)
   const planningDraftGuidance = getPlanningDraftGuidance(latestPlanningDraft?.status)
   const planningDiff = workItem
@@ -1100,7 +1349,26 @@ export function WorkItemDetailScreen({
                     <span key={label} className="inline-flex items-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--theme-muted)]">{label}</span>
                   ))}
                 </div>
-                <h1 className="text-2xl font-medium text-ink">{workItem.title}</h1>
+                <div className="space-y-2">
+                  {cockpitSummary ? (
+                    <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 py-3 text-sm text-[var(--theme-text)]">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                        {WORK_ITEM_OPERATOR_SUMMARY_TITLE}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {cockpitSummary.rows.map((row) => (
+                          <div key={`header-${row.label}`}>
+                            <span className="font-semibold">{row.label}:</span> {row.value}
+                          </div>
+                        ))}
+                        <div>
+                          <span className="font-semibold">Recommended next action:</span>{' '}
+                          {cockpitSummary.recommendedNextAction}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  <h1 className="text-2xl font-medium text-ink">{workItem.title}</h1>
                 <p className="max-w-3xl text-sm text-[var(--theme-muted)]">
                   {workItem.description || 'No work item description yet.'}
                 </p>
@@ -1111,6 +1379,7 @@ export function WorkItemDetailScreen({
                   <div className="mt-2 text-sm text-[var(--theme-text)]">{operatorGuidance}</div>
                 </div>
               </div>
+            </div>
             </div>
 
             <div className="space-y-3 lg:max-w-[28rem]">
@@ -1408,11 +1677,31 @@ export function WorkItemDetailScreen({
           </div>
         </header>
 
+        {cockpitSummary ? (
+          <Panel title={WORK_ITEM_OPERATOR_SUMMARY_TITLE}>
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                  Recommended next action
+                </div>
+                <p className="mt-2 text-sm text-[var(--theme-text)]">
+                  {cockpitSummary.recommendedNextAction}
+                </p>
+              </div>
+              <dl className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {cockpitSummary.rows.map((row) => (
+                  <Detail key={row.label} label={row.label} value={row.value} />
+                ))}
+              </dl>
+            </div>
+          </Panel>
+        ) : null}
+
         <Panel title={WORK_ITEM_RUNS_SECTION_TITLE}>
           <div className="grid gap-3 md:grid-cols-2">
             {runTimelineRows.map((row) => {
               const linkLabel = getWorkItemRunTimelineLinkLabel(row)
-              const linkHref = row.link ?? (row.sessionKey ? `/conductor?session=${encodeURIComponent(row.sessionKey)}` : null)
+              const linkHref = getWorkItemRunTimelineLinkHref(row)
               return (
                 <div
                   key={row.phase}
@@ -1474,83 +1763,78 @@ export function WorkItemDetailScreen({
 
         <section className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="space-y-4">
-            <Panel title="Mission Control Summary">
-              <dl className="grid gap-3 md:grid-cols-2">
-                <Detail label="Project" value={project?.name || 'Unknown project'} />
-                <Detail label="Repo Snapshot" value={workItem.repoPathSnapshot} />
-                <Detail label="Mission ID" value={workItem.missionId || '—'} />
-                <Detail label="Hermes Job ID" value={workItem.missionJobId || '—'} />
-                <Detail label="Hermes Job Name" value={workItem.missionJobName || '—'} />
-                <Detail label="Session Prefix" value={workItem.missionSessionKeyPrefix || '—'} />
-                <Detail label="Mission Link" value={workItem.missionLink || '—'} />
-                <Detail label="Mission State" value={workItem.missionState || 'unknown'} />
-                <Detail label="Mission Last Run" value={workItem.missionLastRunAt || '—'} />
-                <Detail label="Mission Last Error" value={workItem.missionLastError || '—'} />
-                <Detail
-                  label={WORK_ITEM_BLOCKED_REASON_FIELD_LABEL}
-                  value={
-                    workItem.blockedReason
-                      ? WORK_ITEM_BLOCKED_REASON_LABELS[workItem.blockedReason]
-                      : '—'
-                  }
-                />
-                <Detail label="Blocked guidance" value={getWorkItemBlockedReasonGuidance(workItem.blockedReason)} />
-                <Detail label="Assigned Profile" value={workItem.assignedProfile || '—'} />
-                <Detail label="Risk Level" value={WORK_ITEM_RISK_LEVEL_LABELS[workItem.riskLevel]} />
-                <Detail label="Plan File Path" value={workItem.planFilePath || '—'} />
-                {mergeEvidenceSummary ? (
-                  <>
-                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.baseBranch} value={mergeEvidenceSummary.baseBranch} />
-                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.featureBranch} value={mergeEvidenceSummary.featureBranch} />
-                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeTarget} value={mergeEvidenceSummary.mergeTarget} />
-                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeCommit} value={mergeEvidenceSummary.mergeCommit} />
-                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeTest} value={mergeEvidenceSummary.mergeTest} />
-                    <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeArtifacts} value={mergeEvidenceSummary.mergeArtifacts} />
-                  </>
-                ) : null}
-                {alwaysOnEvidenceRows.map((row) => (
-                  <Detail key={row.label} label={`${WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE} · ${row.label}`} value={row.value} />
-                ))}
-                {workItem.reviewJobId ? (
-                  <>
-                    <Detail label="Planner Review Job" value={workItem.reviewJobId} />
-                    <Detail label="Planner Review State" value={workItem.reviewState || 'scheduled'} />
-                    {workItem.reviewDecision ? (
+            <Panel title={WORK_ITEM_ADVANCED_EXECUTION_METADATA_TITLE}>
+              <details open={WORK_ITEM_ADVANCED_METADATA_DEFAULT_OPEN}>
+                <summary className="cursor-pointer text-sm font-medium text-[var(--theme-text)]">
+                  Show raw execution IDs, parser fields, and timestamps
+                </summary>
+                <dl className="mt-4 grid gap-3 md:grid-cols-2">
+                  <Detail label="Project" value={project?.name || 'Unknown project'} />
+                  <Detail label="Repo Snapshot" value={workItem.repoPathSnapshot} />
+                  {advancedExecutionMetadataRows.map((row) => (
+                    <Detail
+                      key={row.label}
+                      label={row.label}
+                      value={
+                        row.label === WORK_ITEM_EXECUTION_DETAIL_LABELS.missionLink ? (
+                          <ExecutionTraceValue href={row.value} />
+                        ) : (
+                          row.value
+                        )
+                      }
+                    />
+                  ))}
+                  <Detail
+                    label={WORK_ITEM_BLOCKED_REASON_FIELD_LABEL}
+                    value={
+                      workItem.blockedReason
+                        ? WORK_ITEM_BLOCKED_REASON_LABELS[workItem.blockedReason]
+                        : '—'
+                    }
+                  />
+                  <Detail label="Assigned Profile" value={workItem.assignedProfile || '—'} />
+                  <Detail label="Risk Level" value={WORK_ITEM_RISK_LEVEL_LABELS[workItem.riskLevel]} />
+                  {mergeEvidenceSummary ? (
+                    <>
+                      <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeCommit} value={mergeEvidenceSummary.mergeCommit} />
+                      <Detail label={WORK_ITEM_OPERATOR_EVIDENCE_LABELS.mergeArtifacts} value={mergeEvidenceSummary.mergeArtifacts} />
+                    </>
+                  ) : null}
+                  {alwaysOnEvidenceRows.map((row) => (
+                    <Detail key={row.label} label={`${WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE} · ${row.label}`} value={row.value} />
+                  ))}
+                  {workItem.reviewJobId ? (
+                    <>
+                      <Detail label="Planner Review Job" value={workItem.reviewJobId} />
+                      <Detail label="Planner Review State" value={workItem.reviewState || 'scheduled'} />
+                      {workItem.reviewDecision ? (
+                        <Detail
+                          label="Planner Review Decision"
+                          value={reviewDecisionLabel(workItem.reviewDecision)}
+                        />
+                      ) : null}
+                      <Detail label="Review Confidence" value={workItem.reviewDecisionConfidence || '—'} />
                       <Detail
-                        label="Planner Review Decision"
-                        value={reviewDecisionLabel(workItem.reviewDecision)}
+                        label="Review Quality Gate"
+                        value={reviewQualityGateLabel(workItem.reviewQualityGateStatus)}
                       />
-                    ) : null}
-                    <Detail label="Review Confidence" value={workItem.reviewDecisionConfidence || '—'} />
-                    <Detail
-                      label="Review Quality Gate"
-                      value={reviewQualityGateLabel(workItem.reviewQualityGateStatus)}
-                    />
-                    <Detail
-                      label="Review Summary"
-                      value={workItem.reviewDecisionSummary || '—'}
-                    />
-                    <Detail label="Parser Error" value={workItem.reviewParserError || '—'} />
-                    <Detail
-                      label="Missing Evidence"
-                      value={workItem.reviewMissingEvidence.join(', ') || '—'}
-                    />
-                    <Detail
-                      label="Gate Reasons"
-                      value={workItem.reviewQualityGateReasons.join('; ') || '—'}
-                    />
-                    {getReviewEvidenceAttentionMessage(workItem) ? (
                       <Detail
-                        label="Review Attention"
-                        value={getReviewEvidenceAttentionMessage(workItem) ?? '—'}
+                        label="Review Summary"
+                        value={workItem.reviewDecisionSummary || '—'}
                       />
-                    ) : null}
-                  </>
-                ) : null}
-                <Detail label="Launch Sessions" value={workItem.sessionKeys.join(', ') || '—'} />
-                <Detail label="Created" value={workItem.createdAt} />
-                <Detail label="Updated" value={workItem.updatedAt} />
-              </dl>
+                      <Detail label="Parser Error" value={workItem.reviewParserError || '—'} />
+                      <Detail
+                        label="Missing Evidence"
+                        value={workItem.reviewMissingEvidence.join(', ') || '—'}
+                      />
+                      <Detail
+                        label="Gate Reasons"
+                        value={workItem.reviewQualityGateReasons.join('; ') || '—'}
+                      />
+                    </>
+                  ) : null}
+                </dl>
+              </details>
             </Panel>
 
             <Panel title="Planner Enrichment">
@@ -1843,23 +2127,23 @@ export function WorkItemDetailScreen({
                 />
                 <EvidenceRow
                   icon={PlayIcon}
-                  label="Mission Link"
-                  value={workItem.missionLink || 'No mission link recorded'}
+                  label={WORK_ITEM_EXECUTION_DETAIL_LABELS.missionLink}
+                  value={<ExecutionTraceValue href={getWorkItemExecutionTraceHref(workItem)} />}
                 />
                 <EvidenceRow
                   icon={PlayIcon}
-                  label="Hermes Job ID"
-                  value={workItem.missionJobId || 'No job ID recorded'}
+                  label={WORK_ITEM_EXECUTION_DETAIL_LABELS.missionJobId}
+                  value={workItem.missionJobId || 'No scheduled job ID recorded'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}
-                  label="Hermes Job Name"
-                  value={workItem.missionJobName || 'No job name recorded'}
+                  label={WORK_ITEM_EXECUTION_DETAIL_LABELS.missionJobName}
+                  value={workItem.missionJobName || 'No execution job name recorded'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}
-                  label="Session Prefix"
-                  value={workItem.missionSessionKeyPrefix || 'No session prefix recorded'}
+                  label={WORK_ITEM_EXECUTION_DETAIL_LABELS.missionSessionKeyPrefix}
+                  value={workItem.missionSessionKeyPrefix || 'No execution session prefix recorded'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}
@@ -1868,18 +2152,18 @@ export function WorkItemDetailScreen({
                 />
                 <EvidenceRow
                   icon={PlayIcon}
-                  label="Mission State"
+                  label={WORK_ITEM_EXECUTION_DETAIL_LABELS.missionState}
                   value={workItem.missionState || 'unknown'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}
-                  label="Mission Last Run"
-                  value={workItem.missionLastRunAt || 'No run recorded'}
+                  label={WORK_ITEM_EXECUTION_DETAIL_LABELS.missionLastRunAt}
+                  value={workItem.missionLastRunAt || 'No execution recorded'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}
-                  label="Mission Last Error"
-                  value={workItem.missionLastError || 'No errors recorded'}
+                  label={WORK_ITEM_EXECUTION_DETAIL_LABELS.missionLastError}
+                  value={workItem.missionLastError || 'No execution errors recorded'}
                 />
                 <EvidenceRow
                   icon={PlayIcon}
@@ -1946,9 +2230,9 @@ export function WorkItemDetailScreen({
                         </div>
                         <div className="mt-2 font-medium text-ink">{entry.note}</div>
                         <div className="mt-2 space-y-1 text-xs text-[var(--theme-muted)]">
-                          {entry.missionId ? <div>Mission: {entry.missionId}</div> : null}
+                          {entry.missionId ? <div>Execution: {entry.missionId}</div> : null}
                           {entry.sessionKey ? <div>Session: {entry.sessionKey}</div> : null}
-                          {entry.sessionKeyPrefix ? <div>Session Prefix: {entry.sessionKeyPrefix}</div> : null}
+                          {entry.sessionKeyPrefix ? <div>Execution Session Prefix: {entry.sessionKeyPrefix}</div> : null}
                           <div>{entry.createdAt}</div>
                         </div>
                       </li>
@@ -2048,7 +2332,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
       <div className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">{label}</div>
@@ -2064,7 +2348,7 @@ function EvidenceRow({
 }: {
   icon: unknown
   label: string
-  value: string
+  value: ReactNode
 }) {
   return (
     <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">

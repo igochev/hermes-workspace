@@ -609,9 +609,11 @@ function ChatSidebarComponent({
   const isFilesActive = pathname === '/files'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
+  const isExecutionsActive = pathname.startsWith('/executions')
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
-  const isProjectsActive = pathname === '/projects' || pathname.startsWith('/projects/')
+  const isProjectsActive =
+    pathname === '/projects' || pathname.startsWith('/projects/')
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
@@ -841,6 +843,13 @@ function ChatSidebarComponent({
       icon: Clock01Icon,
       label: t('nav.jobs'),
       active: isJobsActive,
+    },
+    {
+      kind: 'link',
+      to: '/executions',
+      icon: Clock01Icon,
+      label: t('nav.executions'),
+      active: isExecutionsActive,
     },
     {
       kind: 'link',

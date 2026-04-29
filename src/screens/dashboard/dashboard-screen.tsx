@@ -1,22 +1,8 @@
+import { Moon02Icon, Sun02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import {
-  fetchProjects,
-  fetchWorkItems,
-  WORK_ITEM_PHASE_LABELS,
-  type ProjectSummary,
-  type WorkItemRecord,
-} from '@/lib/projects-api'
-import {
-  fetchAttentionQueue,
-} from '@/lib/attention-queue-api'
-import type { AttentionKind, AttentionQueueItem } from '@/server/attention-queue-store'
-import type { WorkItemRecoveryActionType } from '@/server/work-item-recovery-actions'
-import {
-  fetchApprovalInbox,
-  type ApprovalInboxEntry,
-} from '@/lib/work-item-approvals-api'
 import {
   Area,
   AreaChart,
@@ -27,21 +13,29 @@ import {
   YAxis,
 } from 'recharts'
 import type { ReactNode } from 'react'
+
+import type { ProjectSummary, WorkItemRecord } from '@/lib/projects-api'
+import type { ApprovalInboxEntry } from '@/lib/work-item-approvals-api'
+import type { AttentionKind, AttentionQueueItem } from '@/server/attention-queue-store'
 import type { HermesSession } from '@/server/hermes-api'
-import { chatQueryKeys } from '@/screens/chat/chat-queries'
-import { getUnavailableReason } from '@/lib/feature-gates'
-import { useFeatureAvailable } from '@/hooks/use-feature-available'
-import { cn } from '@/lib/utils'
-import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
-import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
-import { fetchSessionTelemetry } from '@/lib/session-telemetry-api'
+import type { MorningReviewBucket, MorningReviewDigest, MorningReviewEntry } from '@/server/morning-review'
 import type {
   SessionTelemetryItem,
   SessionTelemetrySummary,
   TelemetryAccuracy,
 } from '@/server/session-telemetry'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Moon02Icon, Sun02Icon } from '@hugeicons/core-free-icons'
+import type { WorkItemRecoveryActionType } from '@/server/work-item-recovery-actions'
+import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
+import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { fetchAttentionQueue } from '@/lib/attention-queue-api'
+import { getUnavailableReason } from '@/lib/feature-gates'
+import { MORNING_REVIEW_QUERY_KEY, fetchMorningReview } from '@/lib/morning-review-api'
+import { WORK_ITEM_PHASE_LABELS, fetchProjects, fetchWorkItems } from '@/lib/projects-api'
+import { fetchSessionTelemetry } from '@/lib/session-telemetry-api'
+import { cn } from '@/lib/utils'
+import { fetchApprovalInbox } from '@/lib/work-item-approvals-api'
+import { chatQueryKeys } from '@/screens/chat/chat-queries'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -92,6 +86,35 @@ type DashboardSessionTelemetryCard = {
   detail: string
 }
 
+type DashboardMorningReviewSummaryChip = {
+  bucket: MorningReviewBucket
+  label: string
+  count: number
+}
+
+type DashboardMorningReviewPreview = {
+  id: string
+  bucket: MorningReviewBucket
+  title: string
+  detail: string
+  context: string
+  href: string
+  ageLabel: string
+  severity: MorningReviewEntry['severity']
+  executionHref?: string
+  executionLabel?: string
+}
+
+type DashboardMorningReviewSurface = {
+  title: string
+  subtitle: string
+  generatedLabel: string
+  summaryChips: Array<DashboardMorningReviewSummaryChip>
+  primaryAction: { label: string; href: string } | null
+  allClearCopy: string | null
+  bucketPreviews: Record<MorningReviewBucket, Array<DashboardMorningReviewPreview>>
+}
+
 type ClickabilityAuditEntry = {
   surface: string
   label: string
@@ -113,22 +136,49 @@ export const DASHBOARD_MISSION_CONTROL_SUMMARY_LABELS: Record<keyof MissionContr
   workItems: 'Work items',
   pendingApprovals: 'Pending approvals',
   blockedWorkItems: 'Blocked work',
-  failedMissions: 'Failed missions',
-  runningMissions: 'Running missions',
+  failedMissions: 'Failed executions',
+  runningMissions: 'Running executions',
 }
 export const DASHBOARD_MISSION_CONTROL_QUEUE_TITLES: Record<keyof MissionControlQueues, string> = {
   approvals: 'Pending approvals',
-  failed: 'Failed missions',
+  failed: 'Failed executions',
   blocked: 'Blocked work',
-  running: 'Running missions',
+  running: 'Running executions',
+}
+export const DASHBOARD_MISSION_CONTROL_QUEUE_EMPTY_COPY: Record<keyof MissionControlQueues, string> = {
+  approvals: 'No pending approvals in the operator queue.',
+  failed: 'No failed executions in the operator escalation queue.',
+  blocked: 'No blocked work items right now.',
+  running: 'No running executions at the moment.',
+}
+export const DASHBOARD_MORNING_REVIEW_TITLE = 'Morning Review'
+export const DASHBOARD_MORNING_REVIEW_SUBTITLE = 'Overnight digest for the last 18h.'
+export const DASHBOARD_MORNING_REVIEW_ALL_CLEAR_COPY = 'All clear — no overnight operator action needed.'
+export const DASHBOARD_MORNING_REVIEW_BUCKETS: Array<MorningReviewBucket> = [
+  'changed',
+  'needs_approval',
+  'failed',
+  'merged',
+  'parked',
+]
+export const DASHBOARD_MORNING_REVIEW_BUCKET_LABELS: Record<MorningReviewBucket, string> = {
+  changed: 'Changed',
+  needs_approval: 'Needs approval',
+  failed: 'Failed',
+  merged: 'Merged',
+  parked: 'Parked',
 }
 export const DASHBOARD_CLICKABILITY_AUDIT: Array<ClickabilityAuditEntry> = [
   { surface: 'summary-projects', label: 'Projects', kind: 'link', target: '/projects' },
   { surface: 'summary-work-items', label: 'Work items', kind: 'link', target: '/projects' },
   { surface: 'summary-approvals', label: 'Pending approvals', kind: 'link', target: '/projects/approvals' },
   { surface: 'summary-blocked', label: 'Blocked work', kind: 'link', target: '/projects' },
-  { surface: 'summary-failed', label: 'Failed missions', kind: 'link', target: '/projects' },
-  { surface: 'summary-running', label: 'Running missions', kind: 'link', target: '/projects' },
+  { surface: 'summary-failed', label: 'Failed executions', kind: 'link', target: '/projects' },
+  { surface: 'summary-running', label: 'Running executions', kind: 'link', target: '/projects' },
+  { surface: 'morning-review-chip', label: 'Morning Review bucket summary', kind: 'static', target: null },
+  { surface: 'morning-review-next-action', label: 'Open next attention item', kind: 'link', target: 'morningReview.primaryAction.href' },
+  { surface: 'morning-review-bucket-entry', label: 'Open Morning Review item', kind: 'link', target: 'morningReview.entry.href' },
+  { surface: 'morning-review-execution-link', label: 'Open execution', kind: 'link', target: 'morningReview.entry.executionHref' },
   { surface: 'attention-card', label: 'Open detail for all recovery actions', kind: 'link', target: 'attention.href' },
   { surface: 'attention-first-action', label: 'Recommended action preview', kind: 'static', target: null },
   { surface: 'mission-queue-card', label: 'Open work item/project detail', kind: 'link', target: 'queue.href' },
@@ -179,6 +229,105 @@ function telemetryAccuracyDetail(accuracy: TelemetryAccuracy): string {
   if (accuracy === 'exact') return 'Exact token totals from Hermes'
   if (accuracy === 'estimated') return 'Token totals are derived from partial Hermes metadata'
   return 'Telemetry unavailable from Hermes session metadata'
+}
+
+function formatMorningReviewAge(ageMinutes: number): string {
+  if (ageMinutes < 60) return `${ageMinutes}m ago`
+  if (ageMinutes < 1440) return `${Math.floor(ageMinutes / 60)}h ago`
+  return `${Math.floor(ageMinutes / 1440)}d ago`
+}
+
+function formatMorningReviewTimestamp(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function morningReviewContext(entry: MorningReviewEntry): string {
+  const parts = [entry.projectName, entry.workItemTitle].filter(Boolean)
+  return parts.length > 0 ? parts.join(' · ') : 'Mission Control'
+}
+
+function isApprovedMorningReviewHref(href: string | undefined): href is string {
+  if (!href) return false
+  return (
+    href === '/projects' ||
+    href === '/projects/approvals' ||
+    href.startsWith('/projects/') ||
+    href === '/executions' ||
+    href.startsWith('/executions/') ||
+    href.startsWith('/executions?')
+  )
+}
+
+function fallbackMorningReviewHref(entry: MorningReviewEntry): string {
+  if (entry.projectId && entry.workItemId) {
+    return `/projects/${entry.projectId}/work-items/${entry.workItemId}`
+  }
+  if (entry.projectId) return `/projects/${entry.projectId}`
+  return '/projects'
+}
+
+function normalizeMorningReviewHref(entry: MorningReviewEntry): string {
+  return isApprovedMorningReviewHref(entry.href) ? entry.href : fallbackMorningReviewHref(entry)
+}
+
+function mapMorningReviewEntry(entry: MorningReviewEntry): DashboardMorningReviewPreview {
+  const executionHref = entry.executionHref?.startsWith('/executions') ? entry.executionHref : undefined
+  return {
+    id: entry.id,
+    bucket: entry.bucket,
+    title: entry.title,
+    detail: entry.detail,
+    context: morningReviewContext(entry),
+    href: normalizeMorningReviewHref(entry),
+    ageLabel: formatMorningReviewAge(entry.ageMinutes),
+    severity: entry.severity,
+    executionHref,
+    executionLabel: executionHref ? 'Open execution' : undefined,
+  }
+}
+
+export function buildDashboardMorningReviewSurface(
+  digest: MorningReviewDigest,
+): DashboardMorningReviewSurface {
+  const bucketPreviews = DASHBOARD_MORNING_REVIEW_BUCKETS.reduce(
+    (acc, bucket) => {
+      acc[bucket] = digest.buckets[bucket].slice(0, 3).map(mapMorningReviewEntry)
+      return acc
+    },
+    {
+      changed: [],
+      needs_approval: [],
+      failed: [],
+      merged: [],
+      parked: [],
+    } as Record<MorningReviewBucket, Array<DashboardMorningReviewPreview>>,
+  )
+
+  return {
+    title: DASHBOARD_MORNING_REVIEW_TITLE,
+    subtitle: DASHBOARD_MORNING_REVIEW_SUBTITLE,
+    generatedLabel: `Generated ${formatMorningReviewTimestamp(digest.generatedAt)}`,
+    summaryChips: DASHBOARD_MORNING_REVIEW_BUCKETS.map((bucket) => ({
+      bucket,
+      label: DASHBOARD_MORNING_REVIEW_BUCKET_LABELS[bucket],
+      count: digest.summary[bucket],
+    })),
+    primaryAction: digest.nextAttentionItem
+      ? {
+          label: 'Open next attention item',
+          href: normalizeMorningReviewHref(digest.nextAttentionItem),
+        }
+      : null,
+    allClearCopy: digest.allClear ? DASHBOARD_MORNING_REVIEW_ALL_CLEAR_COPY : null,
+    bucketPreviews,
+  }
 }
 
 export function buildDashboardSessionTelemetryCards(
@@ -263,7 +412,7 @@ export function buildDashboardAttentionSurface(
     count: openItems.length,
     emptyCopy: DASHBOARD_ATTENTION_EMPTY_COPY,
     items: openItems.slice(0, 5).map((item) => {
-      const firstAction = item.recommendedActions[0]
+      const firstAction = item.recommendedActions.at(0)
       return {
         id: item.id,
         title: item.title,
@@ -272,9 +421,13 @@ export function buildDashboardAttentionSurface(
         href: item.href,
         badge: item.severity,
         severity: item.severity,
-        firstActionLabel: firstAction?.label,
-        firstActionDescription: firstAction?.description,
-        firstActionType: firstAction?.type,
+        ...(firstAction
+          ? {
+              firstActionLabel: firstAction.label,
+              firstActionDescription: firstAction.description,
+              firstActionType: firstAction.type,
+            }
+          : {}),
         detailHref: item.href,
         detailCta: 'Open detail for all recovery actions',
       }
@@ -628,6 +781,99 @@ function MissionControlQueueCard({
   )
 }
 
+function MorningReviewCard({
+  surface,
+  accentColor,
+}: {
+  surface: DashboardMorningReviewSurface
+  accentColor: string
+}) {
+  const previewEntries = DASHBOARD_MORNING_REVIEW_BUCKETS.flatMap((bucket) =>
+    surface.bucketPreviews[bucket].map((entry) => ({ ...entry, bucketLabel: DASHBOARD_MORNING_REVIEW_BUCKET_LABELS[bucket] })),
+  )
+
+  return (
+    <GlassCard title={surface.title} accentColor={accentColor} noPadding>
+      <div className="p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-ink">{surface.subtitle}</p>
+            <p className="mt-1 text-[11px] text-muted">{surface.generatedLabel}</p>
+          </div>
+          {surface.primaryAction ? (
+            <a
+              href={surface.primaryAction.href}
+              className="inline-flex items-center justify-center rounded-lg bg-[var(--theme-accent)] px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              {surface.primaryAction.label} →
+            </a>
+          ) : null}
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+          {surface.summaryChips.map((chip) => (
+            <div
+              key={chip.bucket}
+              className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                {chip.label}
+              </div>
+              <div className="mt-1 text-lg font-bold tabular-nums text-ink">{chip.count}</div>
+            </div>
+          ))}
+        </div>
+        {surface.allClearCopy ? (
+          <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {surface.allClearCopy}
+          </div>
+        ) : null}
+      </div>
+      {previewEntries.length > 0 ? (
+        <div className="border-t border-[var(--theme-border)] py-2">
+          {previewEntries.slice(0, 6).map((entry) => (
+            <div key={`${entry.bucket}:${entry.id}`} className="px-5 py-3 hover:bg-[var(--theme-card2)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    {entry.bucketLabel} · {entry.ageLabel}
+                  </div>
+                  <a href={entry.href} className="mt-1 block text-sm font-semibold text-ink hover:text-[var(--theme-accent)]">
+                    {entry.title}
+                  </a>
+                  <div className="mt-1 text-xs text-[var(--theme-text)]">{entry.context}</div>
+                  <div className="mt-1 line-clamp-2 text-[11px] text-muted">{entry.detail}</div>
+                </div>
+                <span
+                  className={cn(
+                    'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                    entry.severity === 'critical'
+                      ? 'bg-red-500/15 text-red-300'
+                      : entry.severity === 'warning'
+                        ? 'bg-amber-500/15 text-amber-300'
+                        : entry.severity === 'success'
+                          ? 'bg-emerald-500/15 text-emerald-300'
+                          : 'bg-blue-500/15 text-blue-300',
+                  )}
+                >
+                  {entry.severity}
+                </span>
+              </div>
+              {entry.executionHref ? (
+                <a
+                  href={entry.executionHref}
+                  className="mt-2 inline-flex text-[11px] font-semibold text-[var(--theme-accent)] hover:underline"
+                >
+                  {entry.executionLabel} →
+                </a>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </GlassCard>
+  )
+}
+
 function MissionControlAttentionCard({
   surface,
   accentColor,
@@ -871,6 +1117,7 @@ function ModelCard({ palette }: { palette: ReturnType<typeof readDashboardPalett
     | Record<string, unknown>
     | undefined
   const fallbackModel = fallbackBlock?.model as string | undefined
+  const fallbackProvider = fallbackBlock?.provider as string | undefined
 
   if (!configAvailable) {
     return (
@@ -933,7 +1180,7 @@ function ModelCard({ palette }: { palette: ReturnType<typeof readDashboardPalett
                 {fallbackModel}
               </div>
               <div className="text-[10px] text-muted font-mono truncate">
-                {(fallbackBlock?.provider as string) ?? ''}
+                {fallbackProvider ?? ''}
               </div>
             </div>
           </div>
@@ -1237,7 +1484,7 @@ export function DashboardScreen() {
     enabled: sessionsAvailable,
   })
 
-  const sessions = (sessionsQuery.data ?? []) as HermesSession[]
+  const sessions = (sessionsQuery.data ?? [])
   const sessionTelemetryQuery = useQuery({
     queryKey: DASHBOARD_SESSION_TELEMETRY_QUERY_KEY,
     queryFn: fetchSessionTelemetry,
@@ -1279,6 +1526,12 @@ export function DashboardScreen() {
   const missionAttentionQuery = useQuery({
     queryKey: [...DASHBOARD_MISSION_CONTROL_QUERY_KEY, 'attention-queue'],
     queryFn: () => fetchAttentionQueue({ refresh: true }),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  })
+  const morningReviewQuery = useQuery({
+    queryKey: MORNING_REVIEW_QUERY_KEY,
+    queryFn: () => fetchMorningReview({ lookbackHours: 18 }),
     staleTime: 15_000,
     refetchInterval: 30_000,
   })
@@ -1335,6 +1588,13 @@ export function DashboardScreen() {
   const missionAttentionSurface = useMemo(
     () => buildDashboardAttentionSurface(missionAttentionItems),
     [missionAttentionItems],
+  )
+  const morningReviewSurface = useMemo(
+    () =>
+      morningReviewQuery.data?.digest
+        ? buildDashboardMorningReviewSurface(morningReviewQuery.data.digest)
+        : null,
+    [morningReviewQuery.data],
   )
   const sessionTelemetrySummary = sessionTelemetryQuery.data?.summary ?? emptySessionTelemetrySummary
   const sessionTelemetryCards = useMemo(
@@ -1503,6 +1763,26 @@ export function DashboardScreen() {
         })}
       </div>
 
+      {morningReviewSurface ? (
+        <MorningReviewCard
+          surface={morningReviewSurface}
+          accentColor={
+            morningReviewSurface.summaryChips.some((chip) => chip.bucket === 'failed' && chip.count > 0)
+              ? palette.danger
+              : palette.accent
+          }
+        />
+      ) : (
+        <GlassCard title={DASHBOARD_MORNING_REVIEW_TITLE} accentColor={palette.accent}>
+          <p className="text-sm font-semibold text-ink">{DASHBOARD_MORNING_REVIEW_SUBTITLE}</p>
+          <p className="mt-2 text-xs text-muted">
+            {morningReviewQuery.error
+              ? `Morning Review unavailable: ${morningReviewQuery.error instanceof Error ? morningReviewQuery.error.message : String(morningReviewQuery.error)}`
+              : 'Loading overnight digest…'}
+          </p>
+        </GlassCard>
+      )}
+
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <MissionControlAttentionCard
           surface={missionAttentionSurface}
@@ -1536,7 +1816,7 @@ export function DashboardScreen() {
           title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.approvals}
           entries={missionControlQueues.approvals}
           accentColor={palette.warning}
-          emptyCopy="No pending approvals in the operator queue."
+          emptyCopy={DASHBOARD_MISSION_CONTROL_QUEUE_EMPTY_COPY.approvals}
           onOpenAll={() => navigate({ to: '/projects/approvals' })}
           onOpenEntry={(href) => {
             const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
@@ -1551,7 +1831,7 @@ export function DashboardScreen() {
           title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.failed}
           entries={missionControlQueues.failed}
           accentColor={palette.danger}
-          emptyCopy="No failed missions in the operator escalation queue."
+          emptyCopy={DASHBOARD_MISSION_CONTROL_QUEUE_EMPTY_COPY.failed}
           onOpenAll={() => navigate({ to: '/projects' })}
           onOpenEntry={(href) => {
             const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
@@ -1566,7 +1846,7 @@ export function DashboardScreen() {
           title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.blocked}
           entries={missionControlQueues.blocked}
           accentColor={palette.danger}
-          emptyCopy="No blocked work items right now."
+          emptyCopy={DASHBOARD_MISSION_CONTROL_QUEUE_EMPTY_COPY.blocked}
           onOpenAll={() => navigate({ to: '/projects' })}
           onOpenEntry={(href) => {
             const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)
@@ -1581,7 +1861,7 @@ export function DashboardScreen() {
           title={DASHBOARD_MISSION_CONTROL_QUEUE_TITLES.running}
           entries={missionControlQueues.running}
           accentColor={palette.accent}
-          emptyCopy="No running missions at the moment."
+          emptyCopy={DASHBOARD_MISSION_CONTROL_QUEUE_EMPTY_COPY.running}
           onOpenAll={() => navigate({ to: '/projects' })}
           onOpenEntry={(href) => {
             const match = href.match(/^\/projects\/([^/]+)\/work-items\/([^/]+)$/)

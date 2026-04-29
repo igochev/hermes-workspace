@@ -13,7 +13,7 @@ import {
   PROJECT_AUTOPILOT_SCOUT_SOURCE_LABELS,
   saveProjectAutopilotSchedule,
 } from '@/lib/project-autopilot-api'
-import { fetchProject } from '@/lib/projects-api'
+import { fetchProject, type ProjectAutopilotScoutSource } from '@/lib/projects-api'
 
 export const PROJECT_AUTOPILOT_SAFETY_COPY =
   'Autopilot is suggestions only — no direct code changes, commits, branches, PRs, or automatic work-item creation.'
@@ -64,7 +64,7 @@ export function ProjectAutopilotScreen({ projectId }: { projectId: string }) {
   const [schedulePreset, setSchedulePreset] = useState<'manual' | 'daily' | 'weekly'>('manual')
   const [suggestionLimit, setSuggestionLimit] = useState('5')
   const [scoutProfile, setScoutProfile] = useState('')
-  const [sources, setSources] = useState<Array<string>>([...PROJECT_AUTOPILOT_SCOUT_SOURCES.slice(0, 3)])
+  const [sources, setSources] = useState<Array<ProjectAutopilotScoutSource>>([...PROJECT_AUTOPILOT_SCOUT_SOURCES.slice(0, 3)])
 
   useEffect(() => {
     if (!autopilotPolicy) return

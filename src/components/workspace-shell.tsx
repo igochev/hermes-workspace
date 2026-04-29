@@ -53,6 +53,40 @@ export const LIVE_SESSION_STALE_TIME_MS = 1_000
 export const POLLING_SESSION_STALE_TIME_MS = 10_000
 export const SESSION_POLL_INTERVAL_MS = 15_000
 
+export function getWorkspaceShellTabIndex(path: string): number {
+  if (path === '/dashboard') return 0
+  if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
+  if (path.startsWith('/files')) return 2
+  if (path.startsWith('/terminal')) return 3
+  if (path.startsWith('/executions')) return 4
+  if (path.startsWith('/jobs')) return 5
+  if (path.startsWith('/projects')) return 6
+  if (path.startsWith('/conductor')) return 7
+  if (path.startsWith('/operations')) return 8
+  if (path.startsWith('/memory')) return 9
+  if (path.startsWith('/skills')) return 10
+  if (path.startsWith('/profiles')) return 11
+  if (path.startsWith('/settings')) return 12
+  return -1
+}
+
+export function getMobilePageTitle(pathname: string): string | null {
+  if (pathname.startsWith('/terminal')) return 'Terminal'
+  if (pathname.startsWith('/files')) return 'Files'
+  if (pathname.startsWith('/executions')) return 'Executions'
+  if (pathname.startsWith('/jobs')) return 'Scheduled Jobs'
+  if (pathname.startsWith('/projects')) return 'Projects'
+  if (pathname.startsWith('/conductor')) return 'Conductor'
+  if (pathname.startsWith('/operations')) return 'Operations'
+  if (pathname.startsWith('/memory')) return 'Memory'
+  if (pathname.startsWith('/skills')) return 'Skills'
+  if (pathname.startsWith('/profiles')) return 'Profiles'
+  if (pathname.startsWith('/settings')) return 'Settings'
+  if (pathname.startsWith('/debug')) return 'Debug'
+  if (pathname.startsWith('/activity')) return 'Activity'
+  return null
+}
+
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -101,19 +135,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
   const getTabIndex = useCallback((path: string): number => {
-    if (path === '/dashboard') return 0
-    if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
-    if (path.startsWith('/files')) return 2
-    if (path.startsWith('/terminal')) return 3
-    if (path.startsWith('/jobs')) return 4
-    if (path.startsWith('/projects')) return 5
-    if (path.startsWith('/conductor')) return 6
-    if (path.startsWith('/operations')) return 7
-    if (path.startsWith('/memory')) return 8
-    if (path.startsWith('/skills')) return 9
-    if (path.startsWith('/profiles')) return 10
-    if (path.startsWith('/settings')) return 11
-    return -1
+    return getWorkspaceShellTabIndex(path)
   }, [])
 
   const isClient = typeof window !== 'undefined'
@@ -134,21 +156,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [])
 
   // Derive active session from URL
-  const mobilePageTitle = (() => {
-    if (pathname.startsWith('/terminal')) return 'Terminal'
-    if (pathname.startsWith('/files')) return 'Files'
-    if (pathname.startsWith('/jobs')) return 'Jobs'
-    if (pathname.startsWith('/projects')) return 'Projects'
-    if (pathname.startsWith('/conductor')) return 'Conductor'
-    if (pathname.startsWith('/operations')) return 'Operations'
-    if (pathname.startsWith('/memory')) return 'Memory'
-    if (pathname.startsWith('/skills')) return 'Skills'
-    if (pathname.startsWith('/profiles')) return 'Profiles'
-    if (pathname.startsWith('/settings')) return 'Settings'
-    if (pathname.startsWith('/debug')) return 'Debug'
-    if (pathname.startsWith('/activity')) return 'Activity'
-    return null
-  })()
+  const mobilePageTitle = getMobilePageTitle(pathname)
 
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'

@@ -207,6 +207,7 @@ export type WorkItemRunTimelineRow = {
   state: WorkItemRunTimelineState
   summary: string
   nextExpectedAction?: string
+  executionRunId?: string
   jobId?: string
   jobName?: string
   runId?: string

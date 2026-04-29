@@ -1,8 +1,16 @@
-# Hermes Workspace — Dream Mission Control Implementation Plan Index (Updated 2026-04-26)
+# Hermes Workspace — Dream Mission Control Implementation Plan Index (Updated 2026-04-29)
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md`
+> **Current active implementation plan:** None — Operator UX Clarity cycle is accepted for merge-readiness packaging. Last plan: `docs/plans/2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md`
+>
+> **Previous Operator UX Clarity plan:** `docs/plans/2026-04-29-hermes-workspace-p3-morning-review-overnight-digest-plan.md`
+>
+> **Previous Operator UX Clarity plan:** `docs/plans/2026-04-29-hermes-workspace-p2-dedicated-runs-executions-architecture-plan.md`
+>
+> **Previous Operator UX Clarity plan:** `docs/plans/2026-04-28-hermes-workspace-p1-work-item-cockpit-progressive-disclosure-plan.md`
+>
+> **Previous Operator UX Clarity plan:** `docs/plans/2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md`
 >
 > **Previous merge-readiness plan:** `docs/plans/2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md`
 >
@@ -78,14 +86,15 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 |---:|---|---|---|
 | 1 | `2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md` | Clean changed-file TypeScript/ESLint blockers, preserve green functional verification, and produce a final pre-commit review package for the completed Always-On slice | Shipped; committed and pushed at `d3026c4`; final package `dogfood-output/always-on-merge-readiness-final-latest.md` |
 
-### Operator UX Clarity Cycle — active
+### Operator UX Clarity Cycle — active hardening
 
 | Order | Plan | Purpose | Status |
 |---:|---|---|---|
-| P0 | `2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md` | Rename confusing scheduled-job/work-item execution labels and make `/jobs?jobId=...` a sane temporary execution-trace landing path | Active |
-| P1 | `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Work Item Cockpit progressive disclosure: Operator Summary first, raw IDs advanced/collapsed, evidence promoted | Queued; Main/CEO to create detailed plan after P0 review |
-| P2 | `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Dedicated Runs/Executions surface so work-item traces stop landing on Scheduled Jobs | Queued; requires architecture plan after P1 |
-| P3 | `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Morning Review / overnight operator digest | Queued; requires architecture plan after P2 |
+| P0 | `2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md` | Rename confusing scheduled-job/work-item execution labels and make `/jobs?jobId=...` a sane temporary execution-trace landing path | Shipped / Main-reviewed; P0 evidence recorded in current handoff |
+| P1 | `2026-04-28-hermes-workspace-p1-work-item-cockpit-progressive-disclosure-plan.md` | Work Item Cockpit progressive disclosure: Operator Summary first, raw IDs advanced/collapsed, evidence promoted | Shipped / Main-reviewed; P1 evidence recorded in current handoff |
+| P2 | `2026-04-29-hermes-workspace-p2-dedicated-runs-executions-architecture-plan.md` | Dedicated Executions surface so work-item traces stop landing on Scheduled Jobs | Shipped / Main-reviewed; P2 evidence recorded in current handoff |
+| P3 | `2026-04-29-hermes-workspace-p3-morning-review-overnight-digest-plan.md` | Morning Review / overnight operator digest | Functionally shipped / Main-reviewed; H1 hardening complete |
+| H1 | `2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md` | Terminology, lint, changed-file type cleanup, and final merge-readiness evidence for P0-P3 Operator UX changes | Complete / Main-reviewed; accepted for merge-readiness packaging. Final review: `dogfood-output/operator-ux-merge-readiness-main-review-latest.md` |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -100,7 +109,7 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 Current inspected baseline:
 
 - Branch: `my-hermes-workspace-dev`
-- Commit inspected for this update: `d3026c4`
+- Commit inspected for this update: `5afe861` plus uncommitted P0/P1/P2 implementation changes and P3 planning docs under review
 - Test command: `pnpm vitest run` or `pnpm test`
 - Build command: `pnpm build`
 - Service: `hermes-workspace.service`
@@ -183,8 +192,12 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md` | Active Operator UX Clarity plan | Builder executes now: scheduled-job terminology, work-item execution labels, `/jobs?jobId=...` deep-link behavior, live UI verification |
-| `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Current UX roadmap / queued P1-P3 source | Use for P1/P2/P3 context only; do not implement directly until Main creates each detailed plan |
+| `2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md` | Active Operator UX merge-readiness hardening plan | Builder executes now: remaining terminology cleanup, targeted lint cleanup, changed-file type blocker cleanup, and final evidence package before merge |
+| `2026-04-29-hermes-workspace-p3-morning-review-overnight-digest-plan.md` | Functionally shipped / Main-reviewed Operator UX Clarity P3 plan | Historical until hardening passes; Morning Review server view model, `/api/morning-review`, Dashboard overnight digest card, next-attention action, live Dashboard verification |
+| `2026-04-29-hermes-workspace-p2-dedicated-runs-executions-architecture-plan.md` | Shipped / Main-reviewed Operator UX Clarity P2 plan | Historical; dedicated `/executions` list/detail surfaces, legacy jobId trace fallback, Work Item trace links moved off Scheduled Jobs |
+| `2026-04-28-hermes-workspace-p1-work-item-cockpit-progressive-disclosure-plan.md` | Shipped / Main-reviewed Operator UX Clarity P1 plan | Historical; Work Item Cockpit / Operator Summary, evidence-first layout, collapsed advanced execution metadata, first-viewport live verification |
+| `2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md` | Shipped / Main-reviewed Operator UX Clarity P0 plan | Historical; scheduled-job terminology, work-item execution labels, `/jobs?jobId=...` temporary deep-link behavior |
+| `2026-04-27-hermes-workspace-gochevbot-inspired-ux-roadmap.md` | Current UX roadmap / P3 source | Context only; P3 now has its own detailed plan |
 | `2026-04-28-hermes-workspace-always-on-merge-readiness-plan.md` | Shipped stabilization plan | Historical; final package `dogfood-output/always-on-merge-readiness-final-latest.md`; committed at `d3026c4` |
 | `2026-04-28-hermes-workspace-always-on-operator-policy-plan.md` | Shipped owner-policy plan | Accepted for supervised always-on policy only; report `dogfood-output/always-on-policy-gauntlet-latest.md` |
 | `2026-04-28-hermes-workspace-single-lane-production-hardening-plan.md` | Shipped | Accepted supervised production daily use; report `dogfood-output/single-lane-production-hardening-latest.md` |
@@ -211,13 +224,16 @@ P0: Terminology cleanup + /jobs?jobId deep-link sanity
   └─ removes immediate scheduled-job / execution-trace confusion
 
 P1: Work Item Cockpit progressive disclosure
-  └─ depends on P0 vocabulary; reorganizes first viewport and advanced metadata
+  └─ shipped; first viewport now shows operator summary/evidence and collapses raw execution metadata
 
-P2: Dedicated Runs / Executions surface
-  └─ depends on P1 cockpit and requires an architecture decision for execution IDs/routes
+P2: Dedicated Executions surface
+  └─ shipped; replaces Scheduled Jobs as the work-item execution trace destination
 
 P3: Morning Review / overnight digest
-  └─ depends on trustworthy cockpit/execution evidence so digest is grounded in real lane state
+  └─ functionally shipped; Main review found merge-readiness hardening needed
+
+H1: Operator UX merge-readiness hardening
+  └─ complete / Main-reviewed; accepted for merge-readiness packaging
 ```
 
 ---
@@ -239,12 +255,10 @@ A plan is not shipped until:
 
 ## 9. Immediate next action
 
-Start with:
+No Builder implementation task is active. Operator UX Clarity P0/P1/P2/P3 plus H1 are accepted for merge-readiness packaging.
 
-`docs/plans/2026-04-28-hermes-workspace-p0-terminology-deeplink-sanity-plan.md`
+Next owner action: D3n13r/Main decides whether to commit/push the accepted package or asks Main/CEO to create the next product cycle plan.
 
-Builder should execute Task 1 first: add visible copy constants and baseline tests for terminology. Purpose: remove immediate UX confusion before deeper Work Item Cockpit and Runs/Executions surfaces.
+## 10. After owner packaging decision
 
-## 10. After P0 ships
-
-When P0 is complete, Builder should update the handoff with focused tests, full regression/build result, service/root smoke, browser/DOM evidence for `/jobs`, `/jobs?jobId=...`, Work Item detail, and Dashboard labels. Main/CEO should then review P0 and create the detailed P1 Work Item Cockpit progressive-disclosure plan. P2 and P3 remain queued architecture slices after P1.
+If D3n13r authorizes commit/push, package the accepted Operator UX changes with the suggested commit message in `docs/handoff/current-slice-status.md`. If D3n13r asks for the next product cycle, Main/CEO should create a new detailed plan and update this index + handoff before Builder resumes.

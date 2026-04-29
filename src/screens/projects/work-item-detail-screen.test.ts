@@ -11,6 +11,7 @@ import {
   getRunTimelineStateLabel,
   getWorkItemRunTimelineArtifactCopy,
   getWorkItemRunTimelineIdCopy,
+  getWorkItemRunTimelineLinkHref,
   getWorkItemRunTimelineLinkLabel,
   getWorkItemAcceptanceCriteriaProgress,
   getWorkItemAcceptanceCriteriaProgressLabel,
@@ -48,6 +49,19 @@ import {
   WORK_ITEM_OPERATOR_EVIDENCE_LABELS,
   WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS,
   WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE,
+  WORK_ITEM_EXECUTION_DETAIL_LABELS,
+  WORK_ITEM_EXECUTION_SUMMARY_TITLE,
+  WORK_ITEM_EXECUTION_TRACE_LABEL,
+  WORK_ITEM_LAST_EXECUTION_LABEL,
+  WORK_ITEM_EXECUTION_STATE_LABEL,
+  WORK_ITEM_EXECUTION_ERROR_LABEL,
+  WORK_ITEM_OPERATOR_SUMMARY_TITLE,
+  WORK_ITEM_EXECUTION_EVIDENCE_TITLE,
+  WORK_ITEM_ADVANCED_EXECUTION_METADATA_TITLE,
+  WORK_ITEM_ADVANCED_METADATA_DEFAULT_OPEN,
+  getWorkItemAdvancedExecutionMetadataRows,
+  getWorkItemCockpitSummary,
+  getWorkItemEvidenceSnapshot,
   getWorkItemAlwaysOnEvidenceRows,
   getWorkItemMergeEvidenceSummary,
 } from './work-item-detail-screen'
@@ -63,6 +77,170 @@ describe('work item detail screen theme classes', () => {
   it('uses muted theme text instead of hardcoded primary copy', () => {
     expect(WORK_ITEM_DETAIL_MUTED_TEXT_CLASS).toContain('text-[var(--theme-muted)]')
     expect(WORK_ITEM_DETAIL_MUTED_TEXT_CLASS).not.toContain('text-primary-600')
+  })
+
+  it('exposes execution vocabulary for former mission metadata labels', () => {
+    expect(WORK_ITEM_EXECUTION_SUMMARY_TITLE).toBe('Execution Summary')
+    expect(WORK_ITEM_EXECUTION_TRACE_LABEL).toBe('Execution Trace')
+    expect(WORK_ITEM_EXECUTION_STATE_LABEL).toBe('Execution State')
+    expect(WORK_ITEM_LAST_EXECUTION_LABEL).toBe('Last Execution')
+    expect(WORK_ITEM_EXECUTION_ERROR_LABEL).toBe('Execution Error')
+    expect(WORK_ITEM_EXECUTION_DETAIL_LABELS).toEqual({
+      missionId: 'Execution ID',
+      missionJobId: 'Scheduled Job ID',
+      missionJobName: 'Execution Job Name',
+      missionSessionKeyPrefix: 'Execution Session Prefix',
+      missionLink: 'Execution Trace',
+      missionState: 'Execution State',
+      missionLastRunAt: 'Last Execution',
+      missionLastError: 'Execution Error',
+    })
+    expect(WORK_ITEM_DETAIL_CLICKABILITY_AUDIT).toContainEqual(
+      expect.objectContaining({ surface: 'mission-control-summary', label: 'Execution Summary' }),
+    )
+    expect(WORK_ITEM_DETAIL_CLICKABILITY_AUDIT).toContainEqual(
+      expect.objectContaining({ surface: 'operator-summary-cockpit', label: 'Operator Summary' }),
+    )
+  })
+
+  it('builds operator cockpit summary rows from current phase, status, and next action', () => {
+    expect(WORK_ITEM_OPERATOR_SUMMARY_TITLE).toBe('Operator Summary')
+
+    const summary = getWorkItemCockpitSummary({
+      status: 'active',
+      phase: 'build',
+      missionState: 'running',
+      riskLevel: 'medium',
+      assignedProfile: 'builder',
+      acceptanceCriteriaProgress: { metCount: 2, totalCount: 4 },
+      approvals: [{ status: 'pending', phase: 'review' }],
+      baseBranch: 'main',
+      branchName: 'mission/p1-cockpit',
+      mergeTargetBranch: 'main',
+      mergeTestCommand: 'pnpm test',
+      mergeTestPassed: true,
+      prUrl: 'https://github.com/org/repo/pull/42',
+      planFilePath: 'docs/plans/p1.md',
+    })
+
+    expect(summary.rows).toEqual(
+      expect.arrayContaining([
+        { label: 'Status / phase', value: 'Active / Build' },
+        { label: 'Lane / execution', value: 'Agent session running' },
+        { label: 'Risk / profile', value: 'Medium risk · builder' },
+        { label: 'Branch snapshot', value: 'mission/p1-cockpit → main (base main)' },
+        { label: 'Latest evidence', value: 'passed: pnpm test' },
+        { label: 'Pull request', value: 'https://github.com/org/repo/pull/42' },
+        { label: 'Plan file', value: 'docs/plans/p1.md' },
+        { label: 'Attention', value: '1 approvals need attention — pending review approval.' },
+      ]),
+    )
+    expect(summary.recommendedNextAction).toBe(
+      'Build execution is in flight. Sync execution for fresh evidence or request review once implementation is ready.',
+    )
+  })
+
+  it('summarizes execution evidence by operator role from timeline rows', () => {
+    expect(WORK_ITEM_EXECUTION_EVIDENCE_TITLE).toBe('Execution Evidence')
+
+    const evidence = getWorkItemEvidenceSnapshot({
+      rows: [
+        {
+          phase: 'research',
+          phaseLabel: 'Research',
+          profileRole: 'planner',
+          profileName: 'planner',
+          state: 'succeeded',
+          summary: 'Plan ready.',
+          artifacts: ['docs/plans/p1.md'],
+        },
+        {
+          phase: 'build',
+          phaseLabel: 'Build',
+          profileRole: 'builder',
+          profileName: 'builder',
+          state: 'running',
+          summary: 'Builder running.',
+          jobId: 'job-1234567890',
+          sessionKeyPrefix: 'sess-deadbeef',
+          artifacts: ['src/screens/projects/work-item-detail-screen.tsx'],
+        },
+        {
+          phase: 'review',
+          phaseLabel: 'Review',
+          profileRole: 'reviewer',
+          state: 'waiting',
+          summary: 'Awaiting review.',
+          artifacts: [],
+        },
+      ],
+    })
+
+    expect(evidence).toEqual([
+      expect.objectContaining({ role: 'Planner', state: 'Succeeded', summary: 'Plan ready.' }),
+      expect.objectContaining({ role: 'Builder', state: 'Agent session running', evidence: 'Builder changed files: src/screens/projects/work-item-detail-screen.tsx' }),
+      expect.objectContaining({ role: 'Reviewer', state: 'Waiting for approval', evidence: 'No code evidence yet' }),
+      expect.objectContaining({ role: 'Merge-Healer', state: 'No job launched', summary: 'No merge-healer evidence yet.' }),
+    ])
+  })
+
+  it('keeps raw execution identifiers in advanced metadata rows while routing trace actions to Executions', () => {
+    expect(WORK_ITEM_ADVANCED_EXECUTION_METADATA_TITLE).toBe('Advanced execution metadata')
+    expect(WORK_ITEM_ADVANCED_METADATA_DEFAULT_OPEN).toBe(false)
+
+    expect(
+      getWorkItemAdvancedExecutionMetadataRows({
+        id: 'work-item-123',
+        missionId: 'execution-123',
+        missionJobId: 'job-456',
+        missionJobName: 'Build Hermes Workspace',
+        missionSessionKeyPrefix: 'sess-789',
+        missionLink: '/jobs?jobId=job-456',
+        missionState: 'running',
+        missionLastRunAt: '2026-04-28T12:00:00.000Z',
+        missionLastError: 'previous failure',
+        sessionKeys: ['sess-789abcdef', 'review-sess'],
+        createdAt: '2026-04-28T11:00:00.000Z',
+        updatedAt: '2026-04-28T12:30:00.000Z',
+      }),
+    ).toEqual([
+      { label: 'Execution ID', value: 'execution-123' },
+      { label: 'Scheduled Job ID', value: 'job-456' },
+      { label: 'Execution Job Name', value: 'Build Hermes Workspace' },
+      { label: 'Execution Session Prefix', value: 'sess-789' },
+      { label: 'Execution Trace', value: '/executions?jobId=job-456&workItemId=work-item-123' },
+      { label: 'Execution State', value: 'running' },
+      { label: 'Last Execution', value: '2026-04-28T12:00:00.000Z' },
+      { label: 'Execution Error', value: 'previous failure' },
+      { label: 'Launch Sessions', value: 'sess-789abcdef, review-sess' },
+      { label: 'Created', value: '2026-04-28T11:00:00.000Z' },
+      { label: 'Updated', value: '2026-04-28T12:30:00.000Z' },
+    ])
+  })
+
+  it('builds work-item run timeline links for Executions instead of Scheduled Jobs', () => {
+    expect(
+      getWorkItemRunTimelineLinkHref({
+        executionRunId: 'execution-run-1',
+        jobId: 'job-456',
+        sessionKey: 'session-123',
+      }),
+    ).toBe('/executions/execution-run-1')
+    expect(
+      getWorkItemRunTimelineLinkHref({
+        jobId: 'job-456',
+        sessionKey: 'session-123',
+        link: '/executions?jobId=job-456&workItemId=work-item-123',
+      }),
+    ).toBe('/executions?jobId=job-456&workItemId=work-item-123')
+    expect(
+      getWorkItemRunTimelineLinkHref({
+        jobId: 'job-456',
+        sessionKey: 'session-123',
+        link: '/jobs?jobId=job-456',
+      }),
+    ).toBe('/executions?jobId=job-456')
+    expect(getWorkItemRunTimelineLinkLabel({ jobId: 'job-456' })).toBe('Open execution trace')
   })
 
   it('defaults detail loading to execution-sync mode so evidence renders without manual sync', () => {
@@ -169,9 +347,9 @@ describe('work item detail screen theme classes', () => {
     ).toContain('Acceptance criteria progress: 1/3 met.')
     expect(
       getWorkItemOperatorGuidance({ status: 'active', phase: 'build', missionState: 'running' }),
-    ).toBe('Build mission is in flight. Sync execution for fresh evidence or request review once implementation is ready.')
+    ).toBe('Build execution is in flight. Sync execution for fresh evidence or request review once implementation is ready.')
     expect(getWorkItemOperatorGuidance({ status: 'blocked', phase: 'build', missionState: 'failed' })).toBe(
-      'This work item is blocked by a failed build mission. Capture fixes, run Resume Build, and relaunch Build to continue delivery.',
+      'This work item is blocked by a failed build execution. Capture fixes, run Resume Build, and relaunch Build to continue delivery.',
     )
     expect(
       getWorkItemOperatorGuidance({
@@ -181,7 +359,7 @@ describe('work item detail screen theme classes', () => {
       }),
     ).toContain('dependency')
     expect(getWorkItemExecutionSummary({ missionState: 'failed', latestRunStatus: 'failed' })).toBe(
-      'Mission failed — inspect the latest run, capture follow-up notes, run Resume Build, and relaunch Build when ready.',
+      'Execution failed — inspect the latest run, capture follow-up notes, run Resume Build, and relaunch Build when ready.',
     )
     expect(
       getWorkItemApprovalSummary([
@@ -433,8 +611,8 @@ describe('work item detail screen theme classes', () => {
       },
     ])
   })
-  it('exposes Runs / Agents cockpit labels for honest per-profile run states', () => {
-    expect(WORK_ITEM_RUNS_SECTION_TITLE).toBe('Runs / Agents')
+  it('exposes Execution Evidence cockpit labels for honest per-profile run states', () => {
+    expect(WORK_ITEM_RUNS_SECTION_TITLE).toBe('Execution Evidence')
     expect(getRunTimelineStateLabel('not_started')).toBe('No job launched')
     expect(getRunTimelineStateLabel('scheduled')).toBe('Job scheduled')
     expect(getRunTimelineStateLabel('running')).toBe('Agent session running')
@@ -547,11 +725,12 @@ describe('work item detail screen theme classes', () => {
       { surface: 'execution-sync', label: 'Sync Execution', kind: 'button', target: 'sync work item execution evidence' },
       { surface: 'execution-launch', label: 'Launch/Relaunch phase', kind: 'button', target: 'launch selected work item phase' },
       { surface: 'profile-preflight-card', label: WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE, kind: 'static', target: null },
+      { surface: 'operator-summary-cockpit', label: WORK_ITEM_OPERATOR_SUMMARY_TITLE, kind: 'static', target: null },
       { surface: 'runs-agents-cockpit', label: WORK_ITEM_RUNS_SECTION_TITLE, kind: 'link', target: 'job/session deep links from run timeline' },
       { surface: 'open-conductor', label: WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL, kind: 'link', target: '/conductor?mode=work-item&id=:workItemId' },
       { surface: 'recovery-actions', label: WORK_ITEM_RECOVERY_PANEL_TITLE, kind: 'button', target: 'execute selected recovery action' },
       { surface: 'approvals-attention-card', label: 'Approvals Attention', kind: 'static', target: null },
-      { surface: 'mission-control-summary', label: 'Mission Control Summary', kind: 'static', target: null },
+      { surface: 'mission-control-summary', label: WORK_ITEM_EXECUTION_SUMMARY_TITLE, kind: 'static', target: null },
     ])
   })
 })

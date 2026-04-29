@@ -19,6 +19,7 @@ import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
+import { Route as ExecutionsRouteImport } from './routes/executions'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as SplatRouteImport } from './routes/$'
@@ -31,6 +32,7 @@ import { Route as SettingsMcpRouteImport } from './routes/settings/mcp'
 import { Route as ProjectsAutopilotRouteImport } from './routes/projects/autopilot'
 import { Route as ProjectsApprovalsRouteImport } from './routes/projects/approvals'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
+import { Route as ExecutionsExecutionIdRouteImport } from './routes/executions/$executionId'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiWorkItemsRouteImport } from './routes/api/work-items'
@@ -55,6 +57,7 @@ import { Route as ApiProjectsRouteImport } from './routes/api/projects'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiMorningReviewRouteImport } from './routes/api/morning-review'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-providers'
@@ -65,6 +68,7 @@ import { Route as ApiHermesJobsRouteImport } from './routes/api/hermes-jobs'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiExecutionRunsRouteImport } from './routes/api/execution-runs'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
@@ -112,6 +116,7 @@ import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/c
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
 import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
+import { Route as ApiExecutionRunsExecutionRunIdRouteImport } from './routes/api/execution-runs.$executionRunId'
 import { Route as ApiAutopilotSuggestionsSuggestionIdRouteImport } from './routes/api/autopilot-suggestions.$suggestionId'
 import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
 import { Route as ApiWorkItemsSupervisorReconcileRouteImport } from './routes/api/work-items.supervisor.reconcile'
@@ -182,6 +187,11 @@ const FilesRoute = FilesRouteImport.update({
   path: '/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExecutionsRoute = ExecutionsRouteImport.update({
+  id: '/executions',
+  path: '/executions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -241,6 +251,11 @@ const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/$projectId',
   path: '/$projectId',
   getParentRoute: () => ProjectsRoute,
+} as any)
+const ExecutionsExecutionIdRoute = ExecutionsExecutionIdRouteImport.update({
+  id: '/$executionId',
+  path: '/$executionId',
+  getParentRoute: () => ExecutionsRoute,
 } as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
@@ -363,6 +378,11 @@ const ApiPathsRoute = ApiPathsRouteImport.update({
   path: '/api/paths',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMorningReviewRoute = ApiMorningReviewRouteImport.update({
+  id: '/api/morning-review',
+  path: '/api/morning-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
   id: '/api/models',
   path: '/api/models',
@@ -411,6 +431,11 @@ const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
 const ApiFilesRoute = ApiFilesRouteImport.update({
   id: '/api/files',
   path: '/api/files',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiExecutionRunsRoute = ApiExecutionRunsRouteImport.update({
+  id: '/api/execution-runs',
+  path: '/api/execution-runs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEventsRoute = ApiEventsRouteImport.update({
@@ -651,6 +676,12 @@ const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiHermesJobsRoute,
 } as any)
+const ApiExecutionRunsExecutionRunIdRoute =
+  ApiExecutionRunsExecutionRunIdRouteImport.update({
+    id: '/$executionRunId',
+    path: '/$executionRunId',
+    getParentRoute: () => ApiExecutionRunsRoute,
+  } as any)
 const ApiAutopilotSuggestionsSuggestionIdRoute =
   ApiAutopilotSuggestionsSuggestionIdRouteImport.update({
     id: '/$suggestionId',
@@ -771,6 +802,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/executions': typeof ExecutionsRouteWithChildren
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
@@ -792,6 +824,7 @@ export interface FileRoutesByFullPath {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/execution-runs': typeof ApiExecutionRunsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -802,6 +835,7 @@ export interface FileRoutesByFullPath {
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/morning-review': typeof ApiMorningReviewRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
@@ -826,6 +860,7 @@ export interface FileRoutesByFullPath {
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/executions/$executionId': typeof ExecutionsExecutionIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/approvals': typeof ProjectsApprovalsRoute
   '/projects/autopilot': typeof ProjectsAutopilotRoute
@@ -835,6 +870,7 @@ export interface FileRoutesByFullPath {
   '/projects/': typeof ProjectsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
+  '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -895,6 +931,7 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/executions': typeof ExecutionsRouteWithChildren
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
@@ -914,6 +951,7 @@ export interface FileRoutesByTo {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/execution-runs': typeof ApiExecutionRunsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -924,6 +962,7 @@ export interface FileRoutesByTo {
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/morning-review': typeof ApiMorningReviewRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
@@ -948,6 +987,7 @@ export interface FileRoutesByTo {
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/executions/$executionId': typeof ExecutionsExecutionIdRoute
   '/projects/approvals': typeof ProjectsApprovalsRoute
   '/projects/autopilot': typeof ProjectsAutopilotRoute
   '/settings/mcp': typeof SettingsMcpRoute
@@ -956,6 +996,7 @@ export interface FileRoutesByTo {
   '/projects': typeof ProjectsIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
+  '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -1017,6 +1058,7 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/executions': typeof ExecutionsRouteWithChildren
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
@@ -1038,6 +1080,7 @@ export interface FileRoutesById {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/execution-runs': typeof ApiExecutionRunsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -1048,6 +1091,7 @@ export interface FileRoutesById {
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/morning-review': typeof ApiMorningReviewRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
@@ -1072,6 +1116,7 @@ export interface FileRoutesById {
   '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/executions/$executionId': typeof ExecutionsExecutionIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/approvals': typeof ProjectsApprovalsRoute
   '/projects/autopilot': typeof ProjectsAutopilotRoute
@@ -1081,6 +1126,7 @@ export interface FileRoutesById {
   '/projects/': typeof ProjectsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
+  '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -1143,6 +1189,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/conductor'
     | '/dashboard'
+    | '/executions'
     | '/files'
     | '/jobs'
     | '/memory'
@@ -1164,6 +1211,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/execution-runs'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -1174,6 +1222,7 @@ export interface FileRouteTypes {
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
+    | '/api/morning-review'
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
@@ -1198,6 +1247,7 @@ export interface FileRouteTypes {
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
+    | '/executions/$executionId'
     | '/projects/$projectId'
     | '/projects/approvals'
     | '/projects/autopilot'
@@ -1207,6 +1257,7 @@ export interface FileRouteTypes {
     | '/projects/'
     | '/settings/'
     | '/api/autopilot-suggestions/$suggestionId'
+    | '/api/execution-runs/$executionRunId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1267,6 +1318,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/conductor'
     | '/dashboard'
+    | '/executions'
     | '/files'
     | '/jobs'
     | '/memory'
@@ -1286,6 +1338,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/execution-runs'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -1296,6 +1349,7 @@ export interface FileRouteTypes {
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
+    | '/api/morning-review'
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
@@ -1320,6 +1374,7 @@ export interface FileRouteTypes {
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
+    | '/executions/$executionId'
     | '/projects/approvals'
     | '/projects/autopilot'
     | '/settings/mcp'
@@ -1328,6 +1383,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/settings'
     | '/api/autopilot-suggestions/$suggestionId'
+    | '/api/execution-runs/$executionRunId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1388,6 +1444,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/conductor'
     | '/dashboard'
+    | '/executions'
     | '/files'
     | '/jobs'
     | '/memory'
@@ -1409,6 +1466,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/execution-runs'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -1419,6 +1477,7 @@ export interface FileRouteTypes {
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
+    | '/api/morning-review'
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
@@ -1443,6 +1502,7 @@ export interface FileRouteTypes {
     | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
+    | '/executions/$executionId'
     | '/projects/$projectId'
     | '/projects/approvals'
     | '/projects/autopilot'
@@ -1452,6 +1512,7 @@ export interface FileRouteTypes {
     | '/projects/'
     | '/settings/'
     | '/api/autopilot-suggestions/$suggestionId'
+    | '/api/execution-runs/$executionRunId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1513,6 +1574,7 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
+  ExecutionsRoute: typeof ExecutionsRouteWithChildren
   FilesRoute: typeof FilesRoute
   JobsRoute: typeof JobsRoute
   MemoryRoute: typeof MemoryRoute
@@ -1534,6 +1596,7 @@ export interface RootRouteChildren {
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiExecutionRunsRoute: typeof ApiExecutionRunsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
@@ -1544,6 +1607,7 @@ export interface RootRouteChildren {
   ApiLocalProvidersRoute: typeof ApiLocalProvidersRoute
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiMorningReviewRoute: typeof ApiMorningReviewRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
@@ -1663,6 +1727,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/executions': {
+      id: '/executions'
+      path: '/executions'
+      fullPath: '/executions'
+      preLoaderRoute: typeof ExecutionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -1746,6 +1817,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/projects/$projectId'
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
       parentRoute: typeof ProjectsRoute
+    }
+    '/executions/$executionId': {
+      id: '/executions/$executionId'
+      path: '/$executionId'
+      fullPath: '/executions/$executionId'
+      preLoaderRoute: typeof ExecutionsExecutionIdRouteImport
+      parentRoute: typeof ExecutionsRoute
     }
     '/chat/$sessionKey': {
       id: '/chat/$sessionKey'
@@ -1915,6 +1993,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPathsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/morning-review': {
+      id: '/api/morning-review'
+      path: '/api/morning-review'
+      fullPath: '/api/morning-review'
+      preLoaderRoute: typeof ApiMorningReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/models': {
       id: '/api/models'
       path: '/api/models'
@@ -1983,6 +2068,13 @@ declare module '@tanstack/react-router' {
       path: '/api/files'
       fullPath: '/api/files'
       preLoaderRoute: typeof ApiFilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/execution-runs': {
+      id: '/api/execution-runs'
+      path: '/api/execution-runs'
+      fullPath: '/api/execution-runs'
+      preLoaderRoute: typeof ApiExecutionRunsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/events': {
@@ -2314,6 +2406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesJobsJobIdRouteImport
       parentRoute: typeof ApiHermesJobsRoute
     }
+    '/api/execution-runs/$executionRunId': {
+      id: '/api/execution-runs/$executionRunId'
+      path: '/$executionRunId'
+      fullPath: '/api/execution-runs/$executionRunId'
+      preLoaderRoute: typeof ApiExecutionRunsExecutionRunIdRouteImport
+      parentRoute: typeof ApiExecutionRunsRoute
+    }
     '/api/autopilot-suggestions/$suggestionId': {
       id: '/api/autopilot-suggestions/$suggestionId'
       path: '/$suggestionId'
@@ -2450,6 +2549,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ExecutionsRouteChildren {
+  ExecutionsExecutionIdRoute: typeof ExecutionsExecutionIdRoute
+}
+
+const ExecutionsRouteChildren: ExecutionsRouteChildren = {
+  ExecutionsExecutionIdRoute: ExecutionsExecutionIdRoute,
+}
+
+const ExecutionsRouteWithChildren = ExecutionsRoute._addFileChildren(
+  ExecutionsRouteChildren,
+)
+
 interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdAutopilotRoute: typeof ProjectsProjectIdAutopilotRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
@@ -2529,6 +2640,17 @@ const ApiAutopilotSuggestionsRouteWithChildren =
   ApiAutopilotSuggestionsRoute._addFileChildren(
     ApiAutopilotSuggestionsRouteChildren,
   )
+
+interface ApiExecutionRunsRouteChildren {
+  ApiExecutionRunsExecutionRunIdRoute: typeof ApiExecutionRunsExecutionRunIdRoute
+}
+
+const ApiExecutionRunsRouteChildren: ApiExecutionRunsRouteChildren = {
+  ApiExecutionRunsExecutionRunIdRoute: ApiExecutionRunsExecutionRunIdRoute,
+}
+
+const ApiExecutionRunsRouteWithChildren =
+  ApiExecutionRunsRoute._addFileChildren(ApiExecutionRunsRouteChildren)
 
 interface ApiHermesJobsRouteChildren {
   ApiHermesJobsJobIdRoute: typeof ApiHermesJobsJobIdRoute
@@ -2714,6 +2836,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
+  ExecutionsRoute: ExecutionsRouteWithChildren,
   FilesRoute: FilesRoute,
   JobsRoute: JobsRoute,
   MemoryRoute: MemoryRoute,
@@ -2735,6 +2858,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiExecutionRunsRoute: ApiExecutionRunsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
@@ -2745,6 +2869,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLocalProvidersRoute: ApiLocalProvidersRoute,
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
   ApiModelsRoute: ApiModelsRoute,
+  ApiMorningReviewRoute: ApiMorningReviewRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,

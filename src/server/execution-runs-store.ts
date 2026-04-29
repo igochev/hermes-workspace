@@ -7,7 +7,13 @@ import type { WorkItemPhase } from './work-items-store'
 
 export type ExecutionEngine = 'conductor' | 'hermes-cron'
 export type ExecutionRunRole = 'mission' | 'review' | 'supervisor'
-export type ExecutionRunState = 'scheduled' | 'running' | 'succeeded' | 'failed' | 'stale' | 'unknown'
+export type ExecutionRunState =
+  | 'scheduled'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'stale'
+  | 'unknown'
 
 export type ExecutionRunRecord = {
   id: string
@@ -61,10 +67,14 @@ type UpsertExecutionRunInput = {
   artifactPaths?: Array<string>
 }
 
-type ListExecutionRunsFilters = {
+export type ListExecutionRunsFilters = {
   workItemId?: string
   projectId?: string
   role?: ExecutionRunRole
+  phase?: WorkItemPhase
+  state?: ExecutionRunState
+  jobId?: string
+  q?: string
 }
 
 const VALID_ROLES: Array<ExecutionRunRole> = ['mission', 'review', 'supervisor']
@@ -77,7 +87,12 @@ const VALID_STATES: Array<ExecutionRunState> = [
   'stale',
   'unknown',
 ]
-const VALID_PHASES: Array<WorkItemPhase> = ['research', 'build', 'review', 'deploy']
+const VALID_PHASES: Array<WorkItemPhase> = [
+  'research',
+  'build',
+  'review',
+  'deploy',
+]
 
 function getHermesHome(): string {
   return process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
@@ -92,7 +107,11 @@ function ensureExecutionRunsFile(): void {
   const filePath = getExecutionRunsFilePath()
   fs.mkdirSync(hermesHome, { recursive: true })
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify({ runs: [] }, null, 2) + '\n', 'utf-8')
+    fs.writeFileSync(
+      filePath,
+      JSON.stringify({ runs: [] }, null, 2) + '\n',
+      'utf-8',
+    )
   }
 }
 
@@ -116,7 +135,9 @@ function writeExecutionRunsFile(data: ExecutionRunsFile): void {
 }
 
 function asOptionalString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined
 }
 
 function uniqueStrings(values: unknown): Array<string> {
@@ -134,24 +155,35 @@ function uniqueStrings(values: unknown): Array<string> {
 }
 
 function normalizeRole(value: unknown): ExecutionRunRole {
-  return VALID_ROLES.includes(value as ExecutionRunRole) ? (value as ExecutionRunRole) : 'mission'
+  return VALID_ROLES.includes(value as ExecutionRunRole)
+    ? (value as ExecutionRunRole)
+    : 'mission'
 }
 
 function normalizeEngine(value: unknown): ExecutionEngine {
-  return VALID_ENGINES.includes(value as ExecutionEngine) ? (value as ExecutionEngine) : 'conductor'
+  return VALID_ENGINES.includes(value as ExecutionEngine)
+    ? (value as ExecutionEngine)
+    : 'conductor'
 }
 
 function normalizeState(value: unknown): ExecutionRunState {
-  return VALID_STATES.includes(value as ExecutionRunState) ? (value as ExecutionRunState) : 'unknown'
+  return VALID_STATES.includes(value as ExecutionRunState)
+    ? (value as ExecutionRunState)
+    : 'unknown'
 }
 
 function normalizePhase(value: unknown): WorkItemPhase | undefined {
-  return VALID_PHASES.includes(value as WorkItemPhase) ? (value as WorkItemPhase) : undefined
+  return VALID_PHASES.includes(value as WorkItemPhase)
+    ? (value as WorkItemPhase)
+    : undefined
 }
 
 function normalizeExecutionRun(
   run: Partial<ExecutionRunRecord> &
-    Pick<ExecutionRunRecord, 'id' | 'workItemId' | 'projectId' | 'jobId' | 'createdAt' | 'updatedAt'>,
+    Pick<
+      ExecutionRunRecord,
+      'id' | 'workItemId' | 'projectId' | 'jobId' | 'createdAt' | 'updatedAt'
+    >,
 ): ExecutionRunRecord {
   return {
     id: run.id,
@@ -179,7 +211,10 @@ function normalizeExecutionRun(
   }
 }
 
-function dedupeMatches(run: ExecutionRunRecord, input: UpsertExecutionRunInput): boolean {
+function dedupeMatches(
+  run: ExecutionRunRecord,
+  input: UpsertExecutionRunInput,
+): boolean {
   const inputRunId = asOptionalString(input.runId)
   if (run.workItemId !== input.workItemId.trim()) return false
   if (run.role !== input.role) return false
@@ -188,8 +223,12 @@ function dedupeMatches(run: ExecutionRunRecord, input: UpsertExecutionRunInput):
   return run.runId === undefined
 }
 
-export function listExecutionRuns(filters: ListExecutionRunsFilters = {}): Array<ExecutionRunRecord> {
-  let runs = readExecutionRunsFile().runs.map((run) => normalizeExecutionRun(run))
+export function listExecutionRuns(
+  filters: ListExecutionRunsFilters = {},
+): Array<ExecutionRunRecord> {
+  let runs = readExecutionRunsFile().runs.map((run) =>
+    normalizeExecutionRun(run),
+  )
 
   if (filters.workItemId) {
     runs = runs.filter((run) => run.workItemId === filters.workItemId)
@@ -200,6 +239,40 @@ export function listExecutionRuns(filters: ListExecutionRunsFilters = {}): Array
   if (filters.role) {
     runs = runs.filter((run) => run.role === filters.role)
   }
+  if (filters.phase) {
+    runs = runs.filter((run) => run.phase === filters.phase)
+  }
+  if (filters.state) {
+    runs = runs.filter((run) => run.state === filters.state)
+  }
+  if (filters.jobId) {
+    runs = runs.filter((run) => run.jobId === filters.jobId)
+  }
+  if (filters.q) {
+    const query = filters.q.toLowerCase()
+    runs = runs.filter((run) =>
+      [
+        run.id,
+        run.workItemId,
+        run.projectId,
+        run.role,
+        run.phase,
+        run.engine,
+        run.jobId,
+        run.jobName,
+        run.runId,
+        run.state,
+        run.sessionKey,
+        run.sessionKeyPrefix,
+        run.branchName,
+        run.prUrl,
+        run.error,
+        ...run.artifactPaths,
+      ]
+        .filter((value): value is string => typeof value === 'string')
+        .some((value) => value.toLowerCase().includes(query)),
+    )
+  }
 
   return runs.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
@@ -208,15 +281,23 @@ export function getExecutionRun(id: string): ExecutionRunRecord | null {
   return listExecutionRuns().find((run) => run.id === id) ?? null
 }
 
-export function upsertExecutionRun(input: UpsertExecutionRunInput): ExecutionRunRecord {
+export function upsertExecutionRun(
+  input: UpsertExecutionRunInput,
+): ExecutionRunRecord {
   const file = readExecutionRunsFile()
   const normalizedRuns = file.runs.map((run) => normalizeExecutionRun(run))
   const now = new Date().toISOString()
-  const existingIndex = normalizedRuns.findIndex((run) => dedupeMatches(run, input))
+  const existingIndex = normalizedRuns.findIndex((run) =>
+    dedupeMatches(run, input),
+  )
   const existing = existingIndex === -1 ? null : normalizedRuns[existingIndex]
 
   const run = normalizeExecutionRun({
-    id: existing?.id ?? (typeof input.id === 'string' && input.id.trim() ? input.id : randomUUID()),
+    id:
+      existing?.id ??
+      (typeof input.id === 'string' && input.id.trim()
+        ? input.id
+        : randomUUID()),
     workItemId: input.workItemId,
     projectId: input.projectId,
     role: input.role,
