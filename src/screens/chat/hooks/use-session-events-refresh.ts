@@ -58,7 +58,7 @@ export function useSessionEventsRefresh({
     }
 
     let closed = false
-    let invalidateTimer: ReturnType<typeof window.setTimeout> | null = null
+    let invalidateTimer: number | null = null
     const eventSource = new window.EventSource('/api/chat-events')
 
     const scheduleInvalidate = () => {

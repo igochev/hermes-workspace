@@ -3,6 +3,16 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route as SuggestionsRoute } from '../routes/api/autopilot-suggestions'
+import { Route as ConvertSuggestionRoute } from '../routes/api/autopilot-suggestions.$suggestionId.convert'
+import { createProject } from './projects-store'
+import {
+  createAutopilotSuggestion,
+  getAutopilotSuggestion,
+} from './autopilot-suggestions-store'
+import { getLatestPlanningDraftForWorkItem } from './planning-drafts-store'
+import { getWorkItem } from './work-items-store'
+
 const { launchConductorMission } = vi.hoisted(() => ({
   launchConductorMission: vi.fn(),
 }))
@@ -11,15 +21,26 @@ vi.mock('./conductor-launch', () => ({
   launchConductorMission,
 }))
 
-import { createProject } from './projects-store'
-import {
-  createAutopilotSuggestion,
-  getAutopilotSuggestion,
-} from './autopilot-suggestions-store'
-import { getLatestPlanningDraftForWorkItem } from './planning-drafts-store'
-import { getWorkItem } from './work-items-store'
-import { Route as SuggestionsRoute } from '../routes/api/autopilot-suggestions'
-import { Route as ConvertSuggestionRoute } from '../routes/api/autopilot-suggestions.$suggestionId.convert'
+type RouteHandler<
+  TParams extends Record<string, string> = Record<string, string>,
+> = (input: { request: Request; params?: TParams }) => Promise<Response>
+
+function getRouteHandler<
+  TMethod extends 'GET' | 'POST',
+  TParams extends Record<string, string> = Record<string, string>,
+>(route: unknown, method: TMethod): RouteHandler<TParams> {
+  return (
+    route as {
+      options: { server: { handlers: Record<TMethod, RouteHandler<TParams>> } }
+    }
+  ).options.server.handlers[method]
+}
+
+const postSuggestion = getRouteHandler(SuggestionsRoute, 'POST')
+const postConvertSuggestion = getRouteHandler<'POST', { suggestionId: string }>(
+  ConvertSuggestionRoute,
+  'POST',
+)
 
 describe('autopilot suggestions routes', () => {
   let tempHome: string
@@ -27,7 +48,9 @@ describe('autopilot suggestions routes', () => {
   let previousHermesPassword: string | undefined
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-autopilot-routes-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-autopilot-routes-'),
+    )
     previousHermesHome = process.env.HERMES_HOME
     previousHermesPassword = process.env.HERMES_PASSWORD
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
@@ -56,7 +79,7 @@ describe('autopilot suggestions routes', () => {
   it('returns 401 when unauthenticated', async () => {
     process.env.HERMES_PASSWORD = 'secret'
 
-    const response = await SuggestionsRoute.options.server.handlers.POST({
+    const response = await postSuggestion({
       request: new Request('http://127.0.0.1:3456/api/autopilot-suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,7 +95,7 @@ describe('autopilot suggestions routes', () => {
   })
 
   it('returns 404 when creating suggestion for missing project', async () => {
-    const response = await SuggestionsRoute.options.server.handlers.POST({
+    const response = await postSuggestion({
       request: new Request('http://127.0.0.1:3456/api/autopilot-suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,7 +116,7 @@ describe('autopilot suggestions routes', () => {
       repoPath: '/repos/mission-control',
     })
 
-    const response = await SuggestionsRoute.options.server.handlers.POST({
+    const response = await postSuggestion({
       request: new Request('http://127.0.0.1:3456/api/autopilot-suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,7 +132,12 @@ describe('autopilot suggestions routes', () => {
 
     expect(response.status).toBe(201)
     const body = (await response.json()) as {
-      suggestion: { id: string; projectId: string; title: string; status: string }
+      suggestion: {
+        id: string
+        projectId: string
+        title: string
+        status: string
+      }
     }
     expect(body.suggestion.projectId).toBe(project.id)
     expect(body.suggestion.title).toBe('Improve deployment rollback checklist')
@@ -135,7 +163,7 @@ describe('autopilot suggestions routes', () => {
       source: 'failing-tests-scout',
     })
 
-    const response = await ConvertSuggestionRoute.options.server.handlers.POST({
+    const response = await postConvertSuggestion({
       request: new Request(
         `http://127.0.0.1:3456/api/autopilot-suggestions/${suggestion.id}/convert`,
         {
@@ -156,10 +184,16 @@ describe('autopilot suggestions routes', () => {
     expect(workItem?.phase).toBe('research')
     expect(workItem?.priority).toBe('high')
     expect(workItem?.riskLevel).toBe('low')
-    expect(workItem?.labels).toEqual(expect.arrayContaining(['autopilot', 'ci', 'tests']))
-    expect(workItem?.acceptanceCriteria).toEqual(['Flaky test label + quarantine workflow'])
+    expect(workItem?.labels).toEqual(
+      expect.arrayContaining(['autopilot', 'ci', 'tests']),
+    )
+    expect(workItem?.acceptanceCriteria).toEqual([
+      'Flaky test label + quarantine workflow',
+    ])
     expect(workItem?.sourceSuggestionId).toBe(suggestion.id)
-    expect(workItem?.sourceSuggestionTitle).toBe('Add flaky test quarantine lane')
+    expect(workItem?.sourceSuggestionTitle).toBe(
+      'Add flaky test quarantine lane',
+    )
     expect(workItem?.sourceSuggestionEvidence).toEqual([
       'Vitest retries increasing',
       'CI rerun rate 18%',
@@ -180,7 +214,9 @@ describe('autopilot suggestions routes', () => {
       title: 'Plan flaky test quarantine lane',
       rationale: 'Flakes need planner-scoped implementation before coding',
       evidence: ['CI retry rate 18%'],
-      suggestedAcceptanceCriteria: ['Planner draft is requested before build starts'],
+      suggestedAcceptanceCriteria: [
+        'Planner draft is requested before build starts',
+      ],
       impact: 'medium',
       risk: 'low',
       effort: 'small',
@@ -188,7 +224,7 @@ describe('autopilot suggestions routes', () => {
       source: 'failing-tests-scout',
     })
 
-    const response = await ConvertSuggestionRoute.options.server.handlers.POST({
+    const response = await postConvertSuggestion({
       request: new Request(
         `http://127.0.0.1:3456/api/autopilot-suggestions/${suggestion.id}/convert`,
         {
@@ -203,7 +239,12 @@ describe('autopilot suggestions routes', () => {
     expect(response.status).toBe(201)
     const body = (await response.json()) as {
       workItem: { id: string; status: string; phase?: string }
-      planningDraft: { id: string; status: string; workItemId: string; plannerJobId?: string }
+      planningDraft: {
+        id: string
+        status: string
+        workItemId: string
+        plannerJobId?: string
+      }
     }
 
     expect(body.workItem.status).toBe('active')
@@ -217,10 +258,14 @@ describe('autopilot suggestions routes', () => {
     expect(launchConductorMission).toHaveBeenCalledWith(
       expect.objectContaining({
         deliver: 'local',
-        phaseProfiles: expect.objectContaining({ research: expect.any(String) }),
+        phaseProfiles: expect.objectContaining({
+          research: expect.any(String),
+        }),
       }),
     )
-    expect(getWorkItem(body.workItem.id)?.history.at(-1)?.note).toContain('Planner enrichment requested')
+    expect(getWorkItem(body.workItem.id)?.history.at(-1)?.note).toContain(
+      'Planner enrichment requested',
+    )
   })
 
   it('records policy-gated build intent without launching build when mode queues post-plan build', async () => {
@@ -242,7 +287,7 @@ describe('autopilot suggestions routes', () => {
       source: 'stale-docs-scout',
     })
 
-    const response = await ConvertSuggestionRoute.options.server.handlers.POST({
+    const response = await postConvertSuggestion({
       request: new Request(
         `http://127.0.0.1:3456/api/autopilot-suggestions/${suggestion.id}/convert`,
         {
@@ -256,7 +301,13 @@ describe('autopilot suggestions routes', () => {
 
     expect(response.status).toBe(201)
     const body = (await response.json()) as {
-      workItem: { id: string; autopilotBuildIntent?: string; missionId?: string; status: string; phase?: string }
+      workItem: {
+        id: string
+        autopilotBuildIntent?: string
+        missionId?: string
+        status: string
+        phase?: string
+      }
       planningDraft: { id: string; status: string; plannerJobId?: string }
     }
 
@@ -270,5 +321,4 @@ describe('autopilot suggestions routes', () => {
       'Autopilot build intent queued: launch build only after an operator accepts the planner draft.',
     )
   })
-
 })

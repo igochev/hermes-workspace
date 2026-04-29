@@ -3,6 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route as WorkItemSupervisorReconcileRoute } from '../routes/api/work-items.supervisor.reconcile'
+import { createProject } from './projects-store'
+import { createWorkItem, getWorkItem } from './work-items-store'
+
 const { syncWorkItemExecutionState } = vi.hoisted(() => ({
   syncWorkItemExecutionState: vi.fn(),
 }))
@@ -11,9 +15,25 @@ vi.mock('./work-item-execution', () => ({
   syncWorkItemExecutionState,
 }))
 
-import { createProject } from './projects-store'
-import { createWorkItem, getWorkItem } from './work-items-store'
-import { Route as WorkItemSupervisorReconcileRoute } from '../routes/api/work-items.supervisor.reconcile'
+type RouteHandler<
+  TParams extends Record<string, string> = Record<string, string>,
+> = (input: { request: Request; params?: TParams }) => Promise<Response>
+
+function getRouteHandler<
+  TMethod extends 'GET' | 'POST',
+  TParams extends Record<string, string> = Record<string, string>,
+>(route: unknown, method: TMethod): RouteHandler<TParams> {
+  return (
+    route as {
+      options: { server: { handlers: Record<TMethod, RouteHandler<TParams>> } }
+    }
+  ).options.server.handlers[method]
+}
+
+const postSupervisorReconcile = getRouteHandler(
+  WorkItemSupervisorReconcileRoute,
+  'POST',
+)
 
 describe('work item supervisor reconcile route', () => {
   let tempHome: string
@@ -21,7 +41,9 @@ describe('work item supervisor reconcile route', () => {
   let previousHermesPassword: string | undefined
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-supervisor-route-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-supervisor-route-'),
+    )
     previousHermesHome = process.env.HERMES_HOME
     previousHermesPassword = process.env.HERMES_PASSWORD
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
@@ -59,10 +81,13 @@ describe('work item supervisor reconcile route', () => {
   it('returns 401 when unauthenticated', async () => {
     process.env.HERMES_PASSWORD = 'secret'
 
-    const response = await WorkItemSupervisorReconcileRoute.options.server.handlers.POST({
-      request: new Request('http://127.0.0.1:3456/api/work-items/supervisor/reconcile', {
-        method: 'POST',
-      }),
+    const response = await postSupervisorReconcile({
+      request: new Request(
+        'http://127.0.0.1:3456/api/work-items/supervisor/reconcile',
+        {
+          method: 'POST',
+        },
+      ),
     })
 
     expect(response.status).toBe(401)
@@ -70,11 +95,13 @@ describe('work item supervisor reconcile route', () => {
 
   it('reconciles a single work item when workItemId is provided', async () => {
     const workItem = createSupervisorCandidate()
-    syncWorkItemExecutionState.mockImplementation(async (workItemId: string) => ({
-      workItem: getWorkItem(workItemId),
-    }))
+    syncWorkItemExecutionState.mockImplementation(
+      async (workItemId: string) => ({
+        workItem: getWorkItem(workItemId),
+      }),
+    )
 
-    const response = await WorkItemSupervisorReconcileRoute.options.server.handlers.POST({
+    const response = await postSupervisorReconcile({
       request: new Request(
         `http://127.0.0.1:3456/api/work-items/supervisor/reconcile?workItemId=${workItem.id}`,
         { method: 'POST' },
@@ -82,7 +109,10 @@ describe('work item supervisor reconcile route', () => {
     })
 
     expect(response.status).toBe(200)
-    const body = (await response.json()) as { checked: number; findings: Array<unknown> }
+    const body = (await response.json()) as {
+      checked: number
+      findings: Array<unknown>
+    }
     expect(body.checked).toBe(1)
     expect(body.findings).toEqual([])
     expect(syncWorkItemExecutionState).toHaveBeenCalledTimes(1)
@@ -99,18 +129,26 @@ describe('work item supervisor reconcile route', () => {
       priority: 'low',
       repoPathSnapshot: '/repos/mission-control',
     })
-    syncWorkItemExecutionState.mockImplementation(async (workItemId: string) => ({
-      workItem: getWorkItem(workItemId),
-    }))
-
-    const response = await WorkItemSupervisorReconcileRoute.options.server.handlers.POST({
-      request: new Request('http://127.0.0.1:3456/api/work-items/supervisor/reconcile', {
-        method: 'POST',
+    syncWorkItemExecutionState.mockImplementation(
+      async (workItemId: string) => ({
+        workItem: getWorkItem(workItemId),
       }),
+    )
+
+    const response = await postSupervisorReconcile({
+      request: new Request(
+        'http://127.0.0.1:3456/api/work-items/supervisor/reconcile',
+        {
+          method: 'POST',
+        },
+      ),
     })
 
     expect(response.status).toBe(200)
-    const body = (await response.json()) as { checked: number; findings: Array<unknown> }
+    const body = (await response.json()) as {
+      checked: number
+      findings: Array<unknown>
+    }
     expect(body.checked).toBe(1)
     expect(body.findings).toEqual([])
     expect(syncWorkItemExecutionState).toHaveBeenCalledWith(active.id)

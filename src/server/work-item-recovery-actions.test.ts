@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { recommendAlwaysOnRecoveryAction, recommendWorkItemRecoveryActions } from './work-item-recovery-actions'
+import {
+  recommendAlwaysOnRecoveryAction,
+  recommendWorkItemRecoveryActions,
+} from './work-item-recovery-actions'
 import type { AttentionQueueItem } from './attention-queue-store'
 import type { WorkItemRecord } from './work-items-store'
 
-function attention(overrides: Partial<AttentionQueueItem> = {}): AttentionQueueItem {
+function attention(
+  overrides: Partial<AttentionQueueItem> = {},
+): AttentionQueueItem {
   return {
     id: 'attention-1',
     dedupeKey: 'attention:1',
@@ -17,6 +22,7 @@ function attention(overrides: Partial<AttentionQueueItem> = {}): AttentionQueueI
     href: '/projects/project-1/work-items/work-1',
     source: 'derived',
     status: 'open',
+    recommendedActions: [],
     firstSeenAt: '2026-04-26T00:00:00.000Z',
     lastSeenAt: '2026-04-26T00:00:00.000Z',
     ...overrides,
@@ -54,7 +60,11 @@ describe('work item recovery action recommendations', () => {
   it('recommends relaunching the current phase for failed mission attention', () => {
     const actions = recommendWorkItemRecoveryActions({
       attentionItem: attention({ kind: 'mission_failed' }),
-      workItem: workItem({ status: 'active', phase: 'build', missionState: 'failed' }),
+      workItem: workItem({
+        status: 'active',
+        phase: 'build',
+        missionState: 'failed',
+      }),
     })
 
     expect(actions).toEqual(
@@ -66,26 +76,45 @@ describe('work item recovery action recommendations', () => {
           destructive: false,
         }),
         expect.objectContaining({ type: 'return_to_build' }),
-        expect.objectContaining({ type: 'cancel_work_item', destructive: true }),
+        expect.objectContaining({
+          type: 'cancel_work_item',
+          destructive: true,
+        }),
       ]),
     )
   })
 
   it('recommends returning to build or requesting review for failed review attention', () => {
     const actions = recommendWorkItemRecoveryActions({
-      attentionItem: attention({ kind: 'review_failed', title: 'Review needs attention' }),
-      workItem: workItem({ status: 'active', phase: 'review', reviewDecision: 'changes_requested' }),
+      attentionItem: attention({
+        kind: 'review_failed',
+        title: 'Review needs attention',
+      }),
+      workItem: workItem({
+        status: 'active',
+        phase: 'review',
+        reviewDecision: 'changes_requested',
+      }),
     })
 
     expect(actions.map((action) => action.type)).toContain('return_to_build')
     expect(actions.map((action) => action.type)).toContain('request_review')
-    expect(actions.find((action) => action.type === 'return_to_build')?.label).toBe('Return to build')
+    expect(
+      actions.find((action) => action.type === 'return_to_build')?.label,
+    ).toBe('Return to build')
   })
 
   it('keeps stale execution recovery explicit and auditable', () => {
     const actions = recommendWorkItemRecoveryActions({
-      attentionItem: attention({ kind: 'execution_stale', severity: 'warning' }),
-      workItem: workItem({ status: 'active', phase: 'research', missionState: 'running' }),
+      attentionItem: attention({
+        kind: 'execution_stale',
+        severity: 'warning',
+      }),
+      workItem: workItem({
+        status: 'active',
+        phase: 'research',
+        missionState: 'running',
+      }),
     })
 
     expect(actions[0]).toEqual(
@@ -102,7 +131,11 @@ describe('work item recovery action recommendations', () => {
   it('allows blocked work to return to build and resolve attention without relaunching automatically', () => {
     const actions = recommendWorkItemRecoveryActions({
       attentionItem: attention({ kind: 'blocked_work', severity: 'warning' }),
-      workItem: workItem({ status: 'blocked', phase: 'build', blockedReason: 'blocked_by_dependency' }),
+      workItem: workItem({
+        status: 'blocked',
+        phase: 'build',
+        blockedReason: 'blocked_by_dependency',
+      }),
     })
 
     expect(actions.map((action) => action.type)).toEqual([
@@ -135,7 +168,9 @@ describe('work item recovery action recommendations', () => {
         auditNote: expect.stringContaining('retry 1/2'),
       }),
     )
-    expect(action.description).toContain('cooldown until 2026-04-25T10:46:00.000Z')
+    expect(action.description).toContain(
+      'cooldown until 2026-04-25T10:46:00.000Z',
+    )
     expect(action.description).toContain('finding=mission_stale')
     expect(action.description).toContain('repo=safe')
   })

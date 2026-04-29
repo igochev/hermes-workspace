@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route as RoleCapacityPolicyRoute } from '../routes/api/role-capacity-policy'
 import { createProject } from './projects-store'
 import { createWorkItem } from './work-items-store'
 import {
@@ -11,7 +12,23 @@ import {
   listRoleCapacityRules,
   upsertRoleCapacityRule,
 } from './role-capacity-policy'
-import { Route as RoleCapacityPolicyRoute } from '../routes/api/role-capacity-policy'
+
+type RouteHandler<
+  TParams extends Record<string, string> = Record<string, string>,
+> = (input: { request: Request; params?: TParams }) => Promise<Response>
+
+function getRouteHandler<
+  TMethod extends 'GET' | 'POST',
+  TParams extends Record<string, string> = Record<string, string>,
+>(route: unknown, method: TMethod): RouteHandler<TParams> {
+  return (
+    route as {
+      options: { server: { handlers: Record<TMethod, RouteHandler<TParams>> } }
+    }
+  ).options.server.handlers[method]
+}
+
+const getRoleCapacityPolicy = getRouteHandler(RoleCapacityPolicyRoute, 'GET')
 
 describe('role capacity policy', () => {
   let tempHome: string
@@ -19,7 +36,9 @@ describe('role capacity policy', () => {
   let previousHermesPassword: string | undefined
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-role-capacity-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-role-capacity-'),
+    )
     previousHermesHome = process.env.HERMES_HOME
     previousHermesPassword = process.env.HERMES_PASSWORD
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
@@ -45,11 +64,18 @@ describe('role capacity policy', () => {
   it('normalizes invalid maxActive values to the role default', () => {
     upsertRoleCapacityRule({ role: 'build', maxActive: 0, enabled: true })
 
-    expect(listRoleCapacityRules()).toContainEqual({ role: 'build', maxActive: 2, enabled: true })
+    expect(listRoleCapacityRules()).toContainEqual({
+      role: 'build',
+      maxActive: 2,
+      enabled: true,
+    })
   })
 
   it('counts active build work for the evaluated role', () => {
-    const project = createProject({ name: 'Mission Control', repoPath: '/repos/mission-control' })
+    const project = createProject({
+      name: 'Mission Control',
+      repoPath: '/repos/mission-control',
+    })
     createWorkItem({
       projectId: project.id,
       title: 'Active build',
@@ -79,7 +105,13 @@ describe('role capacity policy', () => {
     })
 
     expect(evaluateLaunchCapacity({ role: 'build' })).toEqual(
-      expect.objectContaining({ role: 'build', activeCount: 1, maxActive: 2, allowed: true, advisoryOnly: true }),
+      expect.objectContaining({
+        role: 'build',
+        activeCount: 1,
+        maxActive: 2,
+        allowed: true,
+        advisoryOnly: true,
+      }),
     )
   })
 
@@ -92,7 +124,10 @@ describe('role capacity policy', () => {
   })
 
   it('returns an advisory over-capacity decision without blocking launch', () => {
-    const project = createProject({ name: 'Mission Control', repoPath: '/repos/mission-control' })
+    const project = createProject({
+      name: 'Mission Control',
+      repoPath: '/repos/mission-control',
+    })
     upsertRoleCapacityRule({ role: 'build', maxActive: 1, enabled: true })
     createWorkItem({
       projectId: project.id,
@@ -110,7 +145,8 @@ describe('role capacity policy', () => {
         maxActive: 1,
         allowed: false,
         advisoryOnly: true,
-        message: 'build capacity is at 1/1 active work items; launch may proceed with operator awareness.',
+        message:
+          'build capacity is at 1/1 active work items; launch may proceed with operator awareness.',
       }),
     )
   })
@@ -118,12 +154,16 @@ describe('role capacity policy', () => {
   it('returns policy from the API route', async () => {
     upsertRoleCapacityRule({ role: 'review', maxActive: 3, enabled: true })
 
-    const response = await RoleCapacityPolicyRoute.options.server.handlers.GET({
+    const response = await getRoleCapacityPolicy({
       request: new Request('http://127.0.0.1:3456/api/role-capacity-policy'),
     })
 
     expect(response.status).toBe(200)
     const body = (await response.json()) as { rules: Array<unknown> }
-    expect(body.rules).toContainEqual({ role: 'review', maxActive: 3, enabled: true })
+    expect(body.rules).toContainEqual({
+      role: 'review',
+      maxActive: 3,
+      enabled: true,
+    })
   })
 })

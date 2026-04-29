@@ -1,10 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { launchConductorMission, buildMissionLink, listProfiles } = vi.hoisted(() => ({
-  launchConductorMission: vi.fn(),
-  buildMissionLink: (jobId: string) => `/jobs?jobId=${encodeURIComponent(jobId)}`,
-  listProfiles: vi.fn(),
-}))
+import { createProject } from './projects-store'
+import { createWorkItem, getWorkItem } from './work-items-store'
+import {
+  buildPlannerReviewGoal,
+  buildWorkItemLaunchGoal,
+  launchWorkItemIntoConductor,
+} from './work-item-launch'
+import { listExecutionRuns } from './execution-runs-store'
+import { upsertRoleCapacityRule } from './role-capacity-policy'
+import { listAttentionQueueItems } from './attention-queue-store'
+
+const { launchConductorMission, buildMissionLink, listProfiles } = vi.hoisted(
+  () => ({
+    launchConductorMission: vi.fn(),
+    buildMissionLink: (jobId: string) =>
+      `/jobs?jobId=${encodeURIComponent(jobId)}`,
+    listProfiles: vi.fn(),
+  }),
+)
 
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
@@ -15,19 +29,67 @@ vi.mock('./profiles-browser', () => ({
   listProfiles,
 }))
 
-import { createProject } from './projects-store'
-import {
-  createWorkItem,
-  getWorkItem,
-} from './work-items-store'
-import {
-  buildPlannerReviewGoal,
-  buildWorkItemLaunchGoal,
-  launchWorkItemIntoConductor,
-} from './work-item-launch'
-import { listExecutionRuns } from './execution-runs-store'
-import { upsertRoleCapacityRule } from './role-capacity-policy'
-import { listAttentionQueueItems } from './attention-queue-store'
+function projectFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    runtimeProfiles: {},
+    autonomyLanePolicy: {
+      enabled: false,
+      mode: 'single_lane' as const,
+      isolation: 'branch' as const,
+      maxActiveWorkItems: 1 as const,
+      baseBranch: 'main',
+      branchPrefix: 'mission',
+      plannerTiming: 'on_lane_entry' as const,
+      blockedBehavior: 'park_and_continue_when_repo_clean' as const,
+      mergeHealerEnabled: true,
+      allowParallelWorktrees: false as const,
+      alwaysOn: {
+        enabled: false,
+        retry: {
+          enabled: false,
+          maxAttemptsPerPhase: 1,
+          cooldownMinutes: 30,
+          staleScheduledMinutes: 30,
+          staleRunningMinutes: 240,
+        },
+        notifications: {
+          enabled: true,
+          digestOnly: true,
+          notifyOn: [
+            'blocked',
+            'retry_exhausted',
+            'unsafe_repo',
+            'pr_ready',
+            'cleanup_recommended',
+          ] as Array<
+            | 'blocked'
+            | 'retry_exhausted'
+            | 'unsafe_repo'
+            | 'pr_ready'
+            | 'cleanup_recommended'
+          >,
+          minRepeatMinutes: 60,
+        },
+        prPublishing: {
+          enabled: false,
+          mode: 'manual' as const,
+          titlePrefix: '[Hermes Workspace]',
+          requireCleanRepo: true,
+          requirePassingMergeTests: true,
+        },
+        cleanup: {
+          enabled: false,
+          deleteMergedBranches: false,
+          retainMergedBranchDays: 30,
+          retainLaneStashes: true,
+          retainLaneStashDays: 30,
+          dryRun: true,
+        },
+      },
+    },
+    ...overrides,
+  }
+}
 
 describe('work-item-launch', () => {
   let tempHome: string
@@ -37,7 +99,9 @@ describe('work-item-launch', () => {
     const fs = await import('node:fs')
     const os = await import('node:os')
     const path = await import('node:path')
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-work-item-launch-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-work-item-launch-'),
+    )
     previousHermesHome = process.env.HERMES_HOME
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     launchConductorMission.mockReset()
@@ -79,6 +143,7 @@ describe('work-item-launch', () => {
           suggestionLimit: 5,
           scoutSources: [],
         },
+        ...projectFixture(),
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
       },
@@ -93,6 +158,7 @@ describe('work-item-launch', () => {
         riskLevel: 'medium',
         labels: [],
         repoPathSnapshot: '/repos/mission-control',
+        sourceSuggestionEvidence: [],
         sessionKeys: [],
         artifactPaths: [],
         acceptanceCriteria: ['Launch API exists', 'Mission metadata is stored'],
@@ -140,6 +206,7 @@ describe('work-item-launch', () => {
           suggestionLimit: 5,
           scoutSources: [],
         },
+        ...projectFixture(),
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
       },
@@ -147,13 +214,15 @@ describe('work-item-launch', () => {
         id: 'work-item-2',
         projectId: 'project-1',
         title: 'Turn operator idea into a plan',
-        description: 'Capture the idea, clarify it, and prepare a build-ready plan.',
+        description:
+          'Capture the idea, clarify it, and prepare a build-ready plan.',
         status: 'inbox',
         phase: 'research',
         priority: 'medium',
         riskLevel: 'medium',
         labels: [],
         repoPathSnapshot: '/repos/mission-control',
+        sourceSuggestionEvidence: [],
         sessionKeys: [],
         artifactPaths: [],
         acceptanceCriteria: [],
@@ -172,7 +241,9 @@ describe('work-item-launch', () => {
     expect(goal).toContain('Launch phase: research')
     expect(goal).toContain('Primary outcome for this research/planning launch:')
     expect(goal).toContain('draft acceptance criteria')
-    expect(goal).toContain('If acceptance criteria are incomplete, propose them explicitly')
+    expect(goal).toContain(
+      'If acceptance criteria are incomplete, propose them explicitly',
+    )
   })
 
   it('rejects build launch for unprepared rough ideas without planFilePath', async () => {
@@ -196,7 +267,9 @@ describe('work-item-launch', () => {
         phase: 'build',
         phaseProfiles: { build: 'builder' },
       }),
-    ).rejects.toThrow('Work item must be prepared by Planner before Builder launch')
+    ).rejects.toThrow(
+      'Work item must be prepared by Planner before Builder launch',
+    )
 
     expect(launchConductorMission).not.toHaveBeenCalled()
   })
@@ -296,12 +369,16 @@ describe('work-item-launch', () => {
     const workItem = createWorkItem({
       projectId: project.id,
       title: 'Wire Conductor launch from work item',
-      description: 'Connect work-item launch API to existing Conductor spawn flow.',
+      description:
+        'Connect work-item launch API to existing Conductor spawn flow.',
       status: 'ready',
       phase: 'build',
       priority: 'high',
       repoPathSnapshot: project.repoPath,
-      acceptanceCriteria: ['Launch creates a mission', 'Work item stores mission metadata'],
+      acceptanceCriteria: [
+        'Launch creates a mission',
+        'Work item stores mission metadata',
+      ],
     })
 
     launchConductorMission.mockResolvedValue({
@@ -324,7 +401,10 @@ describe('work-item-launch', () => {
     // Should pass both build and research profiles for two-phase
     expect(launchConductorMission).toHaveBeenCalledWith(
       expect.objectContaining({
-        phaseProfiles: expect.objectContaining({ build: 'builder', research: 'planner' }),
+        phaseProfiles: expect.objectContaining({
+          build: 'builder',
+          research: 'planner',
+        }),
       }),
     )
     // Goal should be two-phase format
@@ -506,7 +586,12 @@ describe('work-item-launch', () => {
       defaultBranch: 'main',
       phaseProfiles: { build: 'builder' },
     })
-    upsertRoleCapacityRule({ role: 'build', profile: 'builder', maxActive: 1, enabled: true })
+    upsertRoleCapacityRule({
+      role: 'build',
+      profile: 'builder',
+      maxActive: 1,
+      enabled: true,
+    })
     createWorkItem({
       projectId: project.id,
       title: 'Already active build',
@@ -548,7 +633,8 @@ describe('work-item-launch', () => {
       maxActive: 1,
       allowed: false,
       advisoryOnly: true,
-      message: 'build capacity is at 1/1 active work items; launch may proceed with operator awareness.',
+      message:
+        'build capacity is at 1/1 active work items; launch may proceed with operator awareness.',
     })
     expect(result.workItem.status).toBe('active')
   })
@@ -595,11 +681,15 @@ describe('work-item-launch', () => {
       status: 'missing',
       severity: 'warning',
     })
-    expect(result.profileReadinessReport.roles.find((role) => role.role === 'build')).toMatchObject({
+    expect(
+      result.profileReadinessReport.roles.find((role) => role.role === 'build'),
+    ).toMatchObject({
       mappedProfile: 'missing-specialist',
       status: 'missing',
     })
-    expect(result.workItem.history.at(-1)?.note).toContain('Profile readiness advisory:')
+    expect(result.workItem.history.at(-1)?.note).toContain(
+      'Profile readiness advisory:',
+    )
     expect(result.workItem.history.at(-1)?.note).toContain('missing-specialist')
     expect(launchConductorMission).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -618,7 +708,12 @@ describe('work-item-launch', () => {
       defaultBranch: 'main',
       phaseProfiles: { build: 'builder' },
     })
-    upsertRoleCapacityRule({ role: 'build', profile: 'builder', maxActive: 1, enabled: true })
+    upsertRoleCapacityRule({
+      role: 'build',
+      profile: 'builder',
+      maxActive: 1,
+      enabled: true,
+    })
     createWorkItem({
       projectId: project.id,
       title: 'Already active build',
@@ -654,7 +749,9 @@ describe('work-item-launch', () => {
 
     expect(result.launch.jobId).toBe('job-904')
     expect(result.capacityDecision.allowed).toBe(false)
-    expect(result.capacityDecision.message).toContain('build capacity is at 1/1')
+    expect(result.capacityDecision.message).toContain(
+      'build capacity is at 1/1',
+    )
     expect(result.profileReadinessDecision).toMatchObject({
       role: 'build',
       mappedProfile: 'builder',
@@ -662,8 +759,12 @@ describe('work-item-launch', () => {
       severity: 'unknown',
     })
     expect(result.profileReadinessReport.overallStatus).toBe('unknown')
-    expect(result.workItem.history.at(-1)?.note).toContain('Capacity advisory: build capacity is at 1/1')
-    expect(result.workItem.history.at(-1)?.note).toContain('Profile readiness advisory:')
+    expect(result.workItem.history.at(-1)?.note).toContain(
+      'Capacity advisory: build capacity is at 1/1',
+    )
+    expect(result.workItem.history.at(-1)?.note).toContain(
+      'Profile readiness advisory:',
+    )
     expect(result.workItem.status).toBe('active')
   })
 
@@ -674,7 +775,12 @@ describe('work-item-launch', () => {
       defaultBranch: 'main',
       phaseProfiles: { build: 'builder' },
     })
-    upsertRoleCapacityRule({ role: 'build', profile: 'builder', maxActive: 1, enabled: true })
+    upsertRoleCapacityRule({
+      role: 'build',
+      profile: 'builder',
+      maxActive: 1,
+      enabled: true,
+    })
     createWorkItem({
       projectId: project.id,
       title: 'Active build occupying capacity',
@@ -708,7 +814,9 @@ describe('work-item-launch', () => {
       phaseProfiles: { build: 'builder' },
     })
 
-    expect(result.workItem.history.at(-1)?.note).toContain('Capacity advisory: build capacity is at 1/1 active work items')
+    expect(result.workItem.history.at(-1)?.note).toContain(
+      'Capacity advisory: build capacity is at 1/1 active work items',
+    )
     expect(listAttentionQueueItems({ status: 'open' })).toContainEqual(
       expect.objectContaining({
         dedupeKey: `capacity:launch:${workItem.id}:build`,
@@ -740,6 +848,7 @@ describe('buildPlannerReviewGoal', () => {
         suggestionLimit: 5,
         scoutSources: [],
       },
+      ...projectFixture(),
       createdAt: '2026-04-25T12:00:00Z',
       updatedAt: '2026-04-25T12:00:00Z',
     }
@@ -755,9 +864,13 @@ describe('buildPlannerReviewGoal', () => {
       labels: [],
       repoPathSnapshot: '/repos/mission-control-demo',
       planFilePath: 'docs/plans/phase-3-plan.md',
+      sourceSuggestionEvidence: [],
       reviewQualityGateReasons: [],
       reviewMissingEvidence: [],
-      acceptanceCriteria: ['Feature A is implemented', 'Feature B passes all tests'],
+      acceptanceCriteria: [
+        'Feature A is implemented',
+        'Feature B passes all tests',
+      ],
       criteriaStatus: [
         { text: 'Feature A is implemented', met: true },
         { text: 'Feature B passes all tests', met: false },
@@ -783,9 +896,13 @@ describe('buildPlannerReviewGoal', () => {
     expect(goal).toContain('Operator note')
     expect(goal).toContain('REVIEW_DECISION_JSON')
     expect(goal).toContain('"confidence": "low | medium | high"')
-    expect(goal).toContain('"testResults": [{ "command": "...", "status": "passed|failed|not_run|unknown", "summary": "..." }]')
+    expect(goal).toContain(
+      '"testResults": [{ "command": "...", "status": "passed|failed|not_run|unknown", "summary": "..." }]',
+    )
     expect(goal).toContain('"blockers": []')
-    expect(goal).toContain('Missing structured output will require manual CEO review')
+    expect(goal).toContain(
+      'Missing structured output will require manual CEO review',
+    )
   })
 
   it('handles items with no plan file path or criteria gracefully', () => {
@@ -802,6 +919,7 @@ describe('buildPlannerReviewGoal', () => {
         suggestionLimit: 5,
         scoutSources: [],
       },
+      ...projectFixture(),
       createdAt: '2026-04-25T13:00:00Z',
       updatedAt: '2026-04-25T13:00:00Z',
     }
@@ -816,6 +934,7 @@ describe('buildPlannerReviewGoal', () => {
       riskLevel: 'low' as const,
       labels: [],
       repoPathSnapshot: '/repos/mission-control-demo',
+      sourceSuggestionEvidence: [],
       acceptanceCriteria: [],
       criteriaStatus: [],
       reviewQualityGateReasons: [],

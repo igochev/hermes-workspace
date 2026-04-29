@@ -4,13 +4,9 @@ import { join } from 'node:path'
 import {
   getLatestPlanningDraftForWorkItem,
   listPlanningDrafts,
-  type PlanningDraftRecord,
 } from './planning-drafts-store'
 import { getLatestHermesJobOutput } from './hermes-job-output'
-import {
-  listExecutionRuns,
-  type ExecutionRunRecord,
-} from './execution-runs-store'
+import { listExecutionRuns } from './execution-runs-store'
 import {
   buildWorkItemBranchName,
   ensureWorkItemBranch,
@@ -21,7 +17,6 @@ import { launchWorkItemIntoConductor } from './work-item-launch'
 import { syncWorkItemExecutionState } from './work-item-execution'
 import {
   applyPlanningDraftToWorkItem,
-  type PlannerLaneContext,
   prepareWorkItemWithPlanner,
   recordPlannerOutput,
 } from './work-item-planning'
@@ -32,8 +27,11 @@ import {
   getWorkItem,
   listWorkItems,
   updateWorkItem,
-  type WorkItemRecord,
 } from './work-items-store'
+import type { PlannerLaneContext } from './work-item-planning'
+import type { ExecutionRunRecord } from './execution-runs-store'
+import type { PlanningDraftRecord } from './planning-drafts-store'
+import type { WorkItemRecord } from './work-items-store'
 
 export type WorkItemOrchestratorAction =
   | 'launch_planner'
@@ -155,7 +153,9 @@ function readErrorMessage(error: unknown): string {
 }
 
 function mergeHealerTestCommand(): string | undefined {
-  return process.env.HERMES_WORKSPACE_MERGE_HEALER_TEST_COMMAND?.trim() || undefined
+  return (
+    process.env.HERMES_WORKSPACE_MERGE_HEALER_TEST_COMMAND?.trim() || undefined
+  )
 }
 
 type LaneBranchPreparationPurpose = 'Planner' | 'Builder'
@@ -169,7 +169,10 @@ type LaneBranchPreparationResult = {
 
 async function prepareLaneBranch(
   workItem: WorkItemRecord,
-  params: { purpose: LaneBranchPreparationPurpose; laneState: 'preparing' | 'building' },
+  params: {
+    purpose: LaneBranchPreparationPurpose
+    laneState: 'preparing' | 'building'
+  },
 ): Promise<LaneBranchPreparationResult> {
   const project = getProject(workItem.projectId)
   if (!project?.autonomyLanePolicy.enabled) return {}
@@ -232,7 +235,9 @@ async function prepareLaneBranchForBuilder(
   return { blockedEvent: prepared.blockedEvent }
 }
 
-function summarizePreviousCompletedWorkItem(workItem: WorkItemRecord): string | undefined {
+function summarizePreviousCompletedWorkItem(
+  workItem: WorkItemRecord,
+): string | undefined {
   const previous = listWorkItems()
     .filter(
       (candidate) =>
@@ -240,7 +245,8 @@ function summarizePreviousCompletedWorkItem(workItem: WorkItemRecord): string | 
         candidate.id !== workItem.id &&
         candidate.status === 'done',
     )
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .at(0)
 
   if (!previous) return undefined
 
@@ -250,9 +256,7 @@ function summarizePreviousCompletedWorkItem(workItem: WorkItemRecord): string | 
   return `${previous.title} (${previous.id.slice(0, 8)}) completed.${mergeSummary}`
 }
 
-async function prepareLaneEntryForPlanner(
-  workItem: WorkItemRecord,
-): Promise<{
+async function prepareLaneEntryForPlanner(workItem: WorkItemRecord): Promise<{
   request: { laneContext?: PlannerLaneContext }
   blockedEvent?: WorkItemOrchestratorEvent
 }> {
@@ -260,7 +264,8 @@ async function prepareLaneEntryForPlanner(
     purpose: 'Planner',
     laneState: 'preparing',
   })
-  if (prepared.blockedEvent) return { request: {}, blockedEvent: prepared.blockedEvent }
+  if (prepared.blockedEvent)
+    return { request: {}, blockedEvent: prepared.blockedEvent }
   if (!prepared.state || !prepared.baseBranch) return { request: {} }
 
   return {
@@ -298,11 +303,9 @@ function buildPlannerArtifactStructuredOutput(
       workItem.description || `Planner artifact is ready at ${planFilePath}.`,
     priority: workItem.priority,
     riskLevel: workItem.riskLevel,
-    labels: Array.from(
-      new Set([...(workItem.labels || []), 'planner-artifact-ready']),
-    ),
+    labels: Array.from(new Set([...workItem.labels, 'planner-artifact-ready'])),
     acceptanceCriteria:
-      workItem.acceptanceCriteria && workItem.acceptanceCriteria.length > 0
+      workItem.acceptanceCriteria.length > 0
         ? workItem.acceptanceCriteria
         : [
             'Builder completes the implementation described by the Planner artifact.',
@@ -394,8 +397,12 @@ export async function reconcileWorkItemAutonomy(
       workItem.id,
       laneEntry.request,
     )
-    const launchedDraft = prepared?.draft as PlanningDraftRecord | undefined
-    const launch = prepared?.launch as { jobId?: string } | undefined
+    const plannerLaunch = prepared as {
+      draft?: PlanningDraftRecord
+      launch?: { jobId?: string; runId?: string | null }
+    }
+    const launchedDraft = plannerLaunch.draft
+    const launch = plannerLaunch.launch
     return {
       workItemId,
       changed: true,
@@ -404,7 +411,7 @@ export async function reconcileWorkItemAutonomy(
           workItem,
           action: 'launch_planner',
           draftId: launchedDraft?.id,
-          jobId: launch?.jobId ?? launchedDraft?.plannerJobId,
+          jobId: launch?.jobId || launchedDraft?.plannerJobId,
           message: 'Auto-launched Planner for inbox research work item.',
         }),
       ],
@@ -529,7 +536,8 @@ export async function reconcileWorkItemAutonomy(
           workItem,
           action: 'launch_builder',
           jobId: launched.launch.jobId,
-          runId: launched.launch.runId,
+          runId:
+            (launched.launch as { runId?: string | null }).runId ?? undefined,
           statusAfter: launched.workItem.status,
           phaseAfter: launched.workItem.phase,
           message: 'Auto-launched Builder for ready build work item.',
@@ -540,9 +548,16 @@ export async function reconcileWorkItemAutonomy(
 
   const project = getProject(workItem.projectId)
   const reviewApproved = hasApprovedReviewEvidence(workItem)
-  const isReadyForMergeHealer = workItem.status === 'active' && (workItem.phase === 'deploy' || reviewApproved) && reviewApproved
+  const isReadyForMergeHealer =
+    workItem.status === 'active' &&
+    (workItem.phase === 'deploy' || reviewApproved) &&
+    reviewApproved
 
-  if (workItem.status === 'active' && workItem.missionJobId && !isReadyForMergeHealer) {
+  if (
+    workItem.status === 'active' &&
+    workItem.missionJobId &&
+    !isReadyForMergeHealer
+  ) {
     try {
       const synced = await syncWorkItemExecutionState(workItem.id)
       return {
@@ -591,7 +606,11 @@ export async function reconcileWorkItemAutonomy(
     workItem.mergeState !== 'merged'
 
   if (project && shouldRunMergeHealer) {
-    const repoPath = (workItem.repoPathSnapshot || project.repoPath || '').trim()
+    const repoPath = (
+      workItem.repoPathSnapshot ||
+      project.repoPath ||
+      ''
+    ).trim()
     if (!repoPath) {
       return {
         workItemId,
@@ -601,7 +620,8 @@ export async function reconcileWorkItemAutonomy(
           createEvent({
             workItem,
             action: 'run_merge_healer',
-            message: 'Merge-Healer blocked: enabled project lane has no repo path.',
+            message:
+              'Merge-Healer blocked: enabled project lane has no repo path.',
           }),
         ],
       }
@@ -613,7 +633,10 @@ export async function reconcileWorkItemAutonomy(
       testCommand: mergeHealerTestCommand(),
     })
     const mergeUpdates = {
-      laneState: merge.mergeState === 'merged' ? ('done' as const) : ('blocked' as const),
+      laneState:
+        merge.mergeState === 'merged'
+          ? ('done' as const)
+          : ('blocked' as const),
       mergeState: merge.mergeState,
       mergeCommit: merge.mergeCommit,
       mergeBaseCommit: merge.mergeBaseCommit ?? workItem.mergeBaseCommit,
@@ -622,7 +645,9 @@ export async function reconcileWorkItemAutonomy(
       mergeTestCommand: merge.mergeTestCommand,
       mergeTestPassed: merge.mergeTestPassed,
       mergeArtifactPaths: merge.mergeArtifactPaths,
-      artifactPaths: Array.from(new Set([...workItem.artifactPaths, ...merge.mergeArtifactPaths])),
+      artifactPaths: Array.from(
+        new Set([...workItem.artifactPaths, ...merge.mergeArtifactPaths]),
+      ),
     }
 
     if (merge.mergeState === 'merged') {
@@ -653,7 +678,8 @@ export async function reconcileWorkItemAutonomy(
       }
     }
 
-    const blockedReason = merge.mergeBlockedReason ?? 'Merge-Healer blocked autonomous completion.'
+    const blockedReason =
+      merge.mergeBlockedReason ?? 'Merge-Healer blocked autonomous completion.'
     const updated = updateWorkItem(workItem.id, {
       ...mergeUpdates,
       status: 'blocked',

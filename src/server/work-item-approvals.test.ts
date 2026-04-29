@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createProject } from './projects-store'
 import { createWorkItem, getWorkItem } from './work-items-store'
@@ -12,13 +12,23 @@ import {
   requestWorkItemReviewApproval,
   resolveWorkItemApprovalDecision,
 } from './work-item-approvals'
+import type { WorkItemApprovalRecord } from './work-item-approvals'
+
+function expectApproval(
+  approval: WorkItemApprovalRecord | null,
+): WorkItemApprovalRecord {
+  expect(approval).not.toBeNull()
+  return approval as WorkItemApprovalRecord
+}
 
 describe('work-item-approvals', () => {
   let tempHome: string
   let previousHermesHome: string | undefined
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-work-item-approvals-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-work-item-approvals-'),
+    )
     previousHermesHome = process.env.HERMES_HOME
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
   })
@@ -43,14 +53,18 @@ describe('work-item-approvals', () => {
       repoPathSnapshot: project.repoPath,
     })
 
-    const first = requestWorkItemReviewApproval(workItem.id, {
-      requestedBy: 'operator',
-      notes: 'Ready for human review',
-    })
-    const second = requestWorkItemReviewApproval(workItem.id, {
-      requestedBy: 'operator',
-      notes: 'Should reuse pending approval',
-    })
+    const first = expectApproval(
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'operator',
+        notes: 'Ready for human review',
+      }),
+    )
+    const second = expectApproval(
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'operator',
+        notes: 'Should reuse pending approval',
+      }),
+    )
 
     expect(first.id).toBe(second.id)
     expect(first.status).toBe('pending')
@@ -72,9 +86,11 @@ describe('work-item-approvals', () => {
       priority: 'high',
       repoPathSnapshot: project.repoPath,
     })
-    const approval = requestWorkItemReviewApproval(workItem.id, {
-      requestedBy: 'operator',
-    })
+    const approval = expectApproval(
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'operator',
+      }),
+    )
 
     const result = resolveWorkItemApprovalDecision(approval.id, {
       decision: 'approved',
@@ -92,7 +108,10 @@ describe('work-item-approvals', () => {
       phase: 'deploy',
       note: 'Review approved; advanced work item to deploy.',
     })
-    expect(getWorkItem(workItem.id)).toMatchObject({ status: 'active', phase: 'deploy' })
+    expect(getWorkItem(workItem.id)).toMatchObject({
+      status: 'active',
+      phase: 'deploy',
+    })
   })
 
   it('requests changes and returns the work item to build', () => {
@@ -108,9 +127,11 @@ describe('work-item-approvals', () => {
       priority: 'high',
       repoPathSnapshot: project.repoPath,
     })
-    const approval = requestWorkItemReviewApproval(workItem.id, {
-      requestedBy: 'operator',
-    })
+    const approval = expectApproval(
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'operator',
+      }),
+    )
 
     const result = resolveWorkItemApprovalDecision(approval.id, {
       decision: 'changes_requested',
@@ -142,11 +163,13 @@ describe('work-item-approvals', () => {
       priority: 'high',
       repoPathSnapshot: project.repoPath,
     })
-    const approval = requestWorkItemApproval(workItem.id, {
-      requestedBy: 'operator',
-      notes: 'Ready for deploy approval',
-      phase: 'deploy',
-    })
+    const approval = expectApproval(
+      requestWorkItemApproval(workItem.id, {
+        requestedBy: 'operator',
+        notes: 'Ready for deploy approval',
+        phase: 'deploy',
+      }),
+    )
 
     const result = resolveWorkItemApprovalDecision(approval.id, {
       decision: 'approved',
@@ -178,11 +201,13 @@ describe('work-item-approvals', () => {
       priority: 'high',
       repoPathSnapshot: project.repoPath,
     })
-    const approval = requestWorkItemApproval(workItem.id, {
-      requestedBy: 'operator',
-      notes: 'Ready for deploy approval',
-      phase: 'deploy',
-    })
+    const approval = expectApproval(
+      requestWorkItemApproval(workItem.id, {
+        requestedBy: 'operator',
+        notes: 'Ready for deploy approval',
+        phase: 'deploy',
+      }),
+    )
 
     const result = resolveWorkItemApprovalDecision(approval.id, {
       decision: 'rejected',
@@ -215,11 +240,13 @@ describe('work-item-approvals', () => {
       priority: 'high',
       repoPathSnapshot: project.repoPath,
     })
-    const approval = requestWorkItemApproval(workItem.id, {
-      requestedBy: 'operator',
-      notes: 'Ready for deploy approval',
-      phase: 'deploy',
-    })
+    const approval = expectApproval(
+      requestWorkItemApproval(workItem.id, {
+        requestedBy: 'operator',
+        notes: 'Ready for deploy approval',
+        phase: 'deploy',
+      }),
+    )
 
     const result = resolveWorkItemApprovalDecision(approval.id, {
       decision: 'changes_requested',
@@ -261,8 +288,12 @@ describe('work-item-approvals', () => {
       repoPathSnapshot: project.repoPath,
     })
 
-    const firstApproval = requestWorkItemReviewApproval(older.id, { requestedBy: 'operator' })
-    const secondApproval = requestWorkItemReviewApproval(newer.id, { requestedBy: 'operator' })
+    const firstApproval = expectApproval(
+      requestWorkItemReviewApproval(older.id, { requestedBy: 'operator' }),
+    )
+    const secondApproval = expectApproval(
+      requestWorkItemReviewApproval(newer.id, { requestedBy: 'operator' }),
+    )
     resolveWorkItemApprovalDecision(firstApproval.id, {
       decision: 'approved',
       resolvedBy: 'D3n13r',
@@ -302,14 +333,18 @@ describe('work-item-approvals', () => {
       repoPathSnapshot: project.repoPath,
     })
 
-    const approval = requestWorkItemReviewApproval(workItem.id, {
-      requestedBy: 'operator',
-      notes: 'Safe to auto-approve',
-    })
+    const approval = expectApproval(
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'operator',
+        notes: 'Safe to auto-approve',
+      }),
+    )
 
     expect(approval.status).toBe('approved')
     expect(approval.resolvedBy).toBe('policy')
-    expect(approval.resolutionNotes).toBe('Auto-approved by project review policy.')
+    expect(approval.resolutionNotes).toBe(
+      'Auto-approved by project review policy.',
+    )
     expect(getWorkItem(workItem.id)).toMatchObject({
       status: 'active',
       phase: 'deploy',
@@ -341,14 +376,18 @@ describe('work-item-approvals', () => {
       repoPathSnapshot: project.repoPath,
     })
 
-    const approval = requestWorkItemReviewApproval(workItem.id, {
-      requestedBy: 'operator',
-      notes: 'Low-risk review',
-    })
+    const approval = expectApproval(
+      requestWorkItemReviewApproval(workItem.id, {
+        requestedBy: 'operator',
+        notes: 'Low-risk review',
+      }),
+    )
 
     expect(approval.status).toBe('approved')
     expect(approval.resolvedBy).toBe('policy')
-    expect(approval.resolutionNotes).toBe('Auto-approved by project review policy.')
+    expect(approval.resolutionNotes).toBe(
+      'Auto-approved by project review policy.',
+    )
     expect(getWorkItem(workItem.id)).toMatchObject({
       status: 'active',
       phase: 'deploy',

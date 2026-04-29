@@ -1,32 +1,54 @@
-import { getProject, type ProjectRecord } from './projects-store'
+import { getProject } from './projects-store'
 import {
   appendWorkItemHistoryEntry,
   getWorkItem,
   updateWorkItem,
-  type WorkItemMissionState,
-  type WorkItemPhase,
-  type WorkItemRecord,
 } from './work-items-store'
-import { type CronRun } from '../components/cron-manager/cron-types'
-import { requestWorkItemReviewApproval, resolveWorkItemApprovalDecision } from './work-item-approvals'
-import { getHermesJobById, getHermesJobRuns, listHermesJobs, type HermesJobInfo } from './hermes-jobs'
+import {
+  requestWorkItemReviewApproval,
+  resolveWorkItemApprovalDecision,
+} from './work-item-approvals'
+import {
+  getHermesJobById,
+  getHermesJobRuns,
+  listHermesJobs,
+} from './hermes-jobs'
 import { buildMissionLink, launchConductorMission } from './conductor-launch'
 import { launchPlannerReview } from './work-item-launch'
-import { upsertExecutionRun, type ExecutionRunState } from './execution-runs-store'
+import { upsertExecutionRun } from './execution-runs-store'
 import {
   getLatestHermesJobOutput,
   parseBuilderEvidenceOutput,
-  type BuilderStructuredEvidence,
-  type HermesJobOutputSnapshot,
 } from './hermes-job-output'
 import {
-  parsePlannerReviewDecision,
   evaluateReviewQualityGate,
-  type ReviewDecisionParseResult,
-  type ReviewQualityGateResult,
+  parsePlannerReviewDecision,
+} from './work-item-review-decision'
+import type { ExecutionRunState } from './execution-runs-store'
+import type {
+  BuilderStructuredEvidence,
+  HermesJobOutputSnapshot,
+} from './hermes-job-output'
+import type {
+  WorkItemMissionState,
+  WorkItemPhase,
+  WorkItemRecord,
+} from './work-items-store'
+import type { ProjectRecord } from './projects-store'
+import type { HermesJobInfo } from './hermes-jobs'
+import type { CronRun } from '../components/cron-manager/cron-types'
+import type {
+  ReviewDecisionParseResult,
+  ReviewQualityGateResult,
 } from './work-item-review-decision'
 
-export type SyncedExecutionState = 'scheduled' | 'running' | 'stale' | 'succeeded' | 'failed' | 'unknown'
+export type SyncedExecutionState =
+  | 'scheduled'
+  | 'running'
+  | 'stale'
+  | 'succeeded'
+  | 'failed'
+  | 'unknown'
 
 export type WorkItemExecutionSyncResult = {
   workItem: WorkItemRecord
@@ -112,11 +134,17 @@ function extractRunOutputText(run: CronRun | null): string {
   const outputRecord = asRecord(output)
   if (!outputRecord) return ''
   return Object.values(outputRecord)
-    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .filter(
+      (value): value is string =>
+        typeof value === 'string' && value.trim().length > 0,
+    )
     .join('\n')
 }
 
-function isStaleHeartbeat(job: HermesJobInfo | null, latestRun: CronRun | null): boolean {
+function isStaleHeartbeat(
+  job: HermesJobInfo | null,
+  latestRun: CronRun | null,
+): boolean {
   if (!job) return false
   const observedAt =
     readOptionalString(latestRun?.finishedAt) ||
@@ -134,15 +162,24 @@ function evaluateBuilderEvidence(params: {
   state: SyncedExecutionState
   latestRun: CronRun | null
   fallbackOutputText?: string
-}): { state: SyncedExecutionState; evidence?: BuilderStructuredEvidence; error?: string } {
+}): {
+  state: SyncedExecutionState
+  evidence?: BuilderStructuredEvidence
+  error?: string
+} {
   if (!params.project.autonomyLanePolicy.enabled) return { state: params.state }
   if (params.workItem.phase !== 'build') return { state: params.state }
-  if (params.state !== 'succeeded' && params.state !== 'failed') return { state: params.state }
+  if (params.state !== 'succeeded' && params.state !== 'failed')
+    return { state: params.state }
 
-  const outputText = params.fallbackOutputText?.trim() || extractRunOutputText(params.latestRun)
+  const outputText =
+    params.fallbackOutputText?.trim() || extractRunOutputText(params.latestRun)
   if (!outputText.trim()) {
     return params.state === 'succeeded'
-      ? { state: 'failed', error: 'Builder completed without structured build evidence.' }
+      ? {
+          state: 'failed',
+          error: 'Builder completed without structured build evidence.',
+        }
       : { state: params.state }
   }
 
@@ -150,14 +187,24 @@ function evaluateBuilderEvidence(params: {
   if (!parsed.ok) {
     return {
       state: 'failed',
-      error: 'error' in parsed ? parsed.error : 'Builder evidence failed validation.',
+      error:
+        'error' in parsed
+          ? parsed.error
+          : 'Builder evidence failed validation.',
     }
   }
   if (parsed.evidence.workItemId !== params.workItem.id) {
-    return { state: 'failed', error: 'Builder evidence workItemId did not match this work item.' }
+    return {
+      state: 'failed',
+      error: 'Builder evidence workItemId did not match this work item.',
+    }
   }
   if (parsed.evidence.status === 'failed') {
-    return { state: 'failed', evidence: parsed.evidence, error: parsed.evidence.testSummary }
+    return {
+      state: 'failed',
+      evidence: parsed.evidence,
+      error: parsed.evidence.testSummary,
+    }
   }
   return { state: 'succeeded', evidence: parsed.evidence }
 }
@@ -167,18 +214,27 @@ function deriveExecutionState(job: HermesJobInfo | null): SyncedExecutionState {
   if (job.last_status === 'ok') return 'succeeded'
   if (job.last_status === 'error') return 'failed'
   if (job.state === 'running' || job.state === 'active') return 'running'
-  if (job.state === 'scheduled' || job.state === 'queued' || job.state === 'pending') return 'scheduled'
+  if (
+    job.state === 'scheduled' ||
+    job.state === 'queued' ||
+    job.state === 'pending'
+  )
+    return 'scheduled'
   return 'unknown'
 }
 
-function deriveRunState(jobState: SyncedExecutionState, run: CronRun | null): ExecutionRunState {
+function deriveRunState(
+  jobState: SyncedExecutionState,
+  run: CronRun | null,
+): ExecutionRunState {
   if (jobState === 'stale') return 'stale'
   if (!run) return jobState
   const status = readOptionalString(run.status)
   if (status === 'success' || status === 'ok') return 'succeeded'
   if (status === 'error' || status === 'failed') return 'failed'
   if (status === 'running') return 'running'
-  if (status === 'queued' || status === 'pending' || status === 'scheduled') return 'scheduled'
+  if (status === 'queued' || status === 'pending' || status === 'scheduled')
+    return 'scheduled'
   return jobState
 }
 
@@ -190,7 +246,11 @@ function recordExecutionRun(params: {
   job: HermesJobInfo
   run: CronRun | null
   sessionKeyPrefix?: string
-  evidence?: { branchName?: string; prUrl?: string; artifactPaths?: Array<string> }
+  evidence?: {
+    branchName?: string
+    prUrl?: string
+    artifactPaths?: Array<string>
+  }
 }): void {
   const run = params.run
   upsertExecutionRun({
@@ -204,22 +264,38 @@ function recordExecutionRun(params: {
     runId: readOptionalString(run?.id),
     state: deriveRunState(params.state, run),
     sessionKey: readOptionalString(run?.chatSessionKey),
-    sessionKeyPrefix: params.sessionKeyPrefix ?? (params.job.id ? `cron_${params.job.id}_` : undefined),
+    sessionKeyPrefix:
+      params.sessionKeyPrefix ??
+      (params.job.id ? `cron_${params.job.id}_` : undefined),
     startedAt: readOptionalString(run?.startedAt),
     finishedAt: readOptionalString(run?.finishedAt),
     lastRunAt: readOptionalString(params.job.last_run_at),
-    error: params.state === 'failed' ? readOptionalString(params.job.last_error) || readOptionalString((run as CronRun & { error?: unknown } | null)?.error) : undefined,
+    error:
+      params.state === 'failed'
+        ? readOptionalString(params.job.last_error) ||
+          readOptionalString(
+            (run as (CronRun & { error?: unknown }) | null)?.error,
+          )
+        : undefined,
     branchName: params.evidence?.branchName,
     prUrl: params.evidence?.prUrl,
     artifactPaths: params.evidence?.artifactPaths,
   })
 }
 
-async function resolveJobForWorkItem(workItem: WorkItemRecord): Promise<HermesJobInfo | null> {
-  const missionJobId = readOptionalString((workItem as WorkItemRecord & { missionJobId?: string }).missionJobId)
-  const missionJobName = readOptionalString((workItem as WorkItemRecord & { missionJobName?: string }).missionJobName)
+async function resolveJobForWorkItem(
+  workItem: WorkItemRecord,
+): Promise<HermesJobInfo | null> {
+  const missionJobId = readOptionalString(
+    (workItem as WorkItemRecord & { missionJobId?: string }).missionJobId,
+  )
+  const missionJobName = readOptionalString(
+    (workItem as WorkItemRecord & { missionJobName?: string }).missionJobName,
+  )
   const missionId = readOptionalString(workItem.missionId)
-  const candidateIds = Array.from(new Set([missionJobId, missionId].filter(Boolean)))
+  const candidateIds = Array.from(
+    new Set([missionJobId, missionId].filter(Boolean)),
+  )
 
   for (const candidateId of candidateIds) {
     try {
@@ -237,7 +313,9 @@ async function resolveJobForWorkItem(workItem: WorkItemRecord): Promise<HermesJo
     return null
   }
 
-  const candidateNames = Array.from(new Set([missionJobName, missionId].filter(Boolean)))
+  const candidateNames = Array.from(
+    new Set([missionJobName, missionId].filter(Boolean)),
+  )
   return (
     jobs.find((job) => candidateNames.includes(readOptionalString(job.name))) ??
     jobs.find((job) => candidateIds.includes(readOptionalString(job.id))) ??
@@ -249,11 +327,18 @@ function localOutputJobForWorkItem(
   workItem: WorkItemRecord,
   output: HermesJobOutputSnapshot | null,
 ): HermesJobInfo | null {
-  const jobId = readOptionalString((workItem as WorkItemRecord & { missionJobId?: string }).missionJobId) || readOptionalString(workItem.missionId)
+  const jobId =
+    readOptionalString(
+      (workItem as WorkItemRecord & { missionJobId?: string }).missionJobId,
+    ) || readOptionalString(workItem.missionId)
   if (!jobId || !output?.latestOutputText?.trim()) return null
   return {
     id: jobId,
-    name: readOptionalString((workItem as WorkItemRecord & { missionJobName?: string }).missionJobName) || jobId,
+    name:
+      readOptionalString(
+        (workItem as WorkItemRecord & { missionJobName?: string })
+          .missionJobName,
+      ) || jobId,
     state: 'scheduled',
     last_run_at: output.lastObservedAt,
     last_status: 'ok',
@@ -262,41 +347,79 @@ function localOutputJobForWorkItem(
   }
 }
 
-function applyMissionFields(workItem: WorkItemRecord, job: HermesJobInfo | null, state: SyncedExecutionState) {
+function applyMissionFields(
+  workItem: WorkItemRecord,
+  job: HermesJobInfo | null,
+  state: SyncedExecutionState,
+) {
   const fallbackMissionId = readOptionalString(workItem.missionId)
-  const fallbackMissionJobId = readOptionalString((workItem as WorkItemRecord & { missionJobId?: string }).missionJobId)
-  const fallbackMissionJobName = readOptionalString((workItem as WorkItemRecord & { missionJobName?: string }).missionJobName)
-  const fallbackSessionPrefix = readOptionalString((workItem as WorkItemRecord & { missionSessionKeyPrefix?: string }).missionSessionKeyPrefix)
-  const resolvedJobId = job?.id ?? fallbackMissionJobId ?? fallbackMissionId ?? undefined
-  const resolvedJobName = readOptionalString(job?.name) || fallbackMissionJobName || undefined
+  const fallbackMissionJobId = readOptionalString(
+    (workItem as WorkItemRecord & { missionJobId?: string }).missionJobId,
+  )
+  const fallbackMissionJobName = readOptionalString(
+    (workItem as WorkItemRecord & { missionJobName?: string }).missionJobName,
+  )
+  const fallbackSessionPrefix = readOptionalString(
+    (workItem as WorkItemRecord & { missionSessionKeyPrefix?: string })
+      .missionSessionKeyPrefix,
+  )
+  const resolvedJobId = job?.id || fallbackMissionJobId || fallbackMissionId
+  const resolvedJobName =
+    readOptionalString(job?.name) || fallbackMissionJobName || undefined
   const lastError = readOptionalString(job?.last_error)
-  const missionSessionKeyPrefix = fallbackSessionPrefix || (resolvedJobId ? `cron_${resolvedJobId}_` : undefined)
+  const missionSessionKeyPrefix =
+    fallbackSessionPrefix ||
+    (resolvedJobId ? `cron_${resolvedJobId}_` : undefined)
   return {
     missionId: resolvedJobId,
     missionJobId: resolvedJobId,
     missionJobName: resolvedJobName,
     missionSessionKeyPrefix,
-    missionLink: resolvedJobId ? buildMissionLink(resolvedJobId) : workItem.missionLink,
-    missionState: (state === 'unknown' ? 'unknown' : state === 'stale' ? 'running' : state) as WorkItemMissionState,
+    missionLink: resolvedJobId
+      ? buildMissionLink(resolvedJobId)
+      : workItem.missionLink,
+    missionState: (state === 'unknown'
+      ? 'unknown'
+      : state === 'stale'
+        ? 'running'
+        : state) as WorkItemMissionState,
     missionLastRunAt: job?.last_run_at ?? workItem.missionLastRunAt,
-    missionLastError: state === 'failed' ? asOptionalString(lastError) ?? workItem.missionLastError : undefined,
+    missionLastError:
+      state === 'failed'
+        ? (asOptionalString(lastError) ?? workItem.missionLastError)
+        : undefined,
   }
 }
 
-function transitionForSuccess(workItem: WorkItemRecord): { status: WorkItemRecord['status']; phase: WorkItemPhase; note: string } | null {
-  if ((workItem.status === 'active' || workItem.status === 'blocked') && workItem.phase === 'build') {
+function transitionForSuccess(workItem: WorkItemRecord): {
+  status: WorkItemRecord['status']
+  phase: WorkItemPhase
+  note: string
+} | null {
+  if (
+    (workItem.status === 'active' || workItem.status === 'blocked') &&
+    workItem.phase === 'build'
+  ) {
     return {
       status: 'active',
       phase: 'review',
-      note: workItem.status === 'blocked'
-        ? 'Recovered valid Builder evidence; advanced work item into review.'
-        : 'Execution succeeded; advanced work item into review.',
+      note:
+        workItem.status === 'blocked'
+          ? 'Recovered valid Builder evidence; advanced work item into review.'
+          : 'Execution succeeded; advanced work item into review.',
     }
   }
   return null
 }
 
-function transitionForFailure(workItem: WorkItemRecord, reason: string): { status: WorkItemRecord['status']; phase?: WorkItemPhase; note: string } | null {
+function transitionForFailure(
+  workItem: WorkItemRecord,
+  reason: string,
+): {
+  status: WorkItemRecord['status']
+  phase?: WorkItemPhase
+  note: string
+} | null {
   if (workItem.status === 'blocked') return null
   const recoveryTail = ' Run Resume Build before relaunching the build mission.'
   return {
@@ -308,7 +431,9 @@ function transitionForFailure(workItem: WorkItemRecord, reason: string): { statu
   }
 }
 
-export async function syncWorkItemExecutionState(workItemId: string): Promise<WorkItemExecutionSyncResult> {
+export async function syncWorkItemExecutionState(
+  workItemId: string,
+): Promise<WorkItemExecutionSyncResult> {
   const workItem = getWorkItem(workItemId)
   if (!workItem) throw new Error('Work item not found')
 
@@ -322,10 +447,19 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
     job = null
   }
   let localOutput: HermesJobOutputSnapshot | null = null
-  if (!job && project.autonomyLanePolicy.enabled && workItem.phase === 'build') {
-    const fallbackJobId = readOptionalString((workItem as WorkItemRecord & { missionJobId?: string }).missionJobId) || readOptionalString(workItem.missionId)
+  if (
+    !job &&
+    project.autonomyLanePolicy.enabled &&
+    workItem.phase === 'build'
+  ) {
+    const fallbackJobId =
+      readOptionalString(
+        (workItem as WorkItemRecord & { missionJobId?: string }).missionJobId,
+      ) || readOptionalString(workItem.missionId)
     if (fallbackJobId) {
-      localOutput = await getLatestHermesJobOutput(fallbackJobId).catch(() => null)
+      localOutput = await getLatestHermesJobOutput(fallbackJobId).catch(
+        () => null,
+      )
       job = localOutputJobForWorkItem(workItem, localOutput)
     }
   }
@@ -334,14 +468,21 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
   let updated = updateWorkItem(workItem.id, missionFields)
   if (!updated) throw new Error('Failed to persist mission sync state')
 
-  const resolvedJobId = readOptionalString((missionFields as { missionJobId?: string }).missionJobId)
-  const jobRuns = resolvedJobId ? await getHermesJobRuns(resolvedJobId).catch(() => []) : []
-  const latestRun = jobRuns[0] ?? null
+  const resolvedJobId = readOptionalString(
+    (missionFields as { missionJobId?: string }).missionJobId,
+  )
+  const jobRuns = resolvedJobId
+    ? await getHermesJobRuns(resolvedJobId).catch(() => [])
+    : []
+  const latestRun = jobRuns.length > 0 ? jobRuns[0] : null
   const latestSessionKey =
     latestRun?.chatSessionKey ??
-    (jobRuns.find((run) => typeof run.chatSessionKey === 'string' && run.chatSessionKey.trim().length > 0)
-      ?.chatSessionKey ??
-      null)
+    jobRuns.find(
+      (run) =>
+        typeof run.chatSessionKey === 'string' &&
+        run.chatSessionKey.trim().length > 0,
+    )?.chatSessionKey ??
+    null
   const runEvidence = extractRunEvidence(latestRun)
   const builderEvidence = evaluateBuilderEvidence({
     project,
@@ -354,12 +495,18 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
     state = builderEvidence.state
     missionFields = applyMissionFields(updated, job, state)
     updated = updateWorkItem(updated.id, missionFields)
-    if (!updated) throw new Error('Failed to persist Builder evidence sync state')
-  } else if (state === 'running' && project.autonomyLanePolicy.enabled && isStaleHeartbeat(job, latestRun)) {
+    if (!updated)
+      throw new Error('Failed to persist Builder evidence sync state')
+  } else if (
+    state === 'running' &&
+    project.autonomyLanePolicy.enabled &&
+    isStaleHeartbeat(job, latestRun)
+  ) {
     state = 'stale'
     missionFields = applyMissionFields(updated, job, state)
     updated = updateWorkItem(updated.id, missionFields)
-    if (!updated) throw new Error('Failed to persist stale Builder heartbeat state')
+    if (!updated)
+      throw new Error('Failed to persist stale Builder heartbeat state')
   }
   const structuredEvidence = builderEvidence.evidence
   const evidenceForRun = {
@@ -385,10 +532,13 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
 
   if (latestSessionKey && !updated.sessionKeys.includes(latestSessionKey)) {
     updated = updateWorkItem(updated.id, {
-      sessionKeys: Array.from(new Set([...updated.sessionKeys, latestSessionKey])),
+      sessionKeys: Array.from(
+        new Set([...updated.sessionKeys, latestSessionKey]),
+      ),
       ...missionFields,
     })
-    if (!updated) throw new Error('Failed to persist latest execution session key')
+    if (!updated)
+      throw new Error('Failed to persist latest execution session key')
   }
 
   if (
@@ -401,14 +551,20 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       prUrl: evidenceForRun.prUrl ?? updated.prUrl,
       artifactPaths:
         evidenceForRun.artifactPaths && evidenceForRun.artifactPaths.length > 0
-          ? Array.from(new Set([...updated.artifactPaths, ...evidenceForRun.artifactPaths]))
+          ? Array.from(
+              new Set([
+                ...updated.artifactPaths,
+                ...evidenceForRun.artifactPaths,
+              ]),
+            )
           : updated.artifactPaths,
       ...missionFields,
     })
     if (!updated) throw new Error('Failed to persist Hermes execution evidence')
   }
 
-  let transitionApplied: WorkItemExecutionSyncResult['execution']['transitionApplied'] = null
+  let transitionApplied: WorkItemExecutionSyncResult['execution']['transitionApplied'] =
+    null
 
   if (state === 'succeeded') {
     const transition = transitionForSuccess(updated)
@@ -417,12 +573,19 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
         status: transition.status,
         phase: transition.phase,
         blockedReason: undefined,
-        laneState: project.autonomyLanePolicy.enabled ? 'reviewing' : updated.laneState,
-        laneParkedAt: project.autonomyLanePolicy.enabled ? undefined : updated.laneParkedAt,
-        laneBlockedReason: project.autonomyLanePolicy.enabled ? undefined : updated.laneBlockedReason,
+        laneState: project.autonomyLanePolicy.enabled
+          ? 'reviewing'
+          : updated.laneState,
+        laneParkedAt: project.autonomyLanePolicy.enabled
+          ? undefined
+          : updated.laneParkedAt,
+        laneBlockedReason: project.autonomyLanePolicy.enabled
+          ? undefined
+          : updated.laneBlockedReason,
         ...missionFields,
       })
-      if (!updated) throw new Error('Failed to update work item after success transition')
+      if (!updated)
+        throw new Error('Failed to update work item after success transition')
       updated = appendWorkItemHistoryEntry(updated.id, {
         action: 'status-change',
         status: transition.status,
@@ -442,21 +605,22 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       // Launch Planner-as-Reviewer mission for two-phase pipeline items
       if (updated.planFilePath) {
         const project = getProject(updated.projectId)
+        const reviewWorkItem = updated
         if (project) {
-          launchPlannerReview(updated, project).then((reviewLaunch) => {
+          launchPlannerReview(reviewWorkItem, project).then((reviewLaunch) => {
             if (reviewLaunch) {
-              updateWorkItem(updated.id, {
+              updateWorkItem(reviewWorkItem.id, {
                 reviewJobId: reviewLaunch.reviewJobId,
                 reviewState: reviewLaunch.reviewState,
               })
-              appendWorkItemHistoryEntry(updated.id, {
+              appendWorkItemHistoryEntry(reviewWorkItem.id, {
                 action: 'status-change',
                 status: 'active',
                 phase: 'review',
-                note: `Planner review mission launched (${reviewLaunch.reviewJobId}). Reviewing build output against plan at ${updated.planFilePath}.`,
+                note: `Planner review mission launched (${reviewLaunch.reviewJobId}). Reviewing build output against plan at ${reviewWorkItem.planFilePath}.`,
                 missionId: reviewLaunch.reviewJobId,
-                sessionKey: updated.sessionKeys.at(-1),
-                profile: updated.assignedProfile,
+                sessionKey: reviewWorkItem.sessionKeys.at(-1),
+                profile: reviewWorkItem.assignedProfile,
               })
             }
           })
@@ -464,20 +628,30 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
       }
     }
   } else if (state === 'failed') {
-    const transition = transitionForFailure(updated, builderEvidence.error ?? readOptionalString(job?.last_error))
+    const transition = transitionForFailure(
+      updated,
+      builderEvidence.error ?? readOptionalString(job?.last_error),
+    )
     if (transition) {
       updated = updateWorkItem(updated.id, {
         status: transition.status,
         phase: transition.phase,
         blockedReason: 'mission_failed',
-        laneState: project.autonomyLanePolicy.enabled ? 'blocked' : updated.laneState,
-        laneParkedAt: project.autonomyLanePolicy.enabled ? new Date().toISOString() : updated.laneParkedAt,
+        laneState: project.autonomyLanePolicy.enabled
+          ? 'blocked'
+          : updated.laneState,
+        laneParkedAt: project.autonomyLanePolicy.enabled
+          ? new Date().toISOString()
+          : updated.laneParkedAt,
         laneBlockedReason: project.autonomyLanePolicy.enabled
-          ? builderEvidence.error ?? readOptionalString(job?.last_error) ?? 'Builder failed.'
+          ? builderEvidence.error ||
+            readOptionalString(job?.last_error) ||
+            'Builder failed.'
           : updated.laneBlockedReason,
         ...missionFields,
       })
-      if (!updated) throw new Error('Failed to update work item after failure transition')
+      if (!updated)
+        throw new Error('Failed to update work item after failure transition')
       updated = appendWorkItemHistoryEntry(updated.id, {
         action: 'status-change',
         status: transition.status,
@@ -515,34 +689,46 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
         if (reviewJob) {
           const reviewState = deriveExecutionState(reviewJob)
           let parseResult: ReviewDecisionParseResult
-          let gateResult: ReviewQualityGateResult
 
           // Extract review output text: latest run output, job last_error, or empty
-          const jobRuns = await getHermesJobRuns(updated.reviewJobId).catch(() => [])
-          const latestRun = jobRuns[0] ?? null
+          const jobRuns = await getHermesJobRuns(updated.reviewJobId).catch(
+            () => [],
+          )
+          const latestReviewRun = jobRuns.length > 0 ? jobRuns[0] : null
           recordExecutionRun({
             workItem: updated,
             project,
             role: 'review',
             state: reviewState,
             job: reviewJob,
-            run: latestRun,
+            run: latestReviewRun,
             sessionKeyPrefix: `cron_${reviewJob.id}_`,
           })
           const runOutputStr =
-            latestRun?.output && typeof latestRun.output === 'object'
-              ? Object.values(latestRun.output).filter((v): v is string => typeof v === 'string').join('\n')
-              : typeof latestRun?.output === 'string'
-                ? latestRun.output
+            latestReviewRun &&
+            latestReviewRun.output !== null &&
+            typeof latestReviewRun.output === 'object'
+              ? Object.values(latestReviewRun.output)
+                  .filter((v): v is string => typeof v === 'string')
+                  .join('\n')
+              : typeof latestReviewRun?.output === 'string'
+                ? latestReviewRun.output
                 : ''
           const jobErrorStr = readOptionalString(reviewJob.last_error) || ''
-          const combinedText = [runOutputStr, jobErrorStr].filter(Boolean).join('\n\n')
+          const combinedText = [runOutputStr, jobErrorStr]
+            .filter(Boolean)
+            .join('\n\n')
           const outputText = combinedText || `reviewState=${reviewState}`
 
           if (reviewState === 'succeeded' || reviewState === 'failed') {
             parseResult = parsePlannerReviewDecision(outputText)
           } else {
-            parseResult = { ok: false, error: `Review job state is ${reviewState} — not ready for evaluation.`, source: 'missing', warnings: [] }
+            parseResult = {
+              ok: false,
+              error: `Review job state is ${reviewState} — not ready for evaluation.`,
+              source: 'missing',
+              warnings: [],
+            }
           }
 
           // Persist parser/gate fields to work item
@@ -550,17 +736,22 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
 
           if (parseResult.ok) {
             workItemUpdates.reviewDecisionSummary = parseResult.parsed.summary
-            workItemUpdates.reviewDecisionConfidence = parseResult.parsed.confidence
+            workItemUpdates.reviewDecisionConfidence =
+              parseResult.parsed.confidence
             workItemUpdates.reviewDecisionSource = parseResult.source
           } else {
-            workItemUpdates.reviewParserError = (parseResult as { ok: false; error: string }).error || 'Unknown parse error'
+            workItemUpdates.reviewParserError =
+              (parseResult as { ok: false; error: string }).error ||
+              'Unknown parse error'
           }
 
           // Evaluate quality gates
           const projectForGate = getProject(updated.projectId)
-          gateResult = evaluateReviewQualityGate({
+          const gateResult = evaluateReviewQualityGate({
             workItem: updated,
-            project: projectForGate ?? { reviewAutoApproval: { enabled: false, maxPriority: 'low' } },
+            project: projectForGate ?? {
+              reviewAutoApproval: { enabled: false, maxPriority: 'low' },
+            },
             parseResult,
           })
 
@@ -583,22 +774,27 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
                 resolvedBy: 'planner',
                 notes: `Planner review found issues: ${errorNote}. Returning work item to build for fixes.`,
               })
-              updated = updateWorkItem(updated.id, {
-                ...workItemUpdates,
-                reviewState: 'failed' as const,
-                reviewDecision: 'changes_requested' as const,
-              }) ?? updated
-              updated = appendWorkItemHistoryEntry(updated.id, {
-                action: 'status-change',
-                status: 'active',
-                phase: 'build',
-                note: `Planner review requested changes: ${errorNote}. Returned to build for fixes.`,
-                missionId: updated.missionId,
-                sessionKey: updated.sessionKeys.at(-1),
-                profile: updated.assignedProfile,
-              }) ?? updated
+              updated =
+                updateWorkItem(updated.id, {
+                  ...workItemUpdates,
+                  reviewState: 'failed' as const,
+                  reviewDecision: 'changes_requested' as const,
+                }) ?? updated
+              updated =
+                appendWorkItemHistoryEntry(updated.id, {
+                  action: 'status-change',
+                  status: 'active',
+                  phase: 'build',
+                  note: `Planner review requested changes: ${errorNote}. Returned to build for fixes.`,
+                  missionId: updated.missionId,
+                  sessionKey: updated.sessionKeys.at(-1),
+                  profile: updated.assignedProfile,
+                }) ?? updated
             }
-          } else if (gateResult.autoResolvable && gateResult.status === 'pass') {
+          } else if (
+            gateResult.autoResolvable &&
+            gateResult.status === 'pass'
+          ) {
             // Approved with passing gates — auto-resolve and advance to deploy
             const lastHistoryNote = updated.history.at(-1)?.note ?? ''
             if (!lastHistoryNote.includes('Planner review passed')) {
@@ -607,25 +803,30 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
                 resolvedBy: 'planner',
                 notes: `Planner review approved with structured decision. Gate status: pass.`,
               })
-              updated = updateWorkItem(updated.id, {
-                ...workItemUpdates,
-                reviewState: 'succeeded' as const,
-                reviewDecision: 'approved' as const,
-              }) ?? updated
-              updated = appendWorkItemHistoryEntry(updated.id, {
-                action: 'status-change',
-                status: 'active',
-                phase: 'deploy',
-                note: 'Planner review passed all quality gates; automatically advanced work item to deploy.',
-                missionId: updated.missionId,
-                sessionKey: updated.sessionKeys.at(-1),
-                profile: updated.assignedProfile,
-              }) ?? updated
+              updated =
+                updateWorkItem(updated.id, {
+                  ...workItemUpdates,
+                  reviewState: 'succeeded' as const,
+                  reviewDecision: 'approved' as const,
+                }) ?? updated
+              updated =
+                appendWorkItemHistoryEntry(updated.id, {
+                  action: 'status-change',
+                  status: 'active',
+                  phase: 'deploy',
+                  note: 'Planner review passed all quality gates; automatically advanced work item to deploy.',
+                  missionId: updated.missionId,
+                  sessionKey: updated.sessionKeys.at(-1),
+                  profile: updated.assignedProfile,
+                }) ?? updated
             }
           } else {
             // Manual review needed — set reviewDecision=manual_review, keep approval pending
             workItemUpdates.reviewDecision = 'manual_review' as const
-            workItemUpdates.reviewState = reviewState === 'failed' ? ('failed' as const) : ('succeeded' as const)
+            workItemUpdates.reviewState =
+              reviewState === 'failed'
+                ? ('failed' as const)
+                : ('succeeded' as const)
             if (parseResult.ok) {
               workItemUpdates.reviewDecisionSummary = parseResult.parsed.summary
             }
@@ -633,17 +834,19 @@ export async function syncWorkItemExecutionState(workItemId: string): Promise<Wo
 
             const lastHistoryNote = updated.history.at(-1)?.note ?? ''
             if (!lastHistoryNote.includes('Manual review')) {
-              updated = appendWorkItemHistoryEntry(updated.id, {
-                action: 'note',
-                status: 'active',
-                phase: 'review',
-                note: gateResult.status === 'manual_review'
-                  ? `Manual review required: ${gateResult.reasons.join('; ')}`
-                  : `Manual review required — review completed but could not be auto-resolved with quality gates.`,
-                missionId: updated.missionId,
-                sessionKey: updated.sessionKeys.at(-1),
-                profile: updated.assignedProfile,
-              }) ?? updated
+              updated =
+                appendWorkItemHistoryEntry(updated.id, {
+                  action: 'note',
+                  status: 'active',
+                  phase: 'review',
+                  note:
+                    gateResult.status === 'manual_review'
+                      ? `Manual review required: ${gateResult.reasons.join('; ')}`
+                      : `Manual review required — review completed but could not be auto-resolved with quality gates.`,
+                  missionId: updated.missionId,
+                  sessionKey: updated.sessionKeys.at(-1),
+                  profile: updated.assignedProfile,
+                }) ?? updated
             }
           }
         }

@@ -1,6 +1,6 @@
 # Current Slice Execution Status
 
-> Canonical continuation handoff for Builder sessions. Updated by Main/CEO after committing Operator UX and authorizing the next stabilization cycle; keep compact.
+> Canonical continuation handoff for Builder sessions. Updated by Builder after TypeScript Baseline Stabilization completion; keep compact.
 
 ## Active Plan
 
@@ -11,28 +11,31 @@
 
 ## Current State / Evidence
 
-- Operator UX Clarity cycle is accepted, committed, and pushed to `origin/my-hermes-workspace-dev`: `3384ccb operator UX merge-readiness hardening for work items, executions, and morning review`.
-- Roadmap review: GochevBot-inspired UX P0-P3 is complete; earlier next-cycle V/W, X/Y, Z/AA, AB/AC are shipped; the recurring remaining quality blocker is repo-wide TypeScript baseline debt.
-- Main post-commit baseline: `pnpm exec tsc --noEmit --pretty false` exits `2`, with 21 baseline error files and 187 output lines. This no longer blocks Operator UX, but it prevents `tsc --noEmit` from being a hard gate for future autonomous work.
-- Next active plan targets exactly that: make full `tsc --noEmit` green, preserve product behavior, clean a non-blocking legacy Executions no-record fallback link issue, and write durable baseline/final reports.
+- TypeScript Baseline Stabilization is complete and accepted by Builder verification.
+- Baseline report: `dogfood-output/typescript-baseline-stabilization-2026-04-29T12-45-21Z.md`; alias `dogfood-output/typescript-baseline-stabilization-latest.md`.
+- Final report: `dogfood-output/typescript-baseline-stabilization-final-2026-04-29T13-13-46Z.md`; alias `dogfood-output/typescript-baseline-stabilization-final-latest.md`.
+- Full `pnpm exec tsc --noEmit --pretty false` now exits `0`.
+- Full `pnpm vitest run` passes: 79 test files / 509 tests.
+- `pnpm build` passes with existing Vite chunk/dynamic-import warnings.
+- `git diff --check` passes.
+- Targeted `pnpm exec eslint ...` exits `0` with warnings only (no errors): two async handler `require-await`, two `no-shadow` in `work-item-execution.ts`, two async mock warnings in `work-item-supervisor-routes.test.ts`.
+- Service/root smoke passes: `systemctl --user restart hermes-workspace.service`, `is-active` = `active`, root curl wrote `/tmp/hermes-workspace-root-smoke-tsc-stabilization.html` (10,749 bytes) after expected first retry.
+- Browser live smoke passes: `/executions?jobId=missing&workItemId=some-id` shows no-record state with project-context warning and no invalid `/work-items/some-id` link; `/projects` renders project links; `/dashboard` renders Mission Control; browser console clean.
+
+## Completed Tasks
+
+- Task 1 — Durable TypeScript baseline report ✅
+- Task 2 — Route handler test helper cleanup ✅
+- Task 3 — Normalize stale fixtures ✅
+- Task 4 — Product-code nullability and API/type contract fixes ✅
+- Task 5 — Legacy Executions fallback link cleanup ✅
+- Task 6 — Final full verification and report ✅
 
 ## Next Builder Task
 
-Run Task 1 in the active TypeScript baseline stabilization plan: create a durable tsc baseline report from current `pnpm exec tsc --noEmit --pretty false` output, group error families, and update this handoff before fixing error families.
-
-Implementation order:
-
-1. Durable TypeScript baseline report.
-2. Route handler test helper cleanup.
-3. Stale fixture normalization.
-4. Product-code nullability and API/type contract fixes.
-5. Legacy Executions fallback link cleanup.
-6. Final full verification and report.
+No further Builder task is defined in the current active plan. Main/CEO should review the final report and either commit this stabilization package or author/update the next plan in `docs/plans` and this handoff.
 
 ## Verification Rules
 
-- This is stabilization only: no new product feature cycle.
-- Avoid broad type weakening; do not use `as any` except as a last-resort isolated test boundary with explanation.
-- Preserve PATCH partial-update safety; never send undefined fields that wipe arrays like `acceptanceCriteria`.
-- Preserve Operator UX semantics: Scheduled Jobs are definitions, Executions are attempts, Morning Review is read-only.
-- Final acceptance requires full `pnpm exec tsc --noEmit --pretty false` exit 0 plus focused tests, full vitest, build, lint/diff checks, service/root smoke, and final report.
+- This stabilization slice is complete; do not invent new product features without a new plan.
+- Preserve PATCH partial-update safety and Operator UX semantics in any follow-up.

@@ -12,8 +12,6 @@ describe('autopilot-scout-prompts', () => {
         defaultBranch: 'main',
       },
       policy: {
-        enabled: true,
-        schedulePreset: 'daily',
         suggestionLimit: 3,
         scoutSources: ['repo-health-scout', 'failing-tests-scout'],
       },
@@ -40,8 +38,6 @@ describe('autopilot-scout-prompts', () => {
         repoPath: '/repos/workspace',
       },
       policy: {
-        enabled: true,
-        schedulePreset: 'weekly',
         suggestionLimit: 5,
         scoutSources: ['architecture-debt-scout'],
       },
@@ -50,7 +46,9 @@ describe('autopilot-scout-prompts', () => {
 
     expect(prompt).toContain('suggestions only')
     expect(prompt).toContain('Do not modify files')
-    expect(prompt).toContain('Do not create branches, commits, PRs, work items, or code changes')
+    expect(prompt).toContain(
+      'Do not create branches, commits, PRs, work items, or code changes',
+    )
     expect(prompt).toContain('dedupe')
     expect(prompt).toContain('evidence')
   })

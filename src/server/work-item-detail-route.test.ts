@@ -1,24 +1,46 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { Route } from '../routes/api/work-items.$workItemId'
+import { createProject } from './projects-store'
+import { createWorkItem } from './work-items-store'
+import { upsertExecutionRun } from './execution-runs-store'
+import { syncWorkItemExecutionState } from './work-item-execution'
 
 vi.mock('./work-item-execution', () => ({
   syncWorkItemExecutionState: vi.fn(),
 }))
 
-import { createProject } from './projects-store'
-import { createWorkItem } from './work-items-store'
-import { upsertExecutionRun } from './execution-runs-store'
-import { syncWorkItemExecutionState } from './work-item-execution'
-import { Route } from '../routes/api/work-items.$workItemId'
+type RouteHandler<
+  TParams extends Record<string, string> = Record<string, string>,
+> = (input: { request: Request; params?: TParams }) => Promise<Response>
+
+function getRouteHandler<
+  TMethod extends 'GET' | 'POST',
+  TParams extends Record<string, string> = Record<string, string>,
+>(route: unknown, method: TMethod): RouteHandler<TParams> {
+  return (
+    route as {
+      options: { server: { handlers: Record<TMethod, RouteHandler<TParams>> } }
+    }
+  ).options.server.handlers[method]
+}
+
+const getWorkItemDetail = getRouteHandler<'GET', { workItemId: string }>(
+  Route,
+  'GET',
+)
 
 describe('/api/work-items/$workItemId GET sync fallback envelope', () => {
   let tempHome: string
   let previousHermesHome: string | undefined
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-route-work-item-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-route-work-item-'),
+    )
     previousHermesHome = process.env.HERMES_HOME
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     vi.clearAllMocks()
@@ -44,10 +66,14 @@ describe('/api/work-items/$workItemId GET sync fallback envelope', () => {
       repoPathSnapshot: project.repoPath,
     })
 
-    vi.mocked(syncWorkItemExecutionState).mockRejectedValueOnce(new Error('Hermes dashboard timed out'))
+    vi.mocked(syncWorkItemExecutionState).mockRejectedValueOnce(
+      new Error('Hermes dashboard timed out'),
+    )
 
-    const response = await Route.options.server.handlers.GET({
-      request: new Request(`http://127.0.0.1:3456/api/work-items/${workItem.id}?syncExecution=true`),
+    const response = await getWorkItemDetail({
+      request: new Request(
+        `http://127.0.0.1:3456/api/work-items/${workItem.id}?syncExecution=true`,
+      ),
       params: { workItemId: workItem.id },
     })
 
@@ -65,7 +91,10 @@ describe('/api/work-items/$workItemId GET sync fallback envelope', () => {
   })
 
   it('includes run timeline evidence with four phase rows in the detail response', async () => {
-    const project = createProject({ name: 'Detail Demo', repoPath: '/repos/detail-demo' })
+    const project = createProject({
+      name: 'Detail Demo',
+      repoPath: '/repos/detail-demo',
+    })
     const workItem = createWorkItem({
       projectId: project.id,
       title: 'Expose detail timeline',
@@ -89,8 +118,10 @@ describe('/api/work-items/$workItemId GET sync fallback envelope', () => {
       lastObservedAt: '2026-04-27T19:00:00.000Z',
     })
 
-    const response = await Route.options.server.handlers.GET({
-      request: new Request(`http://127.0.0.1:3456/api/work-items/${workItem.id}`),
+    const response = await getWorkItemDetail({
+      request: new Request(
+        `http://127.0.0.1:3456/api/work-items/${workItem.id}`,
+      ),
       params: { workItemId: workItem.id },
     })
 
@@ -98,7 +129,12 @@ describe('/api/work-items/$workItemId GET sync fallback envelope', () => {
     const body = (await response.json()) as {
       workItem: {
         runTimeline?: {
-          rows: Array<{ phase: string; state: string; jobId?: string; sessionKey?: string }>
+          rows: Array<{
+            phase: string
+            state: string
+            jobId?: string
+            sessionKey?: string
+          }>
         }
       }
     }

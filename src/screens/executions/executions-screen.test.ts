@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ExecutionRunRecord } from '../../server/execution-runs-store'
 import {
-  buildExecutionsScreenViewModel,
   EXECUTIONS_LEGACY_NO_RECORD_TITLE,
   EXECUTIONS_NAVIGATION_COPY,
   EXECUTIONS_SCREEN_HELP_COPY,
   EXECUTIONS_SCREEN_SEARCH_PLACEHOLDER,
   EXECUTIONS_SCREEN_TITLE,
+  buildExecutionsScreenViewModel,
 } from './executions-screen'
+import type { ExecutionRunRecord } from '../../server/execution-runs-store'
 
 describe('executions screen operator copy and list model', () => {
   it('exports execution-focused copy without Scheduled Jobs terminology leakage', () => {
@@ -67,7 +67,32 @@ describe('executions screen operator copy and list model', () => {
     expect(viewModel.runs.map((run) => run.id)).toEqual(['builder-run'])
   })
 
-  it('builds a legacy trace landing state with a work item link when no durable run exists', () => {
+  it('builds a scoped legacy trace work item link when project context is available', () => {
+    const viewModel = buildExecutionsScreenViewModel([], {
+      filters: {
+        jobId: 'job-legacy-1',
+        projectId: 'project-legacy-1',
+        workItemId: 'work-legacy-1',
+      },
+      legacyLookup: {
+        status: 'no_durable_run',
+        jobId: 'job-legacy-1',
+        projectId: 'project-legacy-1',
+        workItemId: 'work-legacy-1',
+        message:
+          'Scheduled job job-legacy-1 was referenced by a work item, but no durable execution run record exists yet.',
+      },
+    })
+
+    expect(viewModel.legacyLanding).toEqual({
+      title: 'Execution trace not yet recorded',
+      message:
+        'Scheduled job job-legacy-1 was referenced by a work item, but no durable execution run record exists yet.',
+      workItemHref: '/projects/project-legacy-1/work-items/work-legacy-1',
+    })
+  })
+
+  it('does not expose an invalid unscoped work item link for legacy traces without project context', () => {
     const viewModel = buildExecutionsScreenViewModel([], {
       filters: { jobId: 'job-legacy-1', workItemId: 'work-legacy-1' },
       legacyLookup: {
@@ -79,12 +104,10 @@ describe('executions screen operator copy and list model', () => {
       },
     })
 
-    expect(viewModel.legacyLanding).toEqual({
-      title: 'Execution trace not yet recorded',
-      message:
-        'Scheduled job job-legacy-1 was referenced by a work item, but no durable execution run record exists yet.',
-      workItemHref: '/work-items/work-legacy-1',
-    })
+    expect(viewModel.legacyLanding?.workItemHref).toBeNull()
+    expect(viewModel.legacyLanding?.message).toContain(
+      'Project context is required',
+    )
   })
 })
 

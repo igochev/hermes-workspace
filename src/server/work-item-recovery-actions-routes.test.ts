@@ -3,6 +3,14 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route as WorkItemRecoveryActionsRoute } from '../routes/api/work-items.$workItemId.recovery-actions'
+import {
+  markAttentionQueueItemResolved,
+  upsertAttentionQueueItem,
+} from './attention-queue-store'
+import { createProject } from './projects-store'
+import { createWorkItem, getWorkItem } from './work-items-store'
+
 const { launchWorkItemIntoConductor } = vi.hoisted(() => ({
   launchWorkItemIntoConductor: vi.fn(),
 }))
@@ -11,10 +19,25 @@ vi.mock('./work-item-launch', () => ({
   launchWorkItemIntoConductor,
 }))
 
-import { markAttentionQueueItemResolved, upsertAttentionQueueItem } from './attention-queue-store'
-import { createProject } from './projects-store'
-import { createWorkItem, getWorkItem } from './work-items-store'
-import { Route as WorkItemRecoveryActionsRoute } from '../routes/api/work-items.$workItemId.recovery-actions'
+type RouteHandler<
+  TParams extends Record<string, string> = Record<string, string>,
+> = (input: { request: Request; params?: TParams }) => Promise<Response>
+
+function getRouteHandler<
+  TMethod extends 'GET' | 'POST',
+  TParams extends Record<string, string> = Record<string, string>,
+>(route: unknown, method: TMethod): RouteHandler<TParams> {
+  return (
+    route as {
+      options: { server: { handlers: Record<TMethod, RouteHandler<TParams>> } }
+    }
+  ).options.server.handlers[method]
+}
+
+const postRecoveryAction = getRouteHandler<'POST', { workItemId: string }>(
+  WorkItemRecoveryActionsRoute,
+  'POST',
+)
 
 describe('work item recovery actions route', () => {
   let tempHome: string
@@ -22,7 +45,9 @@ describe('work item recovery actions route', () => {
   let previousHermesPassword: string | undefined
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-recovery-route-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-recovery-route-'),
+    )
     previousHermesHome = process.env.HERMES_HOME
     previousHermesPassword = process.env.HERMES_PASSWORD
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
@@ -42,7 +67,10 @@ describe('work item recovery actions route', () => {
   })
 
   function createFixture() {
-    const project = createProject({ name: 'Mission Control', repoPath: '/repos/mission-control' })
+    const project = createProject({
+      name: 'Mission Control',
+      repoPath: '/repos/mission-control',
+    })
     const workItem = createWorkItem({
       projectId: project.id,
       title: 'Recover failed build',
@@ -77,20 +105,27 @@ describe('work item recovery actions route', () => {
           label: 'Mark externally resolved',
           description: 'Resolve attention',
           destructive: false,
-          auditNote: 'Operator marked attention externally resolved from recovery actions.',
+          auditNote:
+            'Operator marked attention externally resolved from recovery actions.',
         },
       ],
     })
     return { project, workItem, attention }
   }
 
-  async function postRecovery(workItemId: string, body: Record<string, unknown>) {
-    return WorkItemRecoveryActionsRoute.options.server.handlers.POST({
-      request: new Request(`http://127.0.0.1:3456/api/work-items/${workItemId}/recovery-actions`, {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' },
-      }),
+  async function postRecovery(
+    workItemId: string,
+    body: Record<string, unknown>,
+  ) {
+    return postRecoveryAction({
+      request: new Request(
+        `http://127.0.0.1:3456/api/work-items/${workItemId}/recovery-actions`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
       params: { workItemId },
     })
   }
@@ -99,7 +134,9 @@ describe('work item recovery actions route', () => {
     process.env.HERMES_PASSWORD = 'secret'
     const { workItem } = createFixture()
 
-    const response = await postRecovery(workItem.id, { actionType: 'mark_resolved' })
+    const response = await postRecovery(workItem.id, {
+      actionType: 'mark_resolved',
+    })
 
     expect(response.status).toBe(401)
   })
@@ -114,7 +151,10 @@ describe('work item recovery actions route', () => {
     })
 
     expect(response.status).toBe(200)
-    const body = (await response.json()) as { workItem: { history: Array<{ note: string }> }; attentionItem: { status: string } }
+    const body = (await response.json()) as {
+      workItem: { history: Array<{ note: string }> }
+      attentionItem: { status: string }
+    }
     expect(body.attentionItem.status).toBe('resolved')
     expect(body.workItem.history.at(-1)?.note).toContain('Fixed outside Hermes')
   })
@@ -149,8 +189,13 @@ describe('work item recovery actions route', () => {
     })
 
     expect(response.status).toBe(200)
-    const body = (await response.json()) as { workItem: { status: string; phase: string }; attentionItem: { status: string } }
-    expect(body.workItem).toEqual(expect.objectContaining({ status: 'active', phase: 'build' }))
+    const body = (await response.json()) as {
+      workItem: { status: string; phase: string }
+      attentionItem: { status: string }
+    }
+    expect(body.workItem).toEqual(
+      expect.objectContaining({ status: 'active', phase: 'build' }),
+    )
     expect(body.attentionItem.status).toBe('resolved')
   })
 
@@ -175,7 +220,11 @@ describe('work item recovery actions route', () => {
       workItem.id,
       expect.objectContaining({ phase: 'build', supervised: true }),
     )
-    expect(markAttentionQueueItemResolved(attention.id)?.status).toBe('resolved')
-    expect(getWorkItem(workItem.id)?.history.at(-1)?.note).toContain('Retry after transient failure')
+    expect(markAttentionQueueItemResolved(attention.id)?.status).toBe(
+      'resolved',
+    )
+    expect(getWorkItem(workItem.id)?.history.at(-1)?.note).toContain(
+      'Retry after transient failure',
+    )
   })
 })

@@ -9,11 +9,13 @@ import {
   deleteWorkItem,
   getWorkItem,
   updateWorkItem,
-  type WorkItemPhase,
-  type WorkItemPriority,
-  type WorkItemRiskLevel,
-  type WorkItemBlockedReason,
-  type WorkItemStatus,
+} from '../../server/work-items-store'
+import type {
+  WorkItemBlockedReason,
+  WorkItemPhase,
+  WorkItemPriority,
+  WorkItemRiskLevel,
+  WorkItemStatus,
 } from '../../server/work-items-store'
 
 function jsonResponse(data: unknown, status = 200) {
@@ -51,7 +53,9 @@ function isWorkItemRiskLevel(value: unknown): value is WorkItemRiskLevel {
   return value === 'low' || value === 'medium' || value === 'high'
 }
 
-function isWorkItemBlockedReason(value: unknown): value is WorkItemBlockedReason {
+function isWorkItemBlockedReason(
+  value: unknown,
+): value is WorkItemBlockedReason {
   return (
     value === 'mission_failed' ||
     value === 'review_feedback' ||
@@ -83,15 +87,20 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
 
-        const sync = new URL(request.url).searchParams.get('syncExecution') === 'true'
+        const sync =
+          new URL(request.url).searchParams.get('syncExecution') === 'true'
         if (sync) {
           try {
             const result = await syncWorkItemExecutionState(params.workItemId)
             return jsonResponse({
               workItem: {
                 ...result.workItem,
-                approvals: listWorkItemApprovals(result.workItem.id).slice().reverse(),
-                latestPlanningDraft: getLatestPlanningDraftForWorkItem(result.workItem.id),
+                approvals: listWorkItemApprovals(result.workItem.id)
+                  .slice()
+                  .reverse(),
+                latestPlanningDraft: getLatestPlanningDraftForWorkItem(
+                  result.workItem.id,
+                ),
                 runTimeline: buildWorkItemRunTimeline(result.workItem),
               },
               project: result.project,
@@ -99,11 +108,14 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
             })
           } catch (error) {
             const payload = buildWorkItemPayload(params.workItemId)
-            if (!payload) return jsonResponse({ error: 'Work item not found' }, 404)
+            if (!payload)
+              return jsonResponse({ error: 'Work item not found' }, 404)
             return jsonResponse({
               ...payload,
               executionSyncWarning:
-                error instanceof Error ? error.message : 'Failed to sync work item execution',
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to sync work item execution',
             })
           }
         }
@@ -120,29 +132,41 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
 
         try {
           const body = (await request.json()) as Record<string, unknown>
-          const updates = {
+          const updates: Parameters<typeof updateWorkItem>[1] = {
             ...(typeof body.title === 'string' ? { title: body.title } : {}),
-            ...(typeof body.description === 'string' ? { description: body.description } : {}),
+            ...(typeof body.description === 'string'
+              ? { description: body.description }
+              : {}),
             ...(isWorkItemStatus(body.status) ? { status: body.status } : {}),
             ...(isWorkItemPhase(body.phase) ? { phase: body.phase } : {}),
-            ...(isWorkItemPriority(body.priority) ? { priority: body.priority } : {}),
-            ...(isWorkItemRiskLevel(body.riskLevel) ? { riskLevel: body.riskLevel } : {}),
+            ...(isWorkItemPriority(body.priority)
+              ? { priority: body.priority }
+              : {}),
+            ...(isWorkItemRiskLevel(body.riskLevel)
+              ? { riskLevel: body.riskLevel }
+              : {}),
             ...(body.blockedReason === null
               ? { blockedReason: undefined }
               : isWorkItemBlockedReason(body.blockedReason)
                 ? { blockedReason: body.blockedReason }
                 : {}),
-            ...(body.assignedProfile === null || typeof body.assignedProfile === 'string'
-              ? { assignedProfile: (body.assignedProfile as string | null) ?? undefined }
+            ...(body.assignedProfile === null ||
+            typeof body.assignedProfile === 'string'
+              ? {
+                  assignedProfile: body.assignedProfile ?? undefined,
+                }
               : {}),
             ...(typeof body.repoPathSnapshot === 'string'
               ? { repoPathSnapshot: body.repoPathSnapshot }
               : {}),
             ...(body.missionId === null || typeof body.missionId === 'string'
-              ? { missionId: (body.missionId as string | null) ?? undefined }
+              ? { missionId: body.missionId ?? undefined }
               : {}),
-            ...(body.missionLink === null || typeof body.missionLink === 'string'
-              ? { missionLink: (body.missionLink as string | null) ?? undefined }
+            ...(body.missionLink === null ||
+            typeof body.missionLink === 'string'
+              ? {
+                  missionLink: body.missionLink ?? undefined,
+                }
               : {}),
             ...(Array.isArray(body.sessionKeys)
               ? {
@@ -152,10 +176,10 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
                 }
               : {}),
             ...(body.branchName === null || typeof body.branchName === 'string'
-              ? { branchName: (body.branchName as string | null) ?? undefined }
+              ? { branchName: body.branchName ?? undefined }
               : {}),
             ...(body.prUrl === null || typeof body.prUrl === 'string'
-              ? { prUrl: (body.prUrl as string | null) ?? undefined }
+              ? { prUrl: body.prUrl ?? undefined }
               : {}),
             ...(Array.isArray(body.artifactPaths)
               ? {
@@ -186,56 +210,89 @@ export const Route = createFileRoute('/api/work-items/$workItemId')({
               : {}),
             ...(Array.isArray(body.notes)
               ? {
-                  notes: body.notes.filter((value): value is string => typeof value === 'string'),
+                  notes: body.notes.filter(
+                    (value): value is string => typeof value === 'string',
+                  ),
                 }
               : {}),
-            ...(body.planFilePath === null || typeof body.planFilePath === 'string'
-              ? { planFilePath: (body.planFilePath as string | null) ?? undefined }
+            ...(body.planFilePath === null ||
+            typeof body.planFilePath === 'string'
+              ? {
+                  planFilePath: body.planFilePath ?? undefined,
+                }
               : {}),
-            ...(body.reviewJobId === null || typeof body.reviewJobId === 'string'
-              ? { reviewJobId: (body.reviewJobId as string | null) ?? undefined }
+            ...(body.reviewJobId === null ||
+            typeof body.reviewJobId === 'string'
+              ? {
+                  reviewJobId: body.reviewJobId ?? undefined,
+                }
               : {}),
             ...(body.reviewState === 'scheduled' ||
-              body.reviewState === 'running' ||
-              body.reviewState === 'succeeded' ||
-              body.reviewState === 'failed' ||
-              body.reviewState === 'unknown'
+            body.reviewState === 'running' ||
+            body.reviewState === 'succeeded' ||
+            body.reviewState === 'failed' ||
+            body.reviewState === 'unknown'
               ? { reviewState: body.reviewState }
               : {}),
-            ...(body.reviewDecision === 'approved' || body.reviewDecision === 'changes_requested'
+            ...(body.reviewDecision === 'approved' ||
+            body.reviewDecision === 'changes_requested'
               ? { reviewDecision: body.reviewDecision }
               : {}),
-            ...(body.reviewDecisionSummary === null || typeof body.reviewDecisionSummary === 'string'
-              ? { reviewDecisionSummary: (body.reviewDecisionSummary as string | null) ?? undefined }
+            ...(body.reviewDecisionSummary === null ||
+            typeof body.reviewDecisionSummary === 'string'
+              ? {
+                  reviewDecisionSummary:
+                    body.reviewDecisionSummary ?? undefined,
+                }
               : {}),
-            ...(body.reviewDecisionConfidence === 'low' || body.reviewDecisionConfidence === 'medium' || body.reviewDecisionConfidence === 'high'
+            ...(body.reviewDecisionConfidence === 'low' ||
+            body.reviewDecisionConfidence === 'medium' ||
+            body.reviewDecisionConfidence === 'high'
               ? { reviewDecisionConfidence: body.reviewDecisionConfidence }
               : {}),
-            ...(body.reviewDecisionSource === 'json' || body.reviewDecisionSource === 'decision-line-fallback'
+            ...(body.reviewDecisionSource === 'json' ||
+            body.reviewDecisionSource === 'decision-line-fallback'
               ? { reviewDecisionSource: body.reviewDecisionSource }
               : {}),
-            ...(body.reviewParserError === null || typeof body.reviewParserError === 'string'
-              ? { reviewParserError: (body.reviewParserError as string | null) ?? undefined }
+            ...(body.reviewParserError === null ||
+            typeof body.reviewParserError === 'string'
+              ? {
+                  reviewParserError: body.reviewParserError ?? undefined,
+                }
               : {}),
-            ...(body.reviewQualityGateStatus === 'pass' || body.reviewQualityGateStatus === 'fail' || body.reviewQualityGateStatus === 'manual_review'
+            ...(body.reviewQualityGateStatus === 'pass' ||
+            body.reviewQualityGateStatus === 'fail' ||
+            body.reviewQualityGateStatus === 'manual_review'
               ? { reviewQualityGateStatus: body.reviewQualityGateStatus }
               : {}),
             ...(Array.isArray(body.reviewQualityGateReasons)
-              ? { reviewQualityGateReasons: body.reviewQualityGateReasons.filter((v: unknown): v is string => typeof v === 'string') }
+              ? {
+                  reviewQualityGateReasons:
+                    body.reviewQualityGateReasons.filter(
+                      (v: unknown): v is string => typeof v === 'string',
+                    ),
+                }
               : {}),
             ...(Array.isArray(body.reviewMissingEvidence)
-              ? { reviewMissingEvidence: body.reviewMissingEvidence.filter((v: unknown): v is string => typeof v === 'string') }
+              ? {
+                  reviewMissingEvidence: body.reviewMissingEvidence.filter(
+                    (v: unknown): v is string => typeof v === 'string',
+                  ),
+                }
               : {}),
             ...(Array.isArray(body.labels)
               ? {
-                  labels: body.labels.filter((value): value is string => typeof value === 'string'),
+                  labels: body.labels.filter(
+                    (value): value is string => typeof value === 'string',
+                  ),
                 }
               : {}),
           }
 
           const workItem = updateWorkItem(params.workItemId, updates)
 
-          if (!workItem) return jsonResponse({ error: 'Work item not found' }, 404)
+          if (!workItem)
+            return jsonResponse({ error: 'Work item not found' }, 404)
           return jsonResponse(buildWorkItemPayload(workItem.id))
         } catch {
           return jsonResponse({ error: 'Invalid request body' }, 400)

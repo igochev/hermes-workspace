@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { evaluateProfileReadiness } from './profile-readiness'
 import type { ProjectRecord } from './projects-store'
 import type { WorkItemRecord } from './work-items-store'
-import { evaluateProfileReadiness } from './profile-readiness'
 
 function makeProject(overrides: Partial<ProjectRecord> = {}): ProjectRecord {
   return {
@@ -24,6 +24,56 @@ function makeProject(overrides: Partial<ProjectRecord> = {}): ProjectRecord {
       suggestionLimit: 5,
       scoutSources: ['repo-health-scout'],
     },
+    runtimeProfiles: {},
+    autonomyLanePolicy: {
+      enabled: false,
+      mode: 'single_lane',
+      isolation: 'branch',
+      maxActiveWorkItems: 1,
+      baseBranch: 'main',
+      branchPrefix: 'mission',
+      plannerTiming: 'on_lane_entry',
+      blockedBehavior: 'park_and_continue_when_repo_clean',
+      mergeHealerEnabled: true,
+      allowParallelWorktrees: false,
+      alwaysOn: {
+        enabled: false,
+        retry: {
+          enabled: false,
+          maxAttemptsPerPhase: 1,
+          cooldownMinutes: 30,
+          staleScheduledMinutes: 30,
+          staleRunningMinutes: 240,
+        },
+        notifications: {
+          enabled: true,
+          digestOnly: true,
+          notifyOn: [
+            'blocked',
+            'retry_exhausted',
+            'unsafe_repo',
+            'pr_ready',
+            'cleanup_recommended',
+          ],
+          minRepeatMinutes: 60,
+        },
+        prPublishing: {
+          enabled: false,
+          mode: 'manual',
+          titlePrefix: '[Hermes Workspace]',
+          requireCleanRepo: true,
+          requirePassingMergeTests: true,
+        },
+        cleanup: {
+          enabled: false,
+          deleteMergedBranches: false,
+          retainMergedBranchDays: 30,
+          retainLaneStashes: true,
+          retainLaneStashDays: 30,
+          dryRun: true,
+        },
+      },
+    },
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -42,6 +92,7 @@ function makeWorkItem(overrides: Partial<WorkItemRecord> = {}): WorkItemRecord {
     riskLevel: 'medium',
     labels: [],
     repoPathSnapshot: '/repos/mission-control',
+    sourceSuggestionEvidence: [],
     reviewQualityGateReasons: [],
     reviewMissingEvidence: [],
     sessionKeys: [],
@@ -60,7 +111,13 @@ describe('evaluateProfileReadiness', () => {
   it('marks all mapped roles ready when mapped profiles are available', () => {
     const report = evaluateProfileReadiness({
       project: makeProject(),
-      availableProfiles: ['researcher', 'builder', 'planner', 'deployer', 'supervisor'],
+      availableProfiles: [
+        'researcher',
+        'builder',
+        'planner',
+        'deployer',
+        'supervisor',
+      ],
       defaults: { supervisorProfile: 'supervisor' },
     })
 
@@ -105,7 +162,13 @@ describe('evaluateProfileReadiness', () => {
         },
       }),
       workItem: makeWorkItem({ assignedProfile: 'special-builder' }),
-      availableProfiles: ['researcher', 'builder', 'planner', 'deployer', 'special-builder'],
+      availableProfiles: [
+        'researcher',
+        'builder',
+        'planner',
+        'deployer',
+        'special-builder',
+      ],
     })
 
     expect(report.roles.find((role) => role.role === 'build')).toMatchObject({
@@ -120,11 +183,19 @@ describe('evaluateProfileReadiness', () => {
       project: makeProject({
         runtimeProfiles: { supervisorProfile: 'project-supervisor' },
       } as Partial<ProjectRecord>),
-      availableProfiles: ['researcher', 'builder', 'planner', 'deployer', 'project-supervisor'],
+      availableProfiles: [
+        'researcher',
+        'builder',
+        'planner',
+        'deployer',
+        'project-supervisor',
+      ],
       defaults: { supervisorProfile: 'global-supervisor' },
     })
 
-    expect(report.roles.find((role) => role.role === 'supervisor')).toMatchObject({
+    expect(
+      report.roles.find((role) => role.role === 'supervisor'),
+    ).toMatchObject({
       mappedProfile: 'project-supervisor',
       source: 'project-runtime-profile',
       status: 'ready',
@@ -142,10 +213,18 @@ describe('evaluateProfileReadiness', () => {
           scoutSources: ['architecture-debt-scout'],
         },
       }),
-      availableProfiles: ['researcher', 'builder', 'planner', 'deployer', 'scout'],
+      availableProfiles: [
+        'researcher',
+        'builder',
+        'planner',
+        'deployer',
+        'scout',
+      ],
     })
 
-    expect(report.roles.find((role) => role.role === 'autopilot-scout')).toMatchObject({
+    expect(
+      report.roles.find((role) => role.role === 'autopilot-scout'),
+    ).toMatchObject({
       mappedProfile: 'scout',
       source: 'project-autopilot-policy',
       status: 'ready',

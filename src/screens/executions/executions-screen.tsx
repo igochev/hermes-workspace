@@ -3,12 +3,12 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 
-import type { ExecutionRunRecord } from '../../server/execution-runs-store'
 import {
   buildExecutionsViewModel,
   parseExecutionsRouteInput,
-  type ExecutionsFilters,
 } from './executions-view-model'
+import type { ExecutionsFilters } from './executions-view-model'
+import type { ExecutionRunRecord } from '../../server/execution-runs-store'
 
 export const EXECUTIONS_SCREEN_TITLE = 'Executions'
 export const EXECUTIONS_SCREEN_HELP_COPY =
@@ -22,6 +22,7 @@ export const EXECUTIONS_LEGACY_NO_RECORD_TITLE =
 export type LegacyExecutionLookup = {
   status: 'no_durable_run'
   jobId: string
+  projectId?: string
   workItemId?: string
   message: string
 }
@@ -59,10 +60,14 @@ export function buildExecutionsScreenViewModel(
       legacyLookup && base.runs.length === 0
         ? {
             title: EXECUTIONS_LEGACY_NO_RECORD_TITLE,
-            message: legacyLookup.message,
-            workItemHref: legacyLookup.workItemId
-              ? `/work-items/${encodeURIComponent(legacyLookup.workItemId)}`
-              : null,
+            message:
+              legacyLookup.workItemId && !legacyLookup.projectId
+                ? `${legacyLookup.message} Project context is required to open the Work Item from this legacy trace.`
+                : legacyLookup.message,
+            workItemHref:
+              legacyLookup.projectId && legacyLookup.workItemId
+                ? `/projects/${encodeURIComponent(legacyLookup.projectId)}/work-items/${encodeURIComponent(legacyLookup.workItemId)}`
+                : null,
           }
         : null,
   }

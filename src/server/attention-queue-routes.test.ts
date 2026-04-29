@@ -3,9 +3,26 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { Route as AttentionQueueRoute } from '../routes/api/attention-queue'
 import { createProject } from './projects-store'
 import { createWorkItem } from './work-items-store'
-import { Route as AttentionQueueRoute } from '../routes/api/attention-queue'
+
+type RouteHandler<
+  TParams extends Record<string, string> = Record<string, string>,
+> = (input: { request: Request; params?: TParams }) => Promise<Response>
+
+function getRouteHandler<
+  TMethod extends 'GET' | 'POST',
+  TParams extends Record<string, string> = Record<string, string>,
+>(route: unknown, method: TMethod): RouteHandler<TParams> {
+  return (
+    route as {
+      options: { server: { handlers: Record<TMethod, RouteHandler<TParams>> } }
+    }
+  ).options.server.handlers[method]
+}
+
+const getAttentionQueue = getRouteHandler(AttentionQueueRoute, 'GET')
 
 describe('attention queue route', () => {
   let tempHome: string
@@ -13,7 +30,9 @@ describe('attention queue route', () => {
   let previousHermesPassword: string | undefined
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-attention-route-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-attention-route-'),
+    )
     previousHermesHome = process.env.HERMES_HOME
     previousHermesPassword = process.env.HERMES_PASSWORD
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
@@ -33,7 +52,7 @@ describe('attention queue route', () => {
   it('returns 401 when unauthenticated', async () => {
     process.env.HERMES_PASSWORD = 'secret'
 
-    const response = await AttentionQueueRoute.options.server.handlers.GET({
+    const response = await getAttentionQueue({
       request: new Request('http://127.0.0.1:3456/api/attention-queue'),
     })
 
@@ -41,7 +60,10 @@ describe('attention queue route', () => {
   })
 
   it('refreshes and returns attention queue items', async () => {
-    const project = createProject({ name: 'Mission Control', repoPath: '/repos/mission-control' })
+    const project = createProject({
+      name: 'Mission Control',
+      repoPath: '/repos/mission-control',
+    })
     const workItem = createWorkItem({
       projectId: project.id,
       title: 'Failed work',
@@ -52,12 +74,16 @@ describe('attention queue route', () => {
       missionState: 'failed',
     })
 
-    const response = await AttentionQueueRoute.options.server.handlers.GET({
-      request: new Request('http://127.0.0.1:3456/api/attention-queue?refresh=true'),
+    const response = await getAttentionQueue({
+      request: new Request(
+        'http://127.0.0.1:3456/api/attention-queue?refresh=true',
+      ),
     })
 
     expect(response.status).toBe(200)
-    const body = (await response.json()) as { items: Array<{ dedupeKey: string }> }
+    const body = (await response.json()) as {
+      items: Array<{ dedupeKey: string }>
+    }
     expect(body.items).toEqual([
       expect.objectContaining({ dedupeKey: `mission_failed:${workItem.id}` }),
     ])

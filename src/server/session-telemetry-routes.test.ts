@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route as SessionTelemetryRoute } from '../routes/api/session-telemetry'
+
 const { ensureGatewayProbed, listSessions, toSessionSummary } = vi.hoisted(
   () => ({
     ensureGatewayProbed: vi.fn(),
@@ -14,7 +16,22 @@ vi.mock('./hermes-api', () => ({
   toSessionSummary,
 }))
 
-import { Route as SessionTelemetryRoute } from '../routes/api/session-telemetry'
+type RouteHandler<
+  TParams extends Record<string, string> = Record<string, string>,
+> = (input: { request: Request; params?: TParams }) => Promise<Response>
+
+function getRouteHandler<
+  TMethod extends 'GET' | 'POST',
+  TParams extends Record<string, string> = Record<string, string>,
+>(route: unknown, method: TMethod): RouteHandler<TParams> {
+  return (
+    route as {
+      options: { server: { handlers: Record<TMethod, RouteHandler<TParams>> } }
+    }
+  ).options.server.handlers[method]
+}
+
+const getSessionTelemetry = getRouteHandler(SessionTelemetryRoute, 'GET')
 
 describe('session telemetry route', () => {
   const previousHermesPassword = process.env.HERMES_PASSWORD
@@ -34,7 +51,7 @@ describe('session telemetry route', () => {
   it('returns 401 when telemetry is requested without authentication', async () => {
     process.env.HERMES_PASSWORD = 'secret'
 
-    const response = await SessionTelemetryRoute.options.server.handlers.GET({
+    const response = await getSessionTelemetry({
       request: new Request('http://127.0.0.1:3456/api/session-telemetry'),
     })
 
@@ -74,7 +91,7 @@ describe('session telemetry route', () => {
       updatedAt: session.started_at * 1000,
     }))
 
-    const response = await SessionTelemetryRoute.options.server.handlers.GET({
+    const response = await getSessionTelemetry({
       request: new Request('http://127.0.0.1:3456/api/session-telemetry'),
     })
 
@@ -96,7 +113,7 @@ describe('session telemetry route', () => {
   it('returns unavailable telemetry instead of failing when session API is unavailable', async () => {
     ensureGatewayProbed.mockResolvedValue({ sessions: false })
 
-    const response = await SessionTelemetryRoute.options.server.handlers.GET({
+    const response = await getSessionTelemetry({
       request: new Request('http://127.0.0.1:3456/api/session-telemetry'),
     })
 
@@ -120,7 +137,7 @@ describe('session telemetry route', () => {
     ensureGatewayProbed.mockResolvedValue({ sessions: true })
     listSessions.mockRejectedValue(new Error('gateway offline'))
 
-    const response = await SessionTelemetryRoute.options.server.handlers.GET({
+    const response = await getSessionTelemetry({
       request: new Request('http://127.0.0.1:3456/api/session-telemetry'),
     })
 

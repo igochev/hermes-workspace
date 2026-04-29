@@ -8,13 +8,19 @@ import {
   appendWorkItemHistoryEntry,
   getWorkItem,
   updateWorkItem,
-  type WorkItemPhase,
-  type WorkItemPriority,
-  type WorkItemRiskLevel,
+} from './work-items-store'
+import type {
+  WorkItemPhase,
+  WorkItemPriority,
+  WorkItemRiskLevel,
 } from './work-items-store'
 
 export type WorkItemApprovalPhase = 'review' | 'deploy'
-export type WorkItemApprovalStatus = 'pending' | 'approved' | 'changes_requested' | 'rejected'
+export type WorkItemApprovalStatus =
+  | 'pending'
+  | 'approved'
+  | 'changes_requested'
+  | 'rejected'
 
 export type WorkItemApprovalRecord = {
   id: string
@@ -77,7 +83,11 @@ function ensureWorkItemApprovalsFile(): void {
   const approvalsFile = getWorkItemApprovalsFile()
   fs.mkdirSync(hermesHome, { recursive: true })
   if (!fs.existsSync(approvalsFile)) {
-    fs.writeFileSync(approvalsFile, JSON.stringify({ approvals: [] }, null, 2) + '\n', 'utf-8')
+    fs.writeFileSync(
+      approvalsFile,
+      JSON.stringify({ approvals: [] }, null, 2) + '\n',
+      'utf-8',
+    )
   }
 }
 
@@ -88,7 +98,9 @@ function readApprovalsFile(): WorkItemApprovalsFile {
     const raw = fs.readFileSync(approvalsFile, 'utf-8').trim()
     if (!raw) return { approvals: [] }
     const parsed = JSON.parse(raw) as Partial<WorkItemApprovalsFile>
-    return { approvals: Array.isArray(parsed.approvals) ? parsed.approvals : [] }
+    return {
+      approvals: Array.isArray(parsed.approvals) ? parsed.approvals : [],
+    }
   } catch {
     return { approvals: [] }
   }
@@ -96,11 +108,17 @@ function readApprovalsFile(): WorkItemApprovalsFile {
 
 function writeApprovalsFile(data: WorkItemApprovalsFile): void {
   ensureWorkItemApprovalsFile()
-  fs.writeFileSync(getWorkItemApprovalsFile(), JSON.stringify(data, null, 2) + '\n', 'utf-8')
+  fs.writeFileSync(
+    getWorkItemApprovalsFile(),
+    JSON.stringify(data, null, 2) + '\n',
+    'utf-8',
+  )
 }
 
 function asOptionalString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined
 }
 
 function normalizePhase(value: unknown): WorkItemApprovalPhase {
@@ -108,7 +126,9 @@ function normalizePhase(value: unknown): WorkItemApprovalPhase {
 }
 
 function normalizeStatus(value: unknown): WorkItemApprovalStatus {
-  return value === 'approved' || value === 'changes_requested' || value === 'rejected'
+  return value === 'approved' ||
+    value === 'changes_requested' ||
+    value === 'rejected'
     ? value
     : 'pending'
 }
@@ -117,7 +137,15 @@ function normalizeApproval(
   approval: Partial<WorkItemApprovalRecord> &
     Pick<
       WorkItemApprovalRecord,
-      'id' | 'workItemId' | 'projectId' | 'phase' | 'status' | 'requestedBy' | 'requestedAt' | 'createdAt' | 'updatedAt'
+      | 'id'
+      | 'workItemId'
+      | 'projectId'
+      | 'phase'
+      | 'status'
+      | 'requestedBy'
+      | 'requestedAt'
+      | 'createdAt'
+      | 'updatedAt'
     >,
 ): WorkItemApprovalRecord {
   return {
@@ -137,14 +165,25 @@ function normalizeApproval(
   }
 }
 
-export function listWorkItemApprovals(workItemId?: string): Array<WorkItemApprovalRecord> {
-  const approvals = readApprovalsFile().approvals.map((approval) => normalizeApproval(approval))
-  const filtered = workItemId ? approvals.filter((approval) => approval.workItemId === workItemId) : approvals
+export function listWorkItemApprovals(
+  workItemId?: string,
+): Array<WorkItemApprovalRecord> {
+  const approvals = readApprovalsFile().approvals.map((approval) =>
+    normalizeApproval(approval),
+  )
+  const filtered = workItemId
+    ? approvals.filter((approval) => approval.workItemId === workItemId)
+    : approvals
   return filtered.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
 }
 
-export function getWorkItemApproval(approvalId: string): WorkItemApprovalRecord | null {
-  return listWorkItemApprovals().find((approval) => approval.id === approvalId) ?? null
+export function getWorkItemApproval(
+  approvalId: string,
+): WorkItemApprovalRecord | null {
+  return (
+    listWorkItemApprovals().find((approval) => approval.id === approvalId) ??
+    null
+  )
 }
 
 function priorityRank(priority: WorkItemPriority): number {
@@ -172,46 +211,60 @@ function shouldAutoApproveReview(workItemId: string): boolean {
 
   const project = getProject(workItem.projectId)
   if (!project?.reviewAutoApproval.enabled) return false
-  return priorityRank(workItem.priority) <= priorityRank(project.reviewAutoApproval.maxPriority)
+  return (
+    priorityRank(workItem.priority) <=
+    priorityRank(project.reviewAutoApproval.maxPriority)
+  )
 }
 
 export function listApprovalInboxEntries(): Array<ApprovalInboxEntry> {
-  return listWorkItemApprovals()
-    .map((approval) => {
-      const workItem = getWorkItem(approval.workItemId)
-      const project = getProject(approval.projectId)
-      if (!workItem || !project) return null
-      return {
-        approvalId: approval.id,
-        workItemId: workItem.id,
-        workItemTitle: workItem.title,
-        projectId: project.id,
-        projectName: project.name,
-        phase: approval.phase,
-        status: approval.status,
-        requestedBy: approval.requestedBy,
-        requestedAt: approval.requestedAt,
-        resolvedBy: approval.resolvedBy,
-        resolvedAt: approval.resolvedAt,
-        notes: approval.notes,
-        resolutionNotes: approval.resolutionNotes,
-      } satisfies ApprovalInboxEntry
+  const entries: Array<ApprovalInboxEntry> = []
+
+  for (const approval of listWorkItemApprovals()) {
+    const workItem = getWorkItem(approval.workItemId)
+    const project = getProject(approval.projectId)
+    if (!workItem || !project) continue
+
+    entries.push({
+      approvalId: approval.id,
+      workItemId: workItem.id,
+      workItemTitle: workItem.title,
+      projectId: project.id,
+      projectName: project.name,
+      phase: approval.phase,
+      status: approval.status,
+      requestedBy: approval.requestedBy,
+      requestedAt: approval.requestedAt,
+      ...(approval.resolvedBy ? { resolvedBy: approval.resolvedBy } : {}),
+      ...(approval.resolvedAt ? { resolvedAt: approval.resolvedAt } : {}),
+      ...(approval.notes ? { notes: approval.notes } : {}),
+      ...(approval.resolutionNotes
+        ? { resolutionNotes: approval.resolutionNotes }
+        : {}),
     })
-    .filter((entry): entry is ApprovalInboxEntry => Boolean(entry))
-    .sort((a, b) => {
-      const aPending = a.status === 'pending' ? 1 : 0
-      const bPending = b.status === 'pending' ? 1 : 0
-      if (aPending !== bPending) return bPending - aPending
-      return b.requestedAt.localeCompare(a.requestedAt)
-    })
+  }
+
+  return entries.sort((a, b) => {
+    const aPending = a.status === 'pending' ? 1 : 0
+    const bPending = b.status === 'pending' ? 1 : 0
+    if (aPending !== bPending) return bPending - aPending
+    return b.requestedAt.localeCompare(a.requestedAt)
+  })
 }
 
 function updateWorkItemApproval(
   approvalId: string,
-  updates: Partial<Omit<WorkItemApprovalRecord, 'id' | 'workItemId' | 'projectId' | 'createdAt' | 'requestedAt'>>,
+  updates: Partial<
+    Omit<
+      WorkItemApprovalRecord,
+      'id' | 'workItemId' | 'projectId' | 'createdAt' | 'requestedAt'
+    >
+  >,
 ): WorkItemApprovalRecord | null {
   const file = readApprovalsFile()
-  const currentIndex = file.approvals.findIndex((approval) => approval.id === approvalId)
+  const currentIndex = file.approvals.findIndex(
+    (approval) => approval.id === approvalId,
+  )
   if (currentIndex === -1) return null
 
   const current = normalizeApproval(file.approvals[currentIndex])
@@ -227,7 +280,9 @@ function updateWorkItemApproval(
   })
 
   file.approvals[currentIndex] = next
-  writeApprovalsFile({ approvals: file.approvals.map((approval) => normalizeApproval(approval)) })
+  writeApprovalsFile({
+    approvals: file.approvals.map((approval) => normalizeApproval(approval)),
+  })
   return next
 }
 
@@ -238,7 +293,8 @@ export function requestWorkItemApproval(
   const workItem = getWorkItem(workItemId)
   if (!workItem) throw new Error('Work item not found')
   const phase = input.phase ?? 'review'
-  if (workItem.phase !== phase) throw new Error(`Work item must be in ${phase} phase`)
+  if (workItem.phase !== phase)
+    throw new Error(`Work item must be in ${phase} phase`)
   const project = getProject(workItem.projectId)
   if (!project) throw new Error('Project not found')
 
@@ -254,7 +310,8 @@ export function requestWorkItemApproval(
   }
 
   const now = new Date().toISOString()
-  const autoApproved = phase === 'review' && shouldAutoApproveReview(workItem.id)
+  const autoApproved =
+    phase === 'review' && shouldAutoApproveReview(workItem.id)
   const approval = normalizeApproval({
     id: randomUUID(),
     workItemId: workItem.id,
@@ -266,21 +323,26 @@ export function requestWorkItemApproval(
     resolvedBy: autoApproved ? 'policy' : undefined,
     resolvedAt: autoApproved ? now : undefined,
     notes: input.notes,
-    resolutionNotes: autoApproved ? 'Auto-approved by project review policy.' : undefined,
+    resolutionNotes: autoApproved
+      ? 'Auto-approved by project review policy.'
+      : undefined,
     createdAt: now,
     updatedAt: now,
   })
 
   const file = readApprovalsFile()
   file.approvals.push(approval)
-  writeApprovalsFile({ approvals: file.approvals.map((entry) => normalizeApproval(entry)) })
+  writeApprovalsFile({
+    approvals: file.approvals.map((entry) => normalizeApproval(entry)),
+  })
 
   if (autoApproved) {
     const updatedWorkItem = updateWorkItem(workItem.id, {
       status: 'active',
       phase: 'deploy',
     })
-    if (!updatedWorkItem) throw new Error('Failed to update work item after auto-approval')
+    if (!updatedWorkItem)
+      throw new Error('Failed to update work item after auto-approval')
     appendWorkItemHistoryEntry(updatedWorkItem.id, {
       action: 'status-change',
       status: 'active',
@@ -363,10 +425,14 @@ function approvalResolutionTransition(
 export function resolveWorkItemApprovalDecision(
   approvalId: string,
   input: ResolveWorkItemApprovalInput,
-): { approval: WorkItemApprovalRecord; workItem: NonNullable<ReturnType<typeof getWorkItem>> } {
+): {
+  approval: WorkItemApprovalRecord
+  workItem: NonNullable<ReturnType<typeof getWorkItem>>
+} {
   const approval = getWorkItemApproval(approvalId)
   if (!approval) throw new Error('Approval not found')
-  if (approval.status !== 'pending') throw new Error('Approval already resolved')
+  if (approval.status !== 'pending')
+    throw new Error('Approval already resolved')
 
   const workItem = getWorkItem(approval.workItemId)
   if (!workItem) throw new Error('Work item not found')
@@ -379,12 +445,16 @@ export function resolveWorkItemApprovalDecision(
   })
   if (!updatedApproval) throw new Error('Failed to update approval')
 
-  const transition = approvalResolutionTransition(updatedApproval, input.decision)
+  const transition = approvalResolutionTransition(
+    updatedApproval,
+    input.decision,
+  )
   const updatedWorkItem = updateWorkItem(workItem.id, {
     status: transition.status,
     phase: transition.phase,
   })
-  if (!updatedWorkItem) throw new Error('Failed to update work item after approval decision')
+  if (!updatedWorkItem)
+    throw new Error('Failed to update work item after approval decision')
 
   const historyWorkItem = appendWorkItemHistoryEntry(updatedWorkItem.id, {
     action: 'status-change',
@@ -395,7 +465,8 @@ export function resolveWorkItemApprovalDecision(
     sessionKey: updatedWorkItem.sessionKeys.at(-1),
     profile: updatedWorkItem.assignedProfile,
   })
-  if (!historyWorkItem) throw new Error('Failed to append approval history entry')
+  if (!historyWorkItem)
+    throw new Error('Failed to append approval history entry')
 
   return {
     approval: updatedApproval,

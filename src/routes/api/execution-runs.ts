@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { isAuthenticated } from '../../server/auth-middleware'
-import {
-  listExecutionRuns,
-  type ExecutionRunRole,
-  type ExecutionRunState,
-  type ListExecutionRunsFilters,
+import { listExecutionRuns } from '../../server/execution-runs-store'
+import type {
+  ExecutionRunRole,
+  ExecutionRunState,
+  ListExecutionRunsFilters,
 } from '../../server/execution-runs-store'
 import type { WorkItemPhase } from '../../server/work-items-store'
 
@@ -73,6 +73,7 @@ function buildLegacyLookup(
   return {
     status: 'no_durable_run',
     jobId: filters.jobId,
+    projectId: filters.projectId,
     workItemId: filters.workItemId,
     message: `Scheduled job ${filters.jobId} was referenced by a work item, but no durable execution run record exists yet.`,
   }
