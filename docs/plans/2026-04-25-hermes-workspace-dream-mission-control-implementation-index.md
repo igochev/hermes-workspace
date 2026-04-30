@@ -2,9 +2,9 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** none — Real Executions Runtime shipped; ask Main/CEO for the next detailed plan before starting new product work.
+> **Current active implementation plan:** `docs/plans/2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md`
 >
-> **Most recently shipped implementation plan:** `docs/plans/2026-04-29-hermes-workspace-real-executions-runtime-plan.md`
+> **Most recently shipped implementation plan:** `docs/plans/2026-04-29-hermes-workspace-real-executions-runtime-plan.md` (committed/pushed at `bf6706a`)
 >
 > **Previous stabilization plan:** `docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
 >
@@ -111,12 +111,13 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 | T1 | `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Clear repo-wide `pnpm exec tsc --noEmit` baseline debt so TypeScript can become a hard gate again | Shipped / Main-reviewed; committed at `840a67e`; final report `dogfood-output/typescript-baseline-stabilization-final-latest.md` |
 | E1 | `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Clear repo-wide ESLint baseline debt so `pnpm exec eslint . --max-warnings=0` can become a hard autonomous merge gate | Shipped; committed/pushed at `d0edae3`; final report `dogfood-output/eslint-baseline-stabilization-final-latest.md` |
 
-### Production Dogfood Real-Idea Readiness + Real Executions Runtime — shipped
+### Production Dogfood Real-Idea Readiness + Real Executions Runtime — active hardening
 
 | Order | Plan | Purpose | Status |
 |---:|---|---|---|
 | Q1 | `2026-04-29-hermes-workspace-production-dogfood-queue-hygiene-real-idea-readiness-plan.md` | Clean stale ABACUS dummy/test queue items safely, preserve historical evidence, prove no stale item can auto-run, and prepare the lane for one real Family Command Center idea | Shipped; real idea created (`697d0059-a3ca-438e-b92c-481f39e7566b`) |
-| R1 | `2026-04-29-hermes-workspace-real-executions-runtime-plan.md` | Replace Scheduled Job-backed Work Item launches with first-class real `/executions` runs: clickable live progress, logs/output, final results, artifacts, errors, and no normal Work Item cron-job creation | Shipped; final dogfood PASS with work item `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`, execution `7b217f97-691c-4976-a6f8-35041a26591b`, report `dogfood-output/real-executions-runtime-final-latest.md` |
+| R1 | `2026-04-29-hermes-workspace-real-executions-runtime-plan.md` | Replace Scheduled Job-backed Work Item launches with first-class real `/executions` runs: clickable live progress, logs/output, final results, artifacts, errors, and no normal Work Item cron-job creation | Shipped; committed/pushed at `bf6706a`; final dogfood PASS with work item `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`, execution `7b217f97-691c-4976-a6f8-35041a26591b`, report `dogfood-output/real-executions-runtime-final-latest.md` |
+| R2 | `2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md` | Hardening after R1: stream/session heartbeat into immediate `ExecutionRunRecord`, parse immediate review final output from execution records, preserve legacy Scheduled Job compatibility, and dogfood no-new-jobs evidence | Active; Builder starts with Task 1 immediate review sync RED tests |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -131,7 +132,7 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 Current inspected baseline:
 
 - Branch: `my-hermes-workspace-dev`
-- Commit inspected for this update: `840a67e` plus active ESLint Baseline Stabilization planning docs
+- Commit inspected for this update: `bf6706a` plus active Immediate Execution Observability Hardening planning docs
 - Test command: `pnpm vitest run` or `pnpm test`
 - Build command: `pnpm build`
 - Service: `hermes-workspace.service`
@@ -215,6 +216,7 @@ Then live verify UI/API changes.
 | Document | Status | How to use now |
 |---|---|---|
 | `2026-04-29-hermes-workspace-real-executions-runtime-plan.md` | Shipped | Historical; final dogfood PASS proved clickable live `/executions/:executionId` trace for work item `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`, execution `7b217f97-691c-4976-a6f8-35041a26591b`; report `dogfood-output/real-executions-runtime-final-latest.md` |
+| `2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md` | Active hardening plan | Builder must implement next; makes immediate execution heartbeat/latest-output and immediate review sync first-class before more product roadmap work |
 | `2026-04-29-hermes-workspace-production-dogfood-queue-hygiene-real-idea-readiness-plan.md` | Shipped real-idea readiness plan | Historical; stale ABACUS dummy/test queue cleaned safely and real idea work item `697d0059-a3ca-438e-b92c-481f39e7566b` created |
 | `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Shipped stabilization plan | Historical; full `pnpm exec eslint . --max-warnings=0` is green and package committed/pushed at `d0edae3`; final report `dogfood-output/eslint-baseline-stabilization-final-latest.md` |
 | `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Shipped / Main-reviewed stabilization plan | Historical; full `tsc --noEmit` is green and package committed at `840a67e`; final report `dogfood-output/typescript-baseline-stabilization-final-latest.md` |
@@ -262,7 +264,10 @@ T1/E1: TypeScript + ESLint baseline stabilization
   └─ shipped; `pnpm exec tsc --noEmit --pretty false` and `pnpm exec eslint . --max-warnings=0` are now hard green gates
 
 R1: Real Executions Runtime
-  └─ shipped; owner correction implemented so `/executions` are real clickable live run traces/results, not Scheduled Jobs or one-shot cron definitions
+  └─ shipped at `bf6706a`; owner correction implemented so `/executions` are real clickable run traces/results, not Scheduled Jobs or one-shot cron definitions
+
+R2: Immediate Execution Observability Hardening
+  └─ active; adds heartbeat/latest-output truth and immediate review sync from `ExecutionRunRecord` before more product feature work
 ```
 
 ---
@@ -284,15 +289,15 @@ A plan is not shipped until:
 
 ## 9. Immediate next action
 
-No detailed implementation plan is active. Builder must not invent new Hermes Workspace product work from historical docs; ask Main/CEO to create or select the next plan and update `docs/handoff/current-slice-status.md`.
+Builder should read `docs/handoff/current-slice-status.md`, then implement `docs/plans/2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md`, starting with Task 1 immediate review sync RED tests.
 
 ## 10. After R1 ships
 
-R1 shipped with final dogfood PASS. Evidence recorded in:
+R1 shipped and was committed/pushed at `bf6706a`. Evidence recorded in:
 
 - `dogfood-output/real-executions-runtime-final-latest.md`
 - Work item: `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`
 - Execution run: `7b217f97-691c-4976-a6f8-35041a26591b`
 - Screenshot: `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_8a169dfa537a4f6d881ebb770c84d576.png`
 
-Next product work requires a new detailed plan/slice from Main/CEO.
+Main/CEO selected R2 observability hardening as the next slice because the roadmap still calls for event/heartbeat truth and supervisor-grade execution evidence. After R2 ships, Main should reassess the roadmap before authorizing more product features.
