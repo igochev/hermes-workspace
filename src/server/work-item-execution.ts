@@ -13,9 +13,10 @@ import {
   getHermesJobRuns,
   listHermesJobs,
 } from './hermes-jobs'
-import { buildMissionLink, launchConductorMission } from './conductor-launch'
+import { buildMissionLink } from './conductor-launch'
 import { launchPlannerReview } from './work-item-launch'
-import { upsertExecutionRun } from './execution-runs-store'
+import { getExecutionRun, upsertExecutionRun } from './execution-runs-store'
+import { buildExecutionTraceHref } from './work-item-run-timeline'
 import {
   getLatestHermesJobOutput,
   parseBuilderEvidenceOutput,
@@ -24,7 +25,7 @@ import {
   evaluateReviewQualityGate,
   parsePlannerReviewDecision,
 } from './work-item-review-decision'
-import type { ExecutionRunState } from './execution-runs-store'
+import type { ExecutionRunRecord, ExecutionRunState } from './execution-runs-store'
 import type {
   BuilderStructuredEvidence,
   HermesJobOutputSnapshot,
@@ -238,6 +239,71 @@ function deriveRunState(
   return jobState
 }
 
+function executionRunStateToSynced(state: ExecutionRunState): SyncedExecutionState {
+  if (state === 'queued') return 'scheduled'
+  return state
+}
+
+function executionRunStateToReviewState(
+  state: ExecutionRunState,
+): WorkItemRecord['reviewState'] {
+  if (state === 'queued') return 'scheduled'
+  if (state === 'stale') return 'running'
+  return state
+}
+
+function extractExecutionRunOutputText(run: ExecutionRunRecord | null): string {
+  if (!run) return ''
+  return [run.finalResponse, run.latestOutputText, run.error, run.summary]
+    .map((value) => readOptionalString(value))
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+function isReviewStateReady(state: SyncedExecutionState): boolean {
+  return state === 'succeeded' || state === 'failed'
+}
+
+function resolveImmediateMissionExecutionRun(
+  workItem: WorkItemRecord,
+): ExecutionRunRecord | null {
+  const missionId = readOptionalString(workItem.missionId)
+  const missionJobId = readOptionalString(
+    (workItem as WorkItemRecord & { missionJobId?: string }).missionJobId,
+  )
+  const candidates = Array.from(new Set([missionId, missionJobId].filter(Boolean)))
+  for (const candidate of candidates) {
+    const run = getExecutionRun(candidate)
+    if (run && run.engine === 'hermes-session') return run
+  }
+  return null
+}
+
+function executionRunStateToMissionState(
+  state: ExecutionRunState,
+): WorkItemMissionState {
+  if (state === 'queued') return 'scheduled'
+  if (state === 'stale') return 'running'
+  return state
+}
+
+function applyImmediateMissionFields(
+  workItem: WorkItemRecord,
+  run: ExecutionRunRecord,
+) {
+  const missionLink = buildExecutionTraceHref({ executionRunId: run.id })
+  return {
+    missionId: run.id,
+    missionJobId: undefined,
+    missionJobName: undefined,
+    missionSessionKeyPrefix: run.sessionKeyPrefix,
+    missionLink: missionLink ?? workItem.missionLink,
+    missionState: executionRunStateToMissionState(run.state),
+    missionLastRunAt: run.lastObservedAt,
+    missionLastError: run.state === 'failed' ? run.error : undefined,
+  }
+}
+
 function recordExecutionRun(params: {
   workItem: WorkItemRecord
   project: ProjectRecord
@@ -449,14 +515,17 @@ export async function syncWorkItemExecutionState(
   const project = getProject(workItem.projectId)
   if (!project) throw new Error('Project not found')
 
+  const immediateMissionRun = resolveImmediateMissionExecutionRun(workItem)
   let job: HermesJobInfo | null = null
-  try {
-    job = await resolveJobForWorkItem(workItem)
-  } catch {
-    job = null
+  if (!immediateMissionRun) {
+    try {
+      job = await resolveJobForWorkItem(workItem)
+    } catch {
+      job = null
+    }
   }
   let localOutput: HermesJobOutputSnapshot | null = null
-  if (!job) {
+  if (!job && !immediateMissionRun) {
     const fallbackJobId =
       readOptionalString(
         (workItem as WorkItemRecord & { missionJobId?: string }).missionJobId,
@@ -468,8 +537,13 @@ export async function syncWorkItemExecutionState(
       job = localOutputJobForWorkItem(workItem, localOutput)
     }
   }
-  let state = deriveExecutionState(job)
-  let missionFields = applyMissionFields(workItem, job, state)
+  const immediateOutputText = extractExecutionRunOutputText(immediateMissionRun)
+  let state = immediateMissionRun
+    ? executionRunStateToSynced(immediateMissionRun.state)
+    : deriveExecutionState(job)
+  let missionFields = immediateMissionRun
+    ? applyImmediateMissionFields(workItem, immediateMissionRun)
+    : applyMissionFields(workItem, job, state)
   let updated = updateWorkItem(workItem.id, missionFields)
   if (!updated) throw new Error('Failed to persist mission sync state')
 
@@ -481,6 +555,7 @@ export async function syncWorkItemExecutionState(
     : []
   const latestRun = jobRuns.length > 0 ? jobRuns[0] : null
   const latestSessionKey =
+    immediateMissionRun?.sessionKey ??
     latestRun?.chatSessionKey ??
     jobRuns.find(
       (run) =>
@@ -494,16 +569,26 @@ export async function syncWorkItemExecutionState(
     workItem: updated,
     state,
     latestRun,
-    fallbackOutputText: localOutput?.latestOutputText,
+    fallbackOutputText: immediateOutputText || localOutput?.latestOutputText,
   })
   if (builderEvidence.state !== state) {
     state = builderEvidence.state
-    missionFields = applyMissionFields(updated, job, state)
+    missionFields = immediateMissionRun
+      ? {
+          ...applyImmediateMissionFields(updated, immediateMissionRun),
+          missionState: executionRunStateToMissionState(state),
+          missionLastError:
+            state === 'failed'
+              ? builderEvidence.error ?? immediateMissionRun.error
+              : undefined,
+        }
+      : applyMissionFields(updated, job, state)
     updated = updateWorkItem(updated.id, missionFields)
     if (!updated)
       throw new Error('Failed to persist Builder evidence sync state')
   } else if (
     state === 'running' &&
+    !immediateMissionRun &&
     project.autonomyLanePolicy.enabled &&
     isStaleHeartbeat(job, latestRun)
   ) {
@@ -686,52 +771,59 @@ export async function syncWorkItemExecutionState(
         (a) => a.phase === 'review' && a.status === 'pending',
       )
       if (pendingReview) {
+        const reviewExecutionRun = getExecutionRun(updated.reviewJobId)
         let reviewJob: HermesJobInfo | null = null
-        try {
-          reviewJob = await getHermesJobById(updated.reviewJobId)
-        } catch {
-          reviewJob = null
+        let reviewState: SyncedExecutionState = 'unknown'
+        let reviewOutputText = ''
+        let isImmediateReviewExecution = false
+
+        if (reviewExecutionRun) {
+          isImmediateReviewExecution = true
+          reviewState = executionRunStateToSynced(reviewExecutionRun.state)
+          reviewOutputText = extractExecutionRunOutputText(reviewExecutionRun)
+        } else {
+          try {
+            reviewJob = await getHermesJobById(updated.reviewJobId)
+          } catch {
+            reviewJob = null
+          }
+          if (reviewJob) {
+            reviewState = deriveExecutionState(reviewJob)
+
+            // Extract review output text: latest run output, job last_error, or empty
+            const reviewJobRuns = await getHermesJobRuns(updated.reviewJobId).catch(
+              () => [],
+            )
+            const latestReviewRun = reviewJobRuns.length > 0 ? reviewJobRuns[0] : null
+            recordExecutionRun({
+              workItem: updated,
+              project,
+              role: 'review',
+              state: reviewState,
+              job: reviewJob,
+              run: latestReviewRun,
+              sessionKeyPrefix: `cron_${reviewJob.id}_`,
+            })
+            const runOutputStr = extractRunOutputText(latestReviewRun)
+            const jobErrorStr = readOptionalString(reviewJob.last_error) || ''
+            reviewOutputText = [runOutputStr, jobErrorStr]
+              .filter(Boolean)
+              .join('\n\n')
+          }
         }
-        if (reviewJob) {
-          const reviewState = deriveExecutionState(reviewJob)
+
+        if (reviewExecutionRun || reviewJob) {
           let parseResult: ReviewDecisionParseResult
+          const outputText = reviewOutputText || `reviewState=${reviewState}`
 
-          // Extract review output text: latest run output, job last_error, or empty
-          const reviewJobRuns = await getHermesJobRuns(updated.reviewJobId).catch(
-            () => [],
-          )
-          const latestReviewRun = reviewJobRuns.length > 0 ? reviewJobRuns[0] : null
-          recordExecutionRun({
-            workItem: updated,
-            project,
-            role: 'review',
-            state: reviewState,
-            job: reviewJob,
-            run: latestReviewRun,
-            sessionKeyPrefix: `cron_${reviewJob.id}_`,
-          })
-          const runOutputStr =
-            latestReviewRun &&
-            latestReviewRun.output !== null &&
-            typeof latestReviewRun.output === 'object'
-              ? Object.values(latestReviewRun.output)
-                  .filter((v): v is string => typeof v === 'string')
-                  .join('\n')
-              : typeof latestReviewRun?.output === 'string'
-                ? latestReviewRun.output
-                : ''
-          const jobErrorStr = readOptionalString(reviewJob.last_error) || ''
-          const combinedText = [runOutputStr, jobErrorStr]
-            .filter(Boolean)
-            .join('\n\n')
-          const outputText = combinedText || `reviewState=${reviewState}`
-
-          if (reviewState === 'succeeded' || reviewState === 'failed') {
+          if (isReviewStateReady(reviewState)) {
             parseResult = parsePlannerReviewDecision(outputText)
           } else {
             parseResult = {
               ok: false,
-              error: `Review job state is ${reviewState} — not ready for evaluation.`,
+              error: `Review ${
+                isImmediateReviewExecution ? 'execution' : 'job'
+              } state is ${reviewState} — not ready for evaluation.`,
               source: 'missing',
               warnings: [],
             }
@@ -765,7 +857,19 @@ export async function syncWorkItemExecutionState(
           workItemUpdates.reviewQualityGateReasons = gateResult.reasons
           workItemUpdates.reviewMissingEvidence = gateResult.missingEvidence
 
-          if (gateResult.autoResolvable && gateResult.status === 'fail') {
+          if (!isReviewStateReady(reviewState)) {
+            updated =
+              updateWorkItem(updated.id, {
+                ...workItemUpdates,
+                reviewState: reviewExecutionRun
+                  ? executionRunStateToReviewState(reviewExecutionRun.state)
+                  : reviewState === 'scheduled'
+                    ? ('scheduled' as const)
+                    : reviewState === 'running'
+                      ? ('running' as const)
+                      : ('unknown' as const),
+              }) ?? updated
+          } else if (gateResult.autoResolvable && gateResult.status === 'fail') {
             // changes_requested — auto-resolve back to build
             const errorNote =
               parseResult.ok && parseResult.parsed.summary
@@ -827,7 +931,7 @@ export async function syncWorkItemExecutionState(
                 }) ?? updated
             }
           } else {
-            // Manual review needed — set reviewDecision=manual_review, keep approval pending
+            // Completed but not auto-resolvable — set manual_review, keep approval pending
             workItemUpdates.reviewDecision = 'manual_review' as const
             workItemUpdates.reviewState =
               reviewState === 'failed'
@@ -861,7 +965,6 @@ export async function syncWorkItemExecutionState(
       // Non-fatal — skip auto-resolve on this sync cycle
     }
   }
-
   return {
     workItem: updated,
     project,

@@ -4,7 +4,7 @@ import { createProject } from './projects-store'
 import {  createWorkItem, getWorkItem } from './work-items-store'
 import { listWorkItemApprovals } from './work-item-approvals'
 import { syncWorkItemExecutionState } from './work-item-execution'
-import { listExecutionRuns } from './execution-runs-store'
+import { listExecutionRuns, upsertExecutionRun } from './execution-runs-store'
 import type {WorkItemRecord} from './work-items-store';
 
 const { getHermesJobById, listHermesJobs, getHermesJobRuns } = vi.hoisted(() => ({
@@ -133,6 +133,64 @@ describe('work-item-execution', () => {
         lastRunAt: '2026-04-21T21:35:00Z',
       },
     ])
+  })
+
+  it('syncs normal immediate mission state from ExecutionRunRecord without rewriting it as a Scheduled Job', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Immediate mission observability',
+      status: 'active',
+      phase: 'research',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'exec-immediate-123',
+      missionLink: '/executions/exec-immediate-123',
+      missionState: 'running',
+      sessionKeys: [],
+    })
+
+    upsertExecutionRun({
+      id: 'exec-immediate-123',
+      workItemId: workItem.id,
+      projectId: project.id,
+      role: 'planner',
+      phase: 'research',
+      engine: 'hermes-session',
+      state: 'running',
+      profile: 'planner',
+      sessionKey: 'session-immediate-123',
+      startedAt: '2026-04-30T12:00:00Z',
+      lastObservedAt: '2026-04-30T12:01:00Z',
+      latestOutputText: 'Planning heartbeat from immediate execution.',
+      summary: 'Planner execution running in Hermes session.',
+      artifactPaths: [],
+    })
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(getHermesJobById).not.toHaveBeenCalled()
+    expect(listHermesJobs).not.toHaveBeenCalled()
+    expect(getHermesJobRuns).not.toHaveBeenCalled()
+    expect(result.execution.job).toBeNull()
+    expect(result.execution.state).toBe('running')
+    expect(result.execution.transitionApplied).toBeNull()
+    expect(result.workItem.missionId).toBe('exec-immediate-123')
+    expect(result.workItem.missionJobId).toBeUndefined()
+    expect(result.workItem.missionJobName).toBeUndefined()
+    expect(result.workItem.missionLink).toBe('/executions/exec-immediate-123')
+    expect(result.workItem.missionState).toBe('running')
+    expect(result.workItem.missionLastRunAt).toBe('2026-04-30T12:01:00Z')
+    expect(result.workItem.sessionKeys).toContain('session-immediate-123')
+
+    const persisted = getWorkItem(workItem.id)
+    expect(persisted?.missionJobId).toBeUndefined()
+    expect(persisted?.missionLink).toBe('/executions/exec-immediate-123')
+    expect(persisted?.sessionKeys).toContain('session-immediate-123')
   })
 
   it('blocks a work item and records error details when the mission fails', async () => {
@@ -1133,6 +1191,127 @@ DECISION: APPROVED`,
       expect(result.workItem.reviewQualityGateStatus).toBe('manual_review')
       const approvals = listWorkItemApprovals(workItem.id)
       expect(approvals[0]?.status).toBe('pending')
+    })
+
+    it('resolves approved immediate review execution output when no scheduled job exists', async () => {
+      const project = createProject({
+        name: 'Immediate Review Demo',
+        repoPath: '/repos/immediate-review-demo',
+        defaultBranch: 'main',
+        reviewAutoApproval: { enabled: true, maxPriority: 'medium' },
+      })
+      const workItem = createWorkItem({
+        projectId: project.id,
+        title: 'Immediate review passes',
+        status: 'active',
+        phase: 'review',
+        priority: 'medium',
+        riskLevel: 'medium',
+        repoPathSnapshot: project.repoPath,
+        reviewJobId: 'exec-review-approved',
+        reviewState: 'running',
+      })
+
+      upsertExecutionRun({
+        id: 'exec-review-approved',
+        workItemId: workItem.id,
+        projectId: project.id,
+        role: 'reviewer',
+        phase: 'review',
+        engine: 'hermes-session',
+        state: 'succeeded',
+        profile: 'reviewer',
+        sessionKey: 'session-review-approved',
+        startedAt: '2026-04-30T12:00:00.000Z',
+        finishedAt: '2026-04-30T12:01:00.000Z',
+        lastObservedAt: '2026-04-30T12:01:00.000Z',
+        finalResponse: `REVIEW_DECISION_JSON: ${JSON.stringify({
+          decision: 'approved',
+          confidence: 'high',
+          summary: 'Immediate execution review approved with evidence.',
+          criteria: [{ text: 'Plan satisfied', met: true, evidence: 'Reviewed implementation output' }],
+          evidence: {
+            testCommands: ['pnpm vitest run'],
+            testResults: [{ command: 'pnpm vitest run', status: 'passed', summary: 'All tests passed' }],
+            filesReviewed: ['src/server/work-item-execution.ts'],
+            planReviewed: true,
+          },
+          blockers: [],
+          risks: [],
+        })}`,
+      })
+      getHermesJobById.mockRejectedValue(new Error('Scheduled job not found'))
+      listHermesJobs.mockResolvedValue([])
+      getHermesJobRuns.mockResolvedValue([])
+
+      const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
+      requestWorkItemReviewApproval(workItem.id, { requestedBy: 'system' })
+
+      const result = await syncWorkItemExecutionState(workItem.id)
+
+      expect(result.workItem.reviewDecision).toBe('approved')
+      expect(result.workItem.reviewState).toBe('succeeded')
+      expect(result.workItem.reviewDecisionSource).toBe('json')
+      expect(result.workItem.reviewQualityGateStatus).toBe('pass')
+      expect(result.workItem.status).toBe('active')
+      expect(result.workItem.phase).toBe('deploy')
+      expect(listWorkItemApprovals(workItem.id)[0]?.status).toBe('approved')
+      expect(listExecutionRuns({ workItemId: workItem.id, role: 'reviewer' })[0]).toMatchObject({
+        id: 'exec-review-approved',
+        engine: 'hermes-session',
+        state: 'succeeded',
+        finalResponse: expect.stringContaining('REVIEW_DECISION_JSON'),
+      })
+    })
+
+    it('keeps running immediate review execution pending without pretending approval', async () => {
+      const project = createProject({
+        name: 'Immediate Review Pending Demo',
+        repoPath: '/repos/immediate-review-pending-demo',
+        defaultBranch: 'main',
+        reviewAutoApproval: { enabled: true, maxPriority: 'medium' },
+      })
+      const workItem = createWorkItem({
+        projectId: project.id,
+        title: 'Immediate review still running',
+        status: 'active',
+        phase: 'review',
+        priority: 'medium',
+        riskLevel: 'medium',
+        repoPathSnapshot: project.repoPath,
+        reviewJobId: 'exec-review-running',
+        reviewState: 'running',
+      })
+
+      upsertExecutionRun({
+        id: 'exec-review-running',
+        workItemId: workItem.id,
+        projectId: project.id,
+        role: 'reviewer',
+        phase: 'review',
+        engine: 'hermes-session',
+        state: 'running',
+        profile: 'reviewer',
+        sessionKey: 'session-review-running',
+        startedAt: '2026-04-30T12:02:00.000Z',
+        lastObservedAt: '2026-04-30T12:02:30.000Z',
+        latestOutputText: 'Review is still checking quality gates...',
+      })
+      getHermesJobById.mockResolvedValue(null)
+      listHermesJobs.mockResolvedValue([])
+      getHermesJobRuns.mockResolvedValue([])
+
+      const { requestWorkItemReviewApproval } = await import('./work-item-approvals')
+      requestWorkItemReviewApproval(workItem.id, { requestedBy: 'system' })
+
+      const result = await syncWorkItemExecutionState(workItem.id)
+
+      expect(result.workItem.reviewDecision).toBeUndefined()
+      expect(result.workItem.reviewState).toBe('running')
+      expect(result.workItem.reviewParserError).toContain('not ready')
+      expect(result.workItem.reviewQualityGateStatus).toBe('manual_review')
+      expect(result.workItem.phase).toBe('review')
+      expect(listWorkItemApprovals(workItem.id)[0]?.status).toBe('pending')
     })
   })
 })

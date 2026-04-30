@@ -9,11 +9,13 @@ import { launchImmediateExecution } from './immediate-execution-launch'
 const {
   createSession,
   sendChat,
+  streamChat,
   sendImmediateChatCompletion,
   launchConductorMission,
 } = vi.hoisted(() => ({
   createSession: vi.fn(),
   sendChat: vi.fn(),
+  streamChat: vi.fn(),
   sendImmediateChatCompletion: vi.fn(),
   launchConductorMission: vi.fn(),
 }))
@@ -21,6 +23,7 @@ const {
 vi.mock('./hermes-api', () => ({
   createSession,
   sendChat,
+  streamChat,
   sendImmediateChatCompletion,
 }))
 
@@ -38,6 +41,7 @@ describe('immediate execution launch', () => {
     process.env.HERMES_HOME = join(tempHome, '.hermes')
     createSession.mockReset()
     sendChat.mockReset()
+    streamChat.mockReset()
     sendImmediateChatCompletion.mockReset()
     launchConductorMission.mockReset()
   })
@@ -50,7 +54,7 @@ describe('immediate execution launch', () => {
 
   it('creates a durable execution run before starting a Hermes session and never creates a scheduled job', async () => {
     createSession.mockResolvedValue({ id: 'session-immediate-1' })
-    sendChat.mockReturnValue(new Promise(() => {}))
+    streamChat.mockReturnValue(new Promise(() => {}))
 
     const result = await launchImmediateExecution({
       projectId: 'project-1',
@@ -73,9 +77,15 @@ describe('immediate execution launch', () => {
       title: 'Planner research execution for work-item-1',
       model: undefined,
     })
-    expect(sendChat).toHaveBeenCalledWith('session-immediate-1', {
-      message: expect.stringContaining('Prepare this idea for build.'),
-    })
+    expect(sendChat).not.toHaveBeenCalled()
+    expect(streamChat).toHaveBeenCalledWith(
+      'session-immediate-1',
+      {
+        message: expect.stringContaining('Prepare this idea for build.'),
+        model: undefined,
+      },
+      { onEvent: expect.any(Function) },
+    )
 
     const runs = listExecutionRuns({ workItemId: 'work-item-1' })
     expect(runs).toHaveLength(1)
@@ -153,24 +163,100 @@ describe('immediate execution launch', () => {
     expect(run.jobId).toBeUndefined()
   })
 
-  it('records background send failures on the same execution run', async () => {
-    createSession.mockResolvedValue({ id: 'session-immediate-2' })
-    sendChat.mockRejectedValue(new Error('model provider rejected request'))
+  it('streams session events into latest output and final response on the execution run', async () => {
+    createSession.mockResolvedValue({ id: 'session-stream-1' })
+    streamChat.mockImplementation((_sessionKey, _body, opts) => {
+      opts.onEvent({
+        event: 'message',
+        data: { role: 'assistant', content: 'Researcher found the first signal.' },
+      })
+      opts.onEvent({
+        event: 'tool',
+        data: { tool_name: 'web_search', content: 'Searched docs for API support.' },
+      })
+      opts.onEvent({
+        event: 'message',
+        data: { role: 'assistant', finalResponse: 'Planner final response from stream.' },
+      })
+      return Promise.resolve()
+    })
 
     const result = await launchImmediateExecution({
       projectId: 'project-1',
       workItemId: 'work-item-1',
-      phase: 'review',
-      role: 'reviewer',
-      goal: 'Review the output.',
+      phase: 'research',
+      role: 'planner',
+      profile: 'planner',
+      goal: 'Prepare this idea for build.',
+      repoPath: '/repos/demo',
+    })
+
+    expect(sendChat).not.toHaveBeenCalled()
+    expect(streamChat).toHaveBeenCalledWith(
+      'session-stream-1',
+      {
+        message: expect.stringContaining('Prepare this idea for build.'),
+        model: undefined,
+      },
+      { onEvent: expect.any(Function) },
+    )
+
+    await vi.waitFor(() => {
+      expect(getExecutionRun(result.executionRunId)).toMatchObject({
+        state: 'succeeded',
+        sessionKey: 'session-stream-1',
+        latestOutputText: expect.stringContaining('Searched docs for API support.'),
+        finalResponse: 'Planner final response from stream.',
+        summary: 'Planner execution completed.',
+      })
+    })
+  })
+
+  it('preserves streamed latest output when a session stream fails', async () => {
+    createSession.mockResolvedValue({ id: 'session-stream-failed' })
+    streamChat.mockImplementation((_sessionKey, _body, opts) => {
+      opts.onEvent({
+        event: 'message',
+        data: { role: 'assistant', content: 'Partial progress before provider outage.' },
+      })
+      return Promise.reject(new Error('stream transport failed'))
+    })
+
+    const result = await launchImmediateExecution({
+      projectId: 'project-1',
+      workItemId: 'work-item-1',
+      phase: 'build',
+      role: 'builder',
+      goal: 'Build the feature.',
       repoPath: '/repos/demo',
     })
 
     await vi.waitFor(() => {
       expect(getExecutionRun(result.executionRunId)).toMatchObject({
         state: 'failed',
-        error: 'model provider rejected request',
+        error: 'stream transport failed',
+        latestOutputText: expect.stringContaining('Partial progress before provider outage.'),
       })
+    })
+  })
+
+  it('records running fallback observability while waiting on immediate chat completion', async () => {
+    createSession.mockRejectedValue(new Error('Hermes API POST /api/sessions: 404 404: Not Found'))
+    sendImmediateChatCompletion.mockReturnValue(new Promise(() => {}))
+
+    const result = await launchImmediateExecution({
+      projectId: 'project-1',
+      workItemId: 'work-item-1',
+      phase: 'research',
+      role: 'planner',
+      goal: 'Prepare the family command center idea.',
+      repoPath: '/repos/demo',
+    })
+
+    expect(getExecutionRun(result.executionRunId)).toMatchObject({
+      state: 'running',
+      latestOutputText: expect.stringContaining('waiting on immediate chat completion'),
+      summary: 'Planner execution running via immediate chat completion.',
     })
   })
 })

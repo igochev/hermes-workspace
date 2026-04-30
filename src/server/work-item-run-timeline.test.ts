@@ -6,12 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createPlanningDraft } from './planning-drafts-store'
 import { createProject } from './projects-store'
 import { upsertExecutionRun } from './execution-runs-store'
-import {  createWorkItem } from './work-items-store'
+import { createWorkItem } from './work-items-store'
 import {
   buildExecutionTraceHref,
   buildWorkItemRunTimeline,
 } from './work-item-run-timeline'
-import type {WorkItemRecord} from './work-items-store';
+import type { WorkItemRecord } from './work-items-store'
 
 describe('work-item-run-timeline', () => {
   let tempHome: string
@@ -168,6 +168,7 @@ describe('work-item-run-timeline', () => {
       state: 'succeeded',
       profile: 'researcher',
       sessionKey: 'session-research-1',
+      latestOutputText: 'Planner streamed acceptance criteria draft.',
       finalResponse: 'Prepared the idea and drafted acceptance criteria.',
       artifactPaths: ['docs/plans/research-plan.md'],
       lastObservedAt: '2026-04-29T11:00:00.000Z',
@@ -184,12 +185,79 @@ describe('work-item-run-timeline', () => {
       profileName: 'researcher',
       sessionKey: 'session-research-1',
       link: `/executions/${run.id}`,
+      latestOutputText: 'Planner streamed acceptance criteria draft.',
+      finalResponse: 'Prepared the idea and drafted acceptance criteria.',
       artifacts: ['docs/plans/research-plan.md'],
     })
     expect(timeline.rows[1]).toMatchObject({
       phase: 'build',
       state: 'not_started',
       summary: 'No job launched',
+    })
+  })
+
+  it('shows running immediate Builder heartbeat output without legacy Scheduled Job wording', () => {
+    const workItem = createDemoWorkItem({ status: 'active', phase: 'build' })
+    const run = upsertExecutionRun({
+      workItemId: workItem.id,
+      projectId: workItem.projectId,
+      role: 'builder',
+      phase: 'build',
+      engine: 'hermes-session',
+      state: 'running',
+      profile: 'builder',
+      sessionKey: 'session-builder-live',
+      latestOutputText:
+        'Builder streamed: editing src/server/work-item-run-timeline.ts',
+      summary: 'Builder is applying patch set 2.',
+      lastObservedAt: '2026-04-30T12:00:00.000Z',
+    })
+
+    const timeline = buildWorkItemRunTimeline(workItem)
+
+    expect(timeline.rows[1]).toMatchObject({
+      phase: 'build',
+      profileRole: 'builder',
+      executionRunId: run.id,
+      state: 'running',
+      profileName: 'builder',
+      sessionKey: 'session-builder-live',
+      link: `/executions/${run.id}`,
+      heartbeatLabel: 'Last observed 2026-04-30T12:00:00.000Z',
+      latestOutputText:
+        'Builder streamed: editing src/server/work-item-run-timeline.ts',
+      summary: 'Builder is running.',
+    })
+    expect(timeline.rows[1].summary).not.toMatch(
+      /Legacy scheduled-job|job scheduled/i,
+    )
+  })
+
+  it('links immediate Reviewer execution rows to the durable execution detail', () => {
+    const workItem = createDemoWorkItem({ status: 'active', phase: 'review' })
+    const run = upsertExecutionRun({
+      workItemId: workItem.id,
+      projectId: workItem.projectId,
+      role: 'reviewer',
+      phase: 'review',
+      engine: 'hermes-session',
+      state: 'running',
+      profile: 'reviewer',
+      sessionKey: 'session-reviewer-live',
+      latestOutputText: 'Reviewer streamed checklist item 1.',
+      lastObservedAt: '2026-04-30T12:05:00.000Z',
+    })
+
+    const timeline = buildWorkItemRunTimeline(workItem)
+
+    expect(timeline.rows[2]).toMatchObject({
+      phase: 'review',
+      profileRole: 'reviewer',
+      executionRunId: run.id,
+      profileSource: 'execution-run',
+      state: 'running',
+      latestOutputText: 'Reviewer streamed checklist item 1.',
+      link: `/executions/${run.id}`,
     })
   })
 

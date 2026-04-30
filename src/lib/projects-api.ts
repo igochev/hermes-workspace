@@ -218,6 +218,8 @@ export type WorkItemRunTimelineRow = {
   lastObservedAt?: string
   startedAt?: string
   finishedAt?: string
+  latestOutputText?: string
+  finalResponse?: string
   artifacts: Array<string>
   error?: string
 }

@@ -1746,6 +1746,16 @@ export function WorkItemDetailScreen({
                     <p className="text-xs text-[var(--theme-muted)]">
                       {getWorkItemRunTimelineArtifactCopy(row.artifacts)}
                     </p>
+                    {row.latestOutputText ? (
+                      <p className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-xs text-[var(--theme-text)]">
+                        Latest output: {row.latestOutputText}
+                      </p>
+                    ) : null}
+                    {row.finalResponse ? (
+                      <p className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-xs text-[var(--theme-text)]">
+                        Final response: {row.finalResponse}
+                      </p>
+                    ) : null}
                     {row.nextExpectedAction ? (
                       <p className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-xs text-[var(--theme-text)]">
                         Next: {row.nextExpectedAction}

@@ -44,6 +44,8 @@ export type WorkItemRunTimelineRow = {
   lastObservedAt?: string
   startedAt?: string
   finishedAt?: string
+  latestOutputText?: string
+  finalResponse?: string
   artifacts: Array<string>
   error?: string
 }
@@ -141,11 +143,18 @@ function rowFromRun(
     runId: run.runId,
     sessionKey: run.sessionKey,
     sessionKeyPrefix: run.sessionKeyPrefix,
-    link: buildExecutionTraceHref({ executionRunId: run.id, jobId: run.jobId, workItemId: workItem.id }) ?? undefined,
+    link:
+      buildExecutionTraceHref({
+        executionRunId: run.id,
+        jobId: run.jobId,
+        workItemId: workItem.id,
+      }) ?? undefined,
     heartbeatLabel: heartbeatLabel(run.lastObservedAt),
     lastObservedAt: run.lastObservedAt,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
+    latestOutputText: run.latestOutputText,
+    finalResponse: run.finalResponse,
     artifacts: run.artifactPaths,
     error,
   }
@@ -335,7 +344,11 @@ function applyWorkItemMissionFallback(
     jobId: workItem.missionJobId,
     jobName: workItem.missionJobName,
     sessionKeyPrefix: workItem.missionSessionKeyPrefix,
-    link: buildExecutionTraceHref({ jobId: workItem.missionJobId, workItemId: workItem.id }) ?? undefined,
+    link:
+      buildExecutionTraceHref({
+        jobId: workItem.missionJobId,
+        workItemId: workItem.id,
+      }) ?? undefined,
     heartbeatLabel: heartbeatLabel(workItem.missionLastRunAt),
     lastObservedAt: workItem.missionLastRunAt,
     artifacts: workItem.artifactPaths,
