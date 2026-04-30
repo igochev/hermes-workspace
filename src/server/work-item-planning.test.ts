@@ -14,12 +14,17 @@ import {
   recordPlannerOutput,
 } from './work-item-planning'
 
-const { launchConductorMission } = vi.hoisted(() => ({
+const { launchConductorMission, launchImmediateExecution } = vi.hoisted(() => ({
   launchConductorMission: vi.fn(),
+  launchImmediateExecution: vi.fn(),
 }))
 
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
+}))
+
+vi.mock('./immediate-execution-launch', () => ({
+  launchImmediateExecution,
 }))
 
 describe('work-item-planning', () => {
@@ -31,6 +36,7 @@ describe('work-item-planning', () => {
     previousHermesHome = process.env.HERMES_HOME
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     launchConductorMission.mockReset()
+    launchImmediateExecution.mockReset()
   })
 
   afterEach(() => {
@@ -54,27 +60,32 @@ describe('work-item-planning', () => {
       repoPathSnapshot: project.repoPath,
     })
 
-    launchConductorMission.mockResolvedValue({
-      ok: true,
-      sessionKey: 'cron_job-200_pending',
-      sessionKeyPrefix: 'cron_job-200_',
-      jobId: 'job-200',
-      jobName: 'planner-enrich-job',
-      runId: null,
+    launchImmediateExecution.mockResolvedValue({
+      executionRunId: 'execution-plan-200',
+      sessionKey: 'session-plan-200',
+      state: 'running',
+      link: '/executions/execution-plan-200',
     })
 
     const result = await prepareWorkItemWithPlanner(workItem.id, {})
 
-    expect(launchConductorMission).toHaveBeenCalledTimes(1)
-    expect(launchConductorMission).toHaveBeenCalledWith(
+    expect(launchConductorMission).not.toHaveBeenCalled()
+    expect(launchImmediateExecution).toHaveBeenCalledTimes(1)
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        deliver: 'local',
-        phaseProfiles: expect.objectContaining({ research: 'researcher' }),
+        projectId: project.id,
+        workItemId: workItem.id,
+        phase: 'research',
+        role: 'planner',
+        profile: 'researcher',
+        repoPath: project.repoPath,
       }),
     )
     expect(result.draft.status).toBe('running')
-    expect(result.draft.plannerJobId).toBe('job-200')
+    expect(result.draft.plannerJobId).toBeUndefined()
+    expect(result.draft.plannerLink).toBe('/executions/execution-plan-200')
     expect(result.launch.profile).toBe('researcher')
+    expect(result.launch.executionRunId).toBe('execution-plan-200')
   })
 
   it('planner goal includes schema and strict planner-only constraints', () => {
@@ -161,13 +172,11 @@ describe('work-item-planning', () => {
       repoPathSnapshot: project.repoPath,
     })
 
-    launchConductorMission.mockResolvedValue({
-      ok: true,
-      sessionKey: 'cron_job-201_pending',
-      sessionKeyPrefix: 'cron_job-201_',
-      jobId: 'job-201',
-      jobName: 'planner-enrich-job-2',
-      runId: null,
+    launchImmediateExecution.mockResolvedValue({
+      executionRunId: 'execution-plan-201',
+      sessionKey: 'session-plan-201',
+      state: 'running',
+      link: '/executions/execution-plan-201',
     })
 
     await prepareWorkItemWithPlanner(workItem.id, {})

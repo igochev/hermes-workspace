@@ -13,12 +13,17 @@ import {
 import { getLatestPlanningDraftForWorkItem } from './planning-drafts-store'
 import { getWorkItem } from './work-items-store'
 
-const { launchConductorMission } = vi.hoisted(() => ({
+const { launchConductorMission, launchImmediateExecution } = vi.hoisted(() => ({
   launchConductorMission: vi.fn(),
+  launchImmediateExecution: vi.fn(),
 }))
 
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
+}))
+
+vi.mock('./immediate-execution-launch', () => ({
+  launchImmediateExecution,
 }))
 
 type RouteHandler<
@@ -56,6 +61,7 @@ describe('autopilot suggestions routes', () => {
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     delete process.env.HERMES_PASSWORD
     launchConductorMission.mockReset()
+    launchImmediateExecution.mockReset()
     launchConductorMission.mockResolvedValue({
       ok: true,
       sessionKey: 'cron_job-autopilot-plan_pending',
@@ -63,6 +69,12 @@ describe('autopilot suggestions routes', () => {
       jobId: 'job-autopilot-plan',
       jobName: 'autopilot-planner',
       runId: null,
+    })
+    launchImmediateExecution.mockResolvedValue({
+      executionRunId: 'execution-autopilot-plan',
+      sessionKey: 'session-autopilot-plan',
+      state: 'running',
+      link: '/executions/execution-autopilot-plan',
     })
   })
 
@@ -251,16 +263,19 @@ describe('autopilot suggestions routes', () => {
     expect(body.workItem.phase).toBe('research')
     expect(body.planningDraft.status).toBe('running')
     expect(body.planningDraft.workItemId).toBe(body.workItem.id)
-    expect(body.planningDraft.plannerJobId).toBe('job-autopilot-plan')
+    expect(body.planningDraft.plannerJobId).toBeUndefined()
 
     const latestDraft = getLatestPlanningDraftForWorkItem(body.workItem.id)
     expect(latestDraft?.id).toBe(body.planningDraft.id)
-    expect(launchConductorMission).toHaveBeenCalledWith(
+    expect(latestDraft?.plannerLink).toBe('/executions/execution-autopilot-plan')
+    expect(launchConductorMission).not.toHaveBeenCalled()
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        deliver: 'local',
-        phaseProfiles: expect.objectContaining({
-          research: expect.any(String),
-        }),
+        projectId: project.id,
+        workItemId: body.workItem.id,
+        phase: 'research',
+        role: 'planner',
+        profile: expect.any(String),
       }),
     )
     expect(getWorkItem(body.workItem.id)?.history.at(-1)?.note).toContain(
@@ -316,7 +331,7 @@ describe('autopilot suggestions routes', () => {
     expect(body.workItem.autopilotBuildIntent).toBe('build-after-accepted-plan')
     expect(body.workItem.missionId).toBeUndefined()
     expect(body.planningDraft.status).toBe('running')
-    expect(body.planningDraft.plannerJobId).toBe('job-autopilot-plan')
+    expect(body.planningDraft.plannerJobId).toBeUndefined()
     expect(getWorkItem(body.workItem.id)?.notes).toContain(
       'Autopilot build intent queued: launch build only after an operator accepts the planner draft.',
     )

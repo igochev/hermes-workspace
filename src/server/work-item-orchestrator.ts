@@ -535,9 +535,8 @@ export async function reconcileWorkItemAutonomy(
         createEvent({
           workItem,
           action: 'launch_builder',
-          jobId: launched.launch.jobId,
-          runId:
-            (launched.launch as { runId?: string | null }).runId ?? undefined,
+          jobId: launched.launch.executionRunId,
+          runId: launched.launch.executionRunId,
           statusAfter: launched.workItem.status,
           phaseAfter: launched.workItem.phase,
           message: 'Auto-launched Builder for ready build work item.',

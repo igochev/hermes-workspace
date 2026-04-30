@@ -5,15 +5,17 @@ import { createWorkItem, getWorkItem } from './work-items-store'
 import {
   buildPlannerReviewGoal,
   buildWorkItemLaunchGoal,
+  launchPlannerReview,
   launchWorkItemIntoConductor,
 } from './work-item-launch'
 import { listExecutionRuns } from './execution-runs-store'
 import { upsertRoleCapacityRule } from './role-capacity-policy'
 import { listAttentionQueueItems } from './attention-queue-store'
 
-const { launchConductorMission, buildMissionLink, listProfiles } = vi.hoisted(
+const { launchConductorMission, launchImmediateExecution, buildMissionLink, listProfiles } = vi.hoisted(
   () => ({
     launchConductorMission: vi.fn(),
+    launchImmediateExecution: vi.fn(),
     buildMissionLink: (jobId: string) =>
       `/jobs?jobId=${encodeURIComponent(jobId)}`,
     listProfiles: vi.fn(),
@@ -23,6 +25,10 @@ const { launchConductorMission, buildMissionLink, listProfiles } = vi.hoisted(
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
   buildMissionLink,
+}))
+
+vi.mock('./immediate-execution-launch', () => ({
+  launchImmediateExecution,
 }))
 
 vi.mock('./profiles-browser', () => ({
@@ -105,6 +111,13 @@ describe('work-item-launch', () => {
     previousHermesHome = process.env.HERMES_HOME
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     launchConductorMission.mockReset()
+    launchImmediateExecution.mockReset()
+    launchImmediateExecution.mockImplementation((input: { phase: string; workItemId: string }) => ({
+      executionRunId: `execution-${input.phase}-${input.workItemId.slice(0, 8)}`,
+      sessionKey: `session-${input.phase}-${input.workItemId.slice(0, 8)}`,
+      state: 'running',
+      link: `/executions/execution-${input.phase}-${input.workItemId.slice(0, 8)}`,
+    }))
     listProfiles.mockReset()
     listProfiles.mockReturnValue([
       { name: 'researcher' },
@@ -304,22 +317,19 @@ describe('work-item-launch', () => {
       phaseProfiles: { build: 'builder', research: 'planner' },
     })
 
-    expect(result.launch.jobId).toBe('job-122')
-    expect(launchConductorMission).toHaveBeenCalledTimes(1)
-    expect(listExecutionRuns({ workItemId: workItem.id })).toMatchObject([
-      {
-        workItemId: workItem.id,
+    expect(result.launch.executionRunId).toBeTruthy()
+    expect(result.launch.link).toMatch(/^\/executions\//)
+    expect(launchConductorMission).not.toHaveBeenCalled()
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
         projectId: project.id,
-        role: 'mission',
+        workItemId: workItem.id,
         phase: 'build',
-        engine: 'conductor',
-        jobId: 'job-122',
-        jobName: 'work-item-build-ready',
-        state: 'scheduled',
-        sessionKey: 'cron_job-122_pending',
-        sessionKeyPrefix: 'cron_job-122_',
-      },
-    ])
+        role: 'builder',
+        profile: 'builder',
+        repoPath: project.repoPath,
+      }),
+    )
   })
 
   it('still allows research launch for rough ideas', async () => {
@@ -356,7 +366,7 @@ describe('work-item-launch', () => {
 
     expect(result.launch.phase).toBe('research')
     expect(result.launch.profile).toBe('researcher')
-    expect(launchConductorMission).toHaveBeenCalledTimes(1)
+    expect(launchImmediateExecution).toHaveBeenCalledTimes(1)
   })
 
   it('launches a work item into conductor as a two-phase pipeline when status is ready', async () => {
@@ -397,53 +407,51 @@ describe('work-item-launch', () => {
       supervised: false,
     })
 
-    expect(launchConductorMission).toHaveBeenCalledTimes(1)
-    // Should pass both build and research profiles for two-phase
-    expect(launchConductorMission).toHaveBeenCalledWith(
+    expect(launchImmediateExecution).toHaveBeenCalledTimes(1)
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        phaseProfiles: expect.objectContaining({
-          build: 'builder',
-          research: 'planner',
-        }),
+        phase: 'build',
+        role: 'builder',
+        profile: 'builder',
       }),
     )
     // Goal should be two-phase format
-    const callArgs = launchConductorMission.mock.calls[0][0]
+    const callArgs = launchImmediateExecution.mock.calls[0][0]
     expect(callArgs.goal).toContain('TWO-PHASE')
     expect(callArgs.goal).toContain('Phase 1')
     expect(callArgs.goal).toContain('Phase 2')
     expect(callArgs.goal).toContain('docs/plans/')
 
-    expect(result.launch.jobId).toBe('job-123')
+    expect(result.launch.executionRunId).toBeTruthy()
     expect(result.launch.profile).toBe('builder')
     expect(result.workItem.status).toBe('active')
     expect(result.workItem.phase).toBe('build')
-    expect(result.workItem.missionId).toBe('job-123')
-    expect(result.workItem.missionJobId).toBe('job-123')
-    expect(result.workItem.missionJobName).toBe('work-item-build-demo')
-    expect(result.workItem.missionSessionKeyPrefix).toBe('cron_job-123_')
-    expect(result.workItem.missionLink).toBe('/jobs?jobId=job-123')
-    expect(result.workItem.missionState).toBe('scheduled')
-    expect(result.workItem.sessionKeys).toContain('cron_job-123_pending')
+    expect(result.workItem.missionId).toBe(result.launch.executionRunId)
+    expect(result.workItem.missionJobId).toBeUndefined()
+    expect(result.workItem.missionJobName).toBeUndefined()
+    expect(result.workItem.missionSessionKeyPrefix).toBe(result.launch.sessionKey)
+    expect(result.workItem.missionLink).toBe(result.launch.link)
+    expect(result.workItem.missionState).toBe('running')
+    expect(result.workItem.sessionKeys).toContain(result.launch.sessionKey)
     expect(result.workItem.planFilePath).toMatch(/^docs\/plans\/.*-plan\.md$/)
     expect(result.workItem.history.at(-1)).toMatchObject({
       action: 'launch',
       phase: 'build',
       status: 'active',
-      missionId: 'job-123',
-      sessionKey: 'cron_job-123_pending',
-      sessionKeyPrefix: 'cron_job-123_',
+      missionId: result.launch.executionRunId,
+      sessionKey: result.launch.sessionKey,
+      sessionKeyPrefix: result.launch.sessionKey,
       profile: 'builder',
     })
     expect(result.workItem.history.at(-1)?.note).toContain('two-phase pipeline')
 
     const persisted = getWorkItem(workItem.id)
-    expect(persisted?.missionId).toBe('job-123')
-    expect(persisted?.missionJobId).toBe('job-123')
-    expect(persisted?.missionJobName).toBe('work-item-build-demo')
-    expect(persisted?.missionSessionKeyPrefix).toBe('cron_job-123_')
-    expect(persisted?.missionLink).toBe('/jobs?jobId=job-123')
-    expect(persisted?.missionState).toBe('scheduled')
+    expect(persisted?.missionId).toBe(result.launch.executionRunId)
+    expect(persisted?.missionJobId).toBeUndefined()
+    expect(persisted?.missionJobName).toBeUndefined()
+    expect(persisted?.missionSessionKeyPrefix).toBe(result.launch.sessionKey)
+    expect(persisted?.missionLink).toBe(result.launch.link)
+    expect(persisted?.missionState).toBe('running')
     expect(persisted?.history.at(-1)?.action).toBe('launch')
     expect(persisted?.planFilePath).toMatch(/^docs\/plans\/.*-plan\.md$/)
   })
@@ -484,12 +492,12 @@ describe('work-item-launch', () => {
 
     expect(result.workItem.status).toBe('active')
     expect(result.workItem.phase).toBe('build')
-    expect(result.workItem.missionState).toBe('scheduled')
+    expect(result.workItem.missionState).toBe('running')
     expect(result.workItem.missionLastError).toBeUndefined()
     expect(result.workItem.history.at(-1)).toMatchObject({
       action: 'launch',
-      note: 'Relaunched build via Conductor using profile builder after failure recovery.',
-      missionId: 'job-777',
+      note: 'Relaunched build as immediate execution using profile builder after failure recovery.',
+      missionId: result.launch.executionRunId,
       profile: 'builder',
     })
   })
@@ -527,12 +535,11 @@ describe('work-item-launch', () => {
       phaseProfiles: { build: 'global-builder' },
     })
 
-    expect(launchConductorMission).toHaveBeenCalledWith(
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        phaseProfiles: expect.objectContaining({
-          build: 'project-builder',
-          review: 'project-reviewer',
-        }),
+        phase: 'build',
+        role: 'builder',
+        profile: 'project-builder',
       }),
     )
     expect(result.launch.profile).toBe('project-builder')
@@ -568,11 +575,11 @@ describe('work-item-launch', () => {
       phaseProfiles: { research: 'researcher', build: 'builder' },
     })
 
-    expect(launchConductorMission).toHaveBeenCalledWith(
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        phaseProfiles: expect.objectContaining({
-          research: 'researcher',
-        }),
+        phase: 'research',
+        role: 'planner',
+        profile: 'researcher',
       }),
     )
     expect(result.launch.profile).toBe('researcher')
@@ -625,7 +632,7 @@ describe('work-item-launch', () => {
       phaseProfiles: { build: 'builder' },
     })
 
-    expect(result.launch.jobId).toBe('job-901')
+    expect(result.launch.executionRunId).toBeTruthy()
     expect(result.capacityDecision).toMatchObject({
       role: 'build',
       profile: 'builder',
@@ -691,9 +698,11 @@ describe('work-item-launch', () => {
       'Profile readiness advisory:',
     )
     expect(result.workItem.history.at(-1)?.note).toContain('missing-specialist')
-    expect(launchConductorMission).toHaveBeenCalledWith(
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
       expect.objectContaining({
-        phaseProfiles: expect.objectContaining({ build: 'missing-specialist' }),
+        phase: 'build',
+        role: 'builder',
+        profile: 'missing-specialist',
       }),
     )
   })
@@ -747,7 +756,7 @@ describe('work-item-launch', () => {
       phaseProfiles: { build: 'builder' },
     })
 
-    expect(result.launch.jobId).toBe('job-904')
+    expect(result.launch.executionRunId).toBeTruthy()
     expect(result.capacityDecision.allowed).toBe(false)
     expect(result.capacityDecision.message).toContain(
       'build capacity is at 1/1',
@@ -826,6 +835,47 @@ describe('work-item-launch', () => {
         projectId: project.id,
         workItemId: workItem.id,
         href: `/projects/${project.id}/work-items/${workItem.id}`,
+      }),
+    )
+  })
+
+  it('launches Planner review as an immediate execution instead of a Scheduled Job', async () => {
+    const project = createProject({
+      name: 'Review Immediate',
+      repoPath: '/repos/review-immediate',
+      phaseProfiles: { review: 'reviewer' },
+      ...projectFixture(),
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Review without scheduled job',
+      status: 'active',
+      phase: 'review',
+      priority: 'medium',
+      riskLevel: 'medium',
+      repoPathSnapshot: project.repoPath,
+      planFilePath: 'docs/plans/review.md',
+      acceptanceCriteria: ['Review uses immediate execution'],
+    })
+
+    const reviewLaunch = await launchPlannerReview(workItem, project)
+
+    expect(reviewLaunch).toEqual(
+      expect.objectContaining({
+        reviewJobId: `execution-review-${workItem.id.slice(0, 8)}`,
+        reviewState: 'running',
+        reviewLink: `/executions/execution-review-${workItem.id.slice(0, 8)}`,
+      }),
+    )
+    expect(launchConductorMission).not.toHaveBeenCalled()
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workItemId: workItem.id,
+        projectId: project.id,
+        phase: 'review',
+        role: 'reviewer',
+        profile: 'reviewer',
+        repoPath: project.repoPath,
       }),
     )
   })

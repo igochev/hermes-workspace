@@ -6,6 +6,7 @@ import {
 } from '../components/workspace-shell'
 import { MOBILE_NAV_ITEMS } from '../components/mobile-hamburger-menu'
 import { MOBILE_TABS } from '../components/mobile-tab-bar'
+import { getExecutionsRouteMode } from './executions'
 
 describe('root layout Executions navigation', () => {
   it('tracks /executions as a distinct navigation destination from Scheduled Jobs', () => {
@@ -44,6 +45,13 @@ describe('root layout Executions navigation', () => {
           to: '/jobs',
         }),
       ]),
+    )
+  })
+
+  it('treats /executions/:executionId as execution detail instead of the list screen', () => {
+    expect(getExecutionsRouteMode('/executions')).toBe('list')
+    expect(getExecutionsRouteMode('/executions/7b217f97-691c-4976-a6f8-35041a26591b')).toBe(
+      'detail',
     )
   })
 })

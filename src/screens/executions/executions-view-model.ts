@@ -24,6 +24,7 @@ export type ParsedExecutionsRouteInput = {
 }
 
 const VALID_STATES: ReadonlyArray<ExecutionRunState> = [
+  'queued',
   'scheduled',
   'running',
   'succeeded',

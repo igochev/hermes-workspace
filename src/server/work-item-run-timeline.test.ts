@@ -157,6 +157,139 @@ describe('work-item-run-timeline', () => {
     })
   })
 
+  it('uses immediate Planner execution runs for research without inventing Builder evidence', () => {
+    const workItem = createDemoWorkItem({ status: 'active', phase: 'research' })
+    const run = upsertExecutionRun({
+      workItemId: workItem.id,
+      projectId: workItem.projectId,
+      role: 'planner',
+      phase: 'research',
+      engine: 'hermes-session',
+      state: 'succeeded',
+      profile: 'researcher',
+      sessionKey: 'session-research-1',
+      finalResponse: 'Prepared the idea and drafted acceptance criteria.',
+      artifactPaths: ['docs/plans/research-plan.md'],
+      lastObservedAt: '2026-04-29T11:00:00.000Z',
+    })
+
+    const timeline = buildWorkItemRunTimeline(workItem)
+
+    expect(timeline.rows[0]).toMatchObject({
+      phase: 'research',
+      profileRole: 'planner',
+      profileSource: 'execution-run',
+      executionRunId: run.id,
+      state: 'succeeded',
+      profileName: 'researcher',
+      sessionKey: 'session-research-1',
+      link: `/executions/${run.id}`,
+      artifacts: ['docs/plans/research-plan.md'],
+    })
+    expect(timeline.rows[1]).toMatchObject({
+      phase: 'build',
+      state: 'not_started',
+      summary: 'No job launched',
+    })
+  })
+
+  it('keeps accepted planning draft connected to the execution run that generated it', () => {
+    const workItem = createDemoWorkItem({ status: 'ready', phase: 'build' })
+    const run = upsertExecutionRun({
+      workItemId: workItem.id,
+      projectId: workItem.projectId,
+      role: 'planner',
+      phase: 'research',
+      engine: 'hermes-session',
+      state: 'succeeded',
+      profile: 'researcher',
+      sessionKey: 'session-planner-accepted',
+      artifactPaths: ['docs/plans/accepted-research-plan.md'],
+      lastObservedAt: '2026-04-29T11:10:00.000Z',
+    })
+    createPlanningDraft({
+      workItemId: workItem.id,
+      projectId: workItem.projectId,
+      status: 'accepted',
+      plannerProfile: 'researcher',
+      plannerSessionKey: 'session-planner-accepted',
+      plannerLink: `/executions/${run.id}`,
+      planFilePath: 'docs/plans/accepted-research-plan.md',
+      acceptedAt: '2026-04-29T11:12:00.000Z',
+    })
+
+    const timeline = buildWorkItemRunTimeline(workItem)
+
+    expect(timeline.rows[0]).toMatchObject({
+      phase: 'research',
+      state: 'succeeded',
+      profileSource: 'planning-draft',
+      executionRunId: run.id,
+      profileName: 'researcher',
+      sessionKey: 'session-planner-accepted',
+      link: `/executions/${run.id}`,
+      artifacts: ['docs/plans/accepted-research-plan.md'],
+    })
+    expect(timeline.rows[1]).toMatchObject({
+      phase: 'build',
+      state: 'scheduled',
+      summary: 'Builder launch pending.',
+    })
+  })
+
+  it('labels work-item mission fallback as legacy scheduled-job output', () => {
+    const workItem = createDemoWorkItem({
+      status: 'active',
+      phase: 'build',
+      missionJobId: 'legacy-job-1',
+      missionJobName: 'legacy builder job',
+      missionState: 'running',
+      missionLastRunAt: '2026-04-29T11:05:00.000Z',
+    })
+
+    const timeline = buildWorkItemRunTimeline(workItem)
+
+    expect(timeline.rows[1]).toMatchObject({
+      phase: 'build',
+      state: 'running',
+      jobId: 'legacy-job-1',
+      summary: 'Legacy scheduled-job output: Builder is running.',
+      link: `/executions?jobId=legacy-job-1&workItemId=${workItem.id}`,
+    })
+  })
+
+  it('labels imported cron-legacy execution runs as legacy scheduled-job output', () => {
+    const workItem = createDemoWorkItem({
+      status: 'active',
+      phase: 'build',
+      missionJobId: 'legacy-job-imported',
+      missionState: 'succeeded',
+    })
+    const run = upsertExecutionRun({
+      workItemId: workItem.id,
+      projectId: workItem.projectId,
+      role: 'mission',
+      phase: 'build',
+      engine: 'cron-legacy',
+      jobId: 'legacy-job-imported',
+      jobName: 'legacy builder job imported',
+      state: 'succeeded',
+      latestOutputText: 'Legacy cron output is still readable.',
+      lastObservedAt: '2026-04-29T11:07:00.000Z',
+    })
+
+    const timeline = buildWorkItemRunTimeline(workItem)
+
+    expect(timeline.rows[1]).toMatchObject({
+      phase: 'build',
+      state: 'succeeded',
+      executionRunId: run.id,
+      jobId: 'legacy-job-imported',
+      summary: 'Legacy scheduled-job output: Builder completed.',
+      link: `/executions/${run.id}`,
+    })
+  })
+
   it('shows stale Builder heartbeat as stale with recovery guidance', () => {
     const workItem = createDemoWorkItem({
       status: 'active',

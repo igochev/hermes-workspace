@@ -534,7 +534,7 @@ export function getPlanningDraftStatusLabel(status?: string): string {
 }
 
 export function getPlanningDraftGuidance(status?: string): string {
-  if (!status) return 'No planner draft yet. Prepare with Planner to generate a structured enrichment draft.'
+  if (!status) return 'No planner draft yet. Use Prepare Idea with Researcher to generate a structured enrichment draft.'
   if (status === 'requested' || status === 'running') {
     return 'Planner enrichment is running. Wait for structured output, then review the suggested changes before accepting.'
   }
@@ -656,8 +656,8 @@ export type ClickabilityAuditDescriptor = {
 }
 
 export function getRunTimelineStateLabel(state: WorkItemRunTimelineState): string {
-  if (state === 'not_started') return 'No job launched'
-  if (state === 'scheduled') return 'Job scheduled'
+  if (state === 'not_started') return 'No execution launched'
+  if (state === 'scheduled') return 'Execution queued'
   if (state === 'running') return 'Agent session running'
   if (state === 'output_ready') return 'Output ready for ingestion'
   if (state === 'succeeded') return 'Succeeded'
@@ -674,16 +674,17 @@ export function getWorkItemRunTimelineIdCopy(
   row: Partial<WorkItemRunTimelineRow>,
 ): string {
   const ids = [
-    row.jobId ? `job ${shortId(row.jobId)}` : null,
+    row.executionRunId ? `execution ${shortId(row.executionRunId)}` : null,
+    row.jobId ? `${row.executionRunId ? 'legacy job' : 'job'} ${shortId(row.jobId)}` : null,
     row.runId ? `run ${shortId(row.runId, 7)}` : null,
     row.sessionKey || row.sessionKeyPrefix ? `session ${shortId(row.sessionKeyPrefix ?? row.sessionKey ?? '')}` : null,
   ].filter((item): item is string => Boolean(item))
 
-  return ids.length > 0 ? ids.join(' · ') : 'No job/session yet'
+  return ids.length > 0 ? ids.join(' · ') : 'No execution/session yet'
 }
 
 export function getWorkItemRunTimelineArtifactCopy(artifacts: Array<string>): string {
-  return artifacts.length > 0 ? `Builder changed files: ${artifacts.join(', ')}` : 'No code evidence yet'
+  return artifacts.length > 0 ? `Execution artifacts: ${artifacts.join(', ')}` : 'No execution artifacts yet'
 }
 
 export function getWorkItemRunTimelineLinkLabel(row: Partial<WorkItemRunTimelineRow>): string | null {
@@ -811,7 +812,8 @@ export function getWorkItemPrimaryLaunchLabel(state: {
   phase: 'research' | 'build' | 'review' | 'deploy' | undefined
   status: 'inbox' | 'ready' | 'active' | 'blocked' | 'done' | 'cancelled'
 }): string {
-  if (state.phase === 'research') return 'Plan with Planner'
+  if (state.phase === 'research' && state.status === 'inbox') return 'Prepare Idea with Researcher'
+  if (state.phase === 'research') return 'Continue Research Plan'
   if (state.phase === 'review') return 'Launch Review'
   if (state.phase === 'deploy') return 'Launch Deploy'
   if (state.phase === 'build' && state.status === 'blocked') return 'Relaunch Build'
@@ -873,7 +875,7 @@ export function getAvailableWorkItemLifecycleActions(state: {
   phase: 'research' | 'build' | 'review' | 'deploy' | undefined
 }): Array<WorkItemDetailLifecycleAction> {
   if (state.status === 'done' || state.status === 'cancelled') return []
-  if (state.status === 'inbox' && state.phase === 'research') return ['send_to_planning', 'cancel']
+  if (state.status === 'inbox' && state.phase === 'research') return ['cancel']
   if (state.status === 'active' && state.phase === 'research') return ['mark_ready', 'back_to_inbox', 'cancel']
   if (state.status === 'active' && state.phase === 'build') return ['request_review', 'back_to_research', 'cancel']
   if (state.status === 'active' && state.phase === 'deploy') return ['request_deploy_approval', 'back_to_build', 'cancel']
@@ -1496,12 +1498,22 @@ export function WorkItemDetailScreen({
                   </button>
                   <button
                     type="button"
-                    onClick={() => launchMutation.mutate()}
-                    disabled={launchMutation.isPending || (isBuildLaunchAction && !canLaunchBuild)}
+                    onClick={() => {
+                      if (workItem.status === 'inbox' && workItem.phase === 'research') {
+                        plannerPrepareMutation.mutate()
+                      } else {
+                        launchMutation.mutate()
+                      }
+                    }}
+                    disabled={
+                      launchMutation.isPending ||
+                      plannerPrepareMutation.isPending ||
+                      (isBuildLaunchAction && !canLaunchBuild)
+                    }
                     className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                   >
                     <HugeiconsIcon icon={PlayIcon} size={14} />
-                    {launchMutation.isPending ? 'Launching…' : primaryLaunchLabel}
+                    {launchMutation.isPending || plannerPrepareMutation.isPending ? 'Preparing…' : primaryLaunchLabel}
                   </button>
                   <a
                     href={buildWorkItemConductorHref(workItem.id)}
@@ -1846,14 +1858,14 @@ export function WorkItemDetailScreen({
                   </span>
                   <p className="text-sm text-[var(--theme-muted)]">{planningDraftGuidance}</p>
                 </div>
-                {!latestPlanningDraft ? (
+                {!latestPlanningDraft && !(workItem.status === 'inbox' && workItem.phase === 'research') ? (
                   <button
                     type="button"
                     onClick={() => plannerPrepareMutation.mutate()}
                     disabled={plannerPrepareMutation.isPending}
                     className="inline-flex items-center gap-1 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                   >
-                    {plannerPrepareMutation.isPending ? 'Preparing…' : 'Prepare with Planner'}
+                    {plannerPrepareMutation.isPending ? 'Preparing…' : 'Prepare Idea with Researcher'}
                   </button>
                 ) : null}
               </div>

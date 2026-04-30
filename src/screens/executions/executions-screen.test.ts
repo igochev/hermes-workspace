@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  EXECUTIONS_DEFINITIONS_LINK_COPY,
   EXECUTIONS_LEGACY_NO_RECORD_TITLE,
   EXECUTIONS_NAVIGATION_COPY,
   EXECUTIONS_SCREEN_HELP_COPY,
@@ -17,9 +18,12 @@ describe('executions screen operator copy and list model', () => {
       'Work-item execution attempts for Planner, Builder, Reviewer, and Merge-Healer.',
     )
     expect(EXECUTIONS_SCREEN_SEARCH_PLACEHOLDER).toBe(
-      'Search job, session, work item, or execution...',
+      'Search execution, session, work item, or legacy job...',
     )
     expect(EXECUTIONS_NAVIGATION_COPY).toBe('Executions')
+    expect(EXECUTIONS_DEFINITIONS_LINK_COPY).toBe(
+      'Open reusable job definitions',
+    )
     expect(EXECUTIONS_LEGACY_NO_RECORD_TITLE).toBe(
       'Execution trace not yet recorded',
     )

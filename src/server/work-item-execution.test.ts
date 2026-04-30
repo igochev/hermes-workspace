@@ -91,7 +91,7 @@ describe('work-item-execution', () => {
     expect(result.workItem.missionJobId).toBe('job-123')
     expect(result.workItem.missionJobName).toBe('work-item-build-demo')
     expect(result.workItem.missionSessionKeyPrefix).toBe('cron_job-123_')
-    expect(result.workItem.missionLink).toBe('/jobs?jobId=job-123')
+    expect(result.workItem.missionLink).toBe('/executions?jobId=job-123')
     expect(result.workItem.missionState).toBe('succeeded')
     expect(result.workItem.status).toBe('active')
     expect(result.workItem.phase).toBe('review')
@@ -121,7 +121,7 @@ describe('work-item-execution', () => {
         projectId: project.id,
         role: 'mission',
         phase: 'build',
-        engine: 'conductor',
+        engine: 'cron-legacy',
         jobId: 'job-123',
         jobName: 'work-item-build-demo',
         runId: 'run-123',
@@ -459,6 +459,84 @@ describe('work-item-execution', () => {
     })
   })
 
+  it('imports local legacy cron output into a readable execution run for the real ABACUS work item id', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const project = createProject({
+      name: 'Family Command Center ABACUS',
+      repoPath: '/repos/family-command-center',
+      defaultBranch: 'main',
+      autonomyLanePolicy: { enabled: true },
+    })
+    const workItem = createWorkItem({
+      id: '697d0059-a3ca-438e-b92c-481f39e7566b',
+      projectId: project.id,
+      title: 'Daddy Daily Brief — one-screen family runway for today',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      riskLevel: 'medium',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'legacy-abacus-job',
+      missionJobId: 'legacy-abacus-job',
+      missionJobName: 'ABACUS legacy Builder cron',
+      missionState: 'unknown',
+      laneState: 'building',
+      branchName: 'mission/abacus-daily-brief',
+      baseBranch: 'main',
+    })
+    const evidenceDir = path.join(tempHome, 'dispatch-legacy-abacus')
+    fs.mkdirSync(evidenceDir, { recursive: true })
+    const evidencePath = path.join(evidenceDir, 'evidence.json')
+    fs.writeFileSync(
+      evidencePath,
+      JSON.stringify({
+        workItemId: workItem.id,
+        phase: 'build',
+        repository: project.repoPath,
+        baseBranch: 'main',
+        branch: 'mission/abacus-daily-brief',
+        commit: 'abc1234',
+        productFilesChanged: ['src/daily-brief.ts'],
+        testFilesChanged: ['src/daily-brief.test.ts'],
+        testsPassed: true,
+        testLog: path.join(evidenceDir, 'test.log'),
+        commands: [{ command: 'pnpm test src/daily-brief.test.ts', exitCode: 0, summary: '3 passed' }],
+      }),
+    )
+    const outputDir = path.join(process.env.HERMES_HOME!, 'cron', 'output', 'legacy-abacus-job')
+    fs.mkdirSync(outputDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(outputDir, '2026-04-29_20-00-00.md'),
+      `Legacy cron completed for ABACUS.\nEvidence: ${evidencePath}`,
+    )
+
+    getHermesJobById.mockRejectedValue(new Error('Dashboard unavailable'))
+    listHermesJobs.mockRejectedValue(new Error('Dashboard unavailable'))
+    getHermesJobRuns.mockResolvedValue([])
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.workItem.id).toBe('697d0059-a3ca-438e-b92c-481f39e7566b')
+    expect(result.execution.job?.id).toBe('legacy-abacus-job')
+    expect(result.workItem.missionLink).toBe('/executions?jobId=legacy-abacus-job')
+    const importedRun = listExecutionRuns({ workItemId: workItem.id, role: 'mission' })[0]
+    expect(importedRun).toMatchObject({
+      workItemId: workItem.id,
+      projectId: project.id,
+      role: 'mission',
+      phase: 'build',
+      engine: 'cron-legacy',
+      jobId: 'legacy-abacus-job',
+      jobName: 'ABACUS legacy Builder cron',
+      state: 'succeeded',
+      branchName: 'mission/abacus-daily-brief',
+      summary: 'Imported legacy scheduled-job evidence.',
+    })
+    expect(importedRun.latestOutputText).toContain('Legacy cron completed for ABACUS.')
+    expect(importedRun.finalResponse).toContain('Legacy cron completed for ABACUS.')
+  })
+
   it('recovers a previously blocked enabled lane build when local Builder evidence becomes parseable', async () => {
     const fs = await import('node:fs')
     const path = await import('node:path')
@@ -728,7 +806,7 @@ describe('work-item-execution', () => {
           projectId: project.id,
           role: 'review',
           phase: 'review',
-          engine: 'conductor',
+          engine: 'cron-legacy',
           jobId: 'review-job-1',
           jobName: 'planner-review-1',
           runId: 'review-run-1',

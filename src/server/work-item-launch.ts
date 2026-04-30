@@ -13,12 +13,7 @@ import {
   getWorkItem,
   updateWorkItem
 } from './work-items-store'
-import {
-
-  buildMissionLink,
-  launchConductorMission
-} from './conductor-launch'
-import { upsertExecutionRun } from './execution-runs-store'
+import { launchImmediateExecution } from './immediate-execution-launch'
 import {  evaluateLaunchCapacity } from './role-capacity-policy'
 import { refreshAttentionQueue } from './attention-queue'
 import {
@@ -29,7 +24,7 @@ import {
 import { listProfiles } from './profiles-browser'
 import type {ProfileReadinessReport, ProfileReadinessRoleReport} from './profile-readiness';
 import type {LaunchCapacityDecision} from './role-capacity-policy';
-import type {ConductorLaunchResult} from './conductor-launch';
+import type {ImmediateExecutionLaunchResult, ImmediateExecutionRole} from './immediate-execution-launch';
 import type {WorkItemPhase, WorkItemRecord, WorkItemReviewDecision} from './work-items-store';
 import type {ProjectRecord} from './projects-store';
 import type {ConductorPhaseKey, ConductorPhaseProfiles} from '../lib/conductor-phase-profiles';
@@ -50,7 +45,7 @@ export type WorkItemLaunchResponse = {
   capacityDecision: LaunchCapacityDecision
   profileReadinessReport: ProfileReadinessReport
   profileReadinessDecision: ProfileReadinessRoleReport
-  launch: ConductorLaunchResult & {
+  launch: ImmediateExecutionLaunchResult & {
     phase: WorkItemPhase
     profile: string | null
   }
@@ -247,6 +242,13 @@ function buildPhaseOutcomeBlock(phase: WorkItemPhase): Array<string> {
   ]
 }
 
+function phaseToImmediateRole(phase: WorkItemPhase): ImmediateExecutionRole {
+  if (phase === 'research') return 'planner'
+  if (phase === 'review') return 'reviewer'
+  if (phase === 'deploy') return 'deployer'
+  return 'builder'
+}
+
 export function buildPlannerReviewGoal(workItem: WorkItemRecord, project: ProjectRecord): string {
   const repoPath = readOptionalString(workItem.repoPathSnapshot) || project.repoPath
   const fullPlanPath = workItem.planFilePath ? `${repoPath}/${workItem.planFilePath}` : 'no plan file recorded'
@@ -333,33 +335,38 @@ export function buildPlannerReviewGoal(workItem: WorkItemRecord, project: Projec
   ].join('\n')
 }
 
-export function launchPlannerReview(workItem: WorkItemRecord, project: ProjectRecord): Promise<{
+export async function launchPlannerReview(workItem: WorkItemRecord, project: ProjectRecord): Promise<{
   reviewJobId: string
-  reviewState: 'scheduled'
+  reviewState: 'running' | 'succeeded' | 'failed'
+  reviewLink: string
+  sessionKey?: string
 } | null> {
-  if (!workItem.planFilePath) return Promise.resolve(null)
+  if (!workItem.planFilePath) return null
 
   const goal = buildPlannerReviewGoal(workItem, project)
   const phase = 'review'
   const profile = resolveLaunchProfile(workItem, project, phase, normalizePhaseProfiles({}))
-  if (!profile) return Promise.resolve(null)
+  if (!profile) return null
 
-  const launchPhaseProfiles = buildLaunchPhaseProfiles({
-    project,
-    requestPhaseProfiles: normalizePhaseProfiles({}),
-    phase,
-    profile,
-  })
-
-  return launchConductorMission({
-    goal,
-    phaseProfiles: launchPhaseProfiles,
-    name: `work-item-review-${project.slug}-${workItem.id.slice(0, 8)}`,
-    deliver: 'local',
-  }).then((launch) => ({
-    reviewJobId: launch.jobId,
-    reviewState: 'scheduled' as const,
-  })).catch(() => null)
+  try {
+    const launch = await launchImmediateExecution({
+      projectId: project.id,
+      workItemId: workItem.id,
+      phase,
+      role: 'reviewer',
+      profile,
+      goal,
+      repoPath: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
+    })
+    return {
+      reviewJobId: launch.executionRunId,
+      reviewState: launch.state === 'queued' ? 'running' : launch.state,
+      reviewLink: launch.link,
+      sessionKey: launch.sessionKey,
+    }
+  } catch {
+    return null
+  }
 }
 
 export function buildWorkItemLaunchGoal(params: {
@@ -473,48 +480,32 @@ export async function launchWorkItemIntoConductor(
     profile: resolvedProfile ?? undefined,
   })
 
-  const launch = await launchConductorMission({
-    goal,
-    orchestratorModel: readOptionalString(request.orchestratorModel),
-    workerModel: readOptionalString(request.workerModel),
-    projectsDir: readOptionalString(request.projectsDir),
-    maxParallel:
-      typeof request.maxParallel === 'number' && Number.isFinite(request.maxParallel)
-        ? request.maxParallel
-        : undefined,
-    supervised: request.supervised === true,
-    phaseProfiles: launchPhaseProfiles,
-    name: `work-item-${phase}-${project.slug}-${workItem.id.slice(0, 8)}`,
-    deliver: 'local',
-  })
-
-  upsertExecutionRun({
-    workItemId: workItem.id,
+  void launchPhaseProfiles
+  const launch = await launchImmediateExecution({
     projectId: project.id,
-    role: 'mission',
+    workItemId: workItem.id,
     phase,
-    engine: 'conductor',
-    jobId: launch.jobId,
-    jobName: launch.jobName,
-    runId: readOptionalString(launch.runId),
-    state: 'scheduled',
-    sessionKey: launch.sessionKey,
-    sessionKeyPrefix: launch.sessionKeyPrefix,
+    role: phaseToImmediateRole(phase),
+    profile: resolvedProfile ?? undefined,
+    goal,
+    repoPath: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
   })
 
-  const sessionKeys = Array.from(new Set([...workItem.sessionKeys, launch.sessionKey]))
-  const missionLink = buildMissionLink(launch.jobId)
+  const sessionKeys = launch.sessionKey
+    ? Array.from(new Set([...workItem.sessionKeys, launch.sessionKey]))
+    : [...workItem.sessionKeys]
+  const missionLink = launch.link
   const wasRecoveryLaunch = workItem.status === 'blocked' || workItem.missionState === 'failed'
 
   const workItemUpdates: Record<string, unknown> = {
     status: 'active',
     phase,
-    missionId: launch.jobId,
-    missionJobId: launch.jobId,
-    missionJobName: launch.jobName,
-    missionSessionKeyPrefix: launch.sessionKeyPrefix,
+    missionId: launch.executionRunId,
+    missionJobId: undefined,
+    missionJobName: undefined,
+    missionSessionKeyPrefix: launch.sessionKey,
     missionLink,
-    missionState: 'scheduled',
+    missionState: launch.state,
     missionLastError: undefined,
     sessionKeys,
     repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
@@ -530,14 +521,14 @@ export async function launchWorkItemIntoConductor(
   if (!nextWorkItem) throw new Error('Failed to update work item after launch')
 
   const baseNote = isTwoPhase
-    ? `Launched two-phase pipeline (Phase 1: ${resolvedProfile} plan → Phase 2: build) via Conductor. Plan path: ${planFilePath}`
+    ? `Started two-phase pipeline (Phase 1: ${resolvedProfile} plan → Phase 2: build) as immediate execution. Plan path: ${planFilePath}`
     : wasRecoveryLaunch
       ? resolvedProfile
-        ? `Relaunched ${phase} via Conductor using profile ${resolvedProfile} after failure recovery.`
-        : `Relaunched ${phase} via Conductor after failure recovery.`
+        ? `Relaunched ${phase} as immediate execution using profile ${resolvedProfile} after failure recovery.`
+        : `Relaunched ${phase} as immediate execution after failure recovery.`
       : resolvedProfile
-        ? `Launched ${phase} via Conductor using profile ${resolvedProfile}.`
-        : `Launched ${phase} via Conductor.`
+        ? `Started ${phase} immediate execution using profile ${resolvedProfile}.`
+        : `Started ${phase} immediate execution.`
   const note = joinLaunchAdvisories(baseNote, [
     !capacityDecision.allowed && capacityDecision.message
       ? `Capacity advisory: ${capacityDecision.message}`
@@ -550,9 +541,9 @@ export async function launchWorkItemIntoConductor(
     phase,
     status: 'active',
     note,
-    missionId: launch.jobId,
+    missionId: launch.executionRunId,
     sessionKey: launch.sessionKey,
-    sessionKeyPrefix: launch.sessionKeyPrefix,
+    sessionKeyPrefix: launch.sessionKey,
     profile: resolvedProfile ?? undefined,
   })
 

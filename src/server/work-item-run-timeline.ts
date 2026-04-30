@@ -68,6 +68,7 @@ const RUN_STATE_TO_TIMELINE_STATE: Record<
   ExecutionRunState,
   WorkItemRunTimelineState
 > = {
+  queued: 'scheduled',
   scheduled: 'scheduled',
   running: 'running',
   succeeded: 'succeeded',
@@ -120,18 +121,21 @@ function rowFromRun(
   const state = RUN_STATE_TO_TIMELINE_STATE[run.state]
   const error =
     run.error ?? (phase === 'build' ? workItem.missionLastError : undefined)
-  const summary = buildRunSummary(profileRole, state, error)
+  const summary =
+    run.engine === 'cron-legacy'
+      ? legacyMissionSummary(profileRole, state, error)
+      : buildRunSummary(profileRole, state, error)
 
   return {
     phase,
     phaseLabel,
     profileRole,
-    profileName: profileRole,
     profileSource: 'execution-run',
     state,
     summary,
     nextExpectedAction: nextActionForState(profileRole, state),
     executionRunId: run.id,
+    profileName: run.profile ?? profileRole,
     jobId: run.jobId,
     jobName: run.jobName,
     runId: run.runId,
@@ -156,7 +160,7 @@ function buildRunSummary(
   if (state === 'failed') return `${actor} failed${error ? `: ${error}` : '.'}`
   if (state === 'stale') return `${actor} is stale.`
   if (state === 'running') return `${actor} is running.`
-  if (state === 'scheduled') return `${actor} job scheduled.`
+  if (state === 'scheduled') return `${actor} execution queued.`
   if (state === 'succeeded') return `${actor} completed.`
   if (state === 'output_ready') return `${actor} output ready for ingestion.`
   return 'No job launched'
@@ -167,6 +171,14 @@ function profileRoleLabel(role: WorkItemRunProfileRole): string {
   if (role === 'builder') return 'Builder'
   if (role === 'reviewer') return 'Reviewer'
   return 'Deploy'
+}
+
+function legacyMissionSummary(
+  profileRole: WorkItemRunProfileRole,
+  state: WorkItemRunTimelineState,
+  error?: string,
+): string {
+  return `Legacy scheduled-job output: ${buildRunSummary(profileRole, state, error)}`
 }
 
 function nextActionForState(
@@ -231,7 +243,7 @@ function researchRowFromDraft(
         : state === 'failed'
           ? `Planner failed${draft.parseError ? `: ${draft.parseError}` : '.'}`
           : state === 'scheduled'
-            ? 'Planner job scheduled.'
+            ? 'Planner execution queued.'
             : state === 'running'
               ? 'Planner is running.'
               : 'Planner is waiting.',
@@ -290,7 +302,7 @@ function applyWorkItemMissionFallback(
   workItem: WorkItemRecord,
 ): WorkItemRunTimelineRow {
   if (
-    row.phase !== 'build' ||
+    row.phase !== workItem.phase ||
     row.state !== 'not_started' ||
     !workItem.missionJobId
   )
@@ -315,7 +327,7 @@ function applyWorkItemMissionFallback(
     summary:
       isParkedLaneBlocker && state === 'failed'
         ? `Builder parked: ${error ?? 'lane blocker evidence recorded.'}`
-        : buildRunSummary('builder', state, error),
+        : legacyMissionSummary('builder', state, error),
     nextExpectedAction:
       isParkedLaneBlocker && state === 'failed'
         ? 'Review Builder evidence, clean or stash the repo, then retry or unpark this work item.'

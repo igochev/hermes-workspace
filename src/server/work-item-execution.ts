@@ -251,14 +251,17 @@ function recordExecutionRun(params: {
     prUrl?: string
     artifactPaths?: Array<string>
   }
+  outputText?: string
 }): void {
   const run = params.run
+  const outputText =
+    params.outputText?.trim() || extractRunOutputText(run).trim()
   upsertExecutionRun({
     workItemId: params.workItem.id,
     projectId: params.project.id,
     role: params.role,
     phase: params.role === 'review' ? 'review' : params.workItem.phase,
-    engine: 'conductor',
+    engine: 'cron-legacy',
     jobId: params.job.id,
     jobName: params.job.name,
     runId: readOptionalString(run?.id),
@@ -276,6 +279,12 @@ function recordExecutionRun(params: {
           readOptionalString(
             (run as (CronRun & { error?: unknown }) | null)?.error,
           )
+        : undefined,
+    summary: outputText ? 'Imported legacy scheduled-job evidence.' : undefined,
+    latestOutputText: outputText || undefined,
+    finalResponse:
+      outputText && (params.state === 'succeeded' || params.state === 'failed')
+        ? outputText
         : undefined,
     branchName: params.evidence?.branchName,
     prUrl: params.evidence?.prUrl,
@@ -447,11 +456,7 @@ export async function syncWorkItemExecutionState(
     job = null
   }
   let localOutput: HermesJobOutputSnapshot | null = null
-  if (
-    !job &&
-    project.autonomyLanePolicy.enabled &&
-    workItem.phase === 'build'
-  ) {
+  if (!job) {
     const fallbackJobId =
       readOptionalString(
         (workItem as WorkItemRecord & { missionJobId?: string }).missionJobId,
@@ -527,6 +532,7 @@ export async function syncWorkItemExecutionState(
       run: latestRun,
       sessionKeyPrefix: missionFields.missionSessionKeyPrefix,
       evidence: evidenceForRun,
+      outputText: localOutput?.latestOutputText,
     })
   }
 

@@ -1,8 +1,12 @@
-# Hermes Workspace — Dream Mission Control Implementation Plan Index (Updated 2026-04-29)
+# Hermes Workspace — Dream Mission Control Implementation Plan Index (Updated 2026-04-30)
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
+> **Current active implementation plan:** none — Real Executions Runtime shipped; ask Main/CEO for the next detailed plan before starting new product work.
+>
+> **Most recently shipped implementation plan:** `docs/plans/2026-04-29-hermes-workspace-real-executions-runtime-plan.md`
+>
+> **Previous stabilization plan:** `docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
 >
 > **Previous stabilization plan:** `docs/plans/2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md`
 >
@@ -100,12 +104,19 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 | P3 | `2026-04-29-hermes-workspace-p3-morning-review-overnight-digest-plan.md` | Morning Review / overnight operator digest | Functionally shipped / Main-reviewed; H1 hardening complete |
 | H1 | `2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md` | Terminology, lint, changed-file type cleanup, and final merge-readiness evidence for P0-P3 Operator UX changes | Complete / Main-reviewed; accepted for merge-readiness packaging. Final review: `dogfood-output/operator-ux-merge-readiness-main-review-latest.md` |
 
-### TypeScript / ESLint Baseline Stabilization — active
+### TypeScript / ESLint Baseline Stabilization — shipped
 
 | Order | Plan | Purpose | Status |
 |---:|---|---|---|
 | T1 | `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Clear repo-wide `pnpm exec tsc --noEmit` baseline debt so TypeScript can become a hard gate again | Shipped / Main-reviewed; committed at `840a67e`; final report `dogfood-output/typescript-baseline-stabilization-final-latest.md` |
-| E1 | `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Clear repo-wide ESLint baseline debt so `pnpm exec eslint . --max-warnings=0` can become a hard autonomous merge gate | Active |
+| E1 | `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Clear repo-wide ESLint baseline debt so `pnpm exec eslint . --max-warnings=0` can become a hard autonomous merge gate | Shipped; committed/pushed at `d0edae3`; final report `dogfood-output/eslint-baseline-stabilization-final-latest.md` |
+
+### Production Dogfood Real-Idea Readiness + Real Executions Runtime — shipped
+
+| Order | Plan | Purpose | Status |
+|---:|---|---|---|
+| Q1 | `2026-04-29-hermes-workspace-production-dogfood-queue-hygiene-real-idea-readiness-plan.md` | Clean stale ABACUS dummy/test queue items safely, preserve historical evidence, prove no stale item can auto-run, and prepare the lane for one real Family Command Center idea | Shipped; real idea created (`697d0059-a3ca-438e-b92c-481f39e7566b`) |
+| R1 | `2026-04-29-hermes-workspace-real-executions-runtime-plan.md` | Replace Scheduled Job-backed Work Item launches with first-class real `/executions` runs: clickable live progress, logs/output, final results, artifacts, errors, and no normal Work Item cron-job creation | Shipped; final dogfood PASS with work item `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`, execution `7b217f97-691c-4976-a6f8-35041a26591b`, report `dogfood-output/real-executions-runtime-final-latest.md` |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -203,7 +214,9 @@ Then live verify UI/API changes.
 
 | Document | Status | How to use now |
 |---|---|---|
-| `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Active stabilization plan | Builder executes now: durable ESLint baseline report, config-friction cleanup, mechanical import/type/syntax cleanup, no-unnecessary-condition cleanup, warning policy, final `eslint . --max-warnings=0` green evidence |
+| `2026-04-29-hermes-workspace-real-executions-runtime-plan.md` | Shipped | Historical; final dogfood PASS proved clickable live `/executions/:executionId` trace for work item `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`, execution `7b217f97-691c-4976-a6f8-35041a26591b`; report `dogfood-output/real-executions-runtime-final-latest.md` |
+| `2026-04-29-hermes-workspace-production-dogfood-queue-hygiene-real-idea-readiness-plan.md` | Shipped real-idea readiness plan | Historical; stale ABACUS dummy/test queue cleaned safely and real idea work item `697d0059-a3ca-438e-b92c-481f39e7566b` created |
+| `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Shipped stabilization plan | Historical; full `pnpm exec eslint . --max-warnings=0` is green and package committed/pushed at `d0edae3`; final report `dogfood-output/eslint-baseline-stabilization-final-latest.md` |
 | `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Shipped / Main-reviewed stabilization plan | Historical; full `tsc --noEmit` is green and package committed at `840a67e`; final report `dogfood-output/typescript-baseline-stabilization-final-latest.md` |
 | `2026-04-29-hermes-workspace-operator-ux-merge-readiness-hardening-plan.md` | Complete / Main-reviewed stabilization plan | Historical; Operator UX accepted and pushed at `3384ccb`; final review `dogfood-output/operator-ux-merge-readiness-main-review-latest.md` |
 | `2026-04-29-hermes-workspace-p3-morning-review-overnight-digest-plan.md` | Functionally shipped / Main-reviewed Operator UX Clarity P3 plan | Historical until hardening passes; Morning Review server view model, `/api/morning-review`, Dashboard overnight digest card, next-attention action, live Dashboard verification |
@@ -245,11 +258,11 @@ P2: Dedicated Executions surface
 P3: Morning Review / overnight digest
   └─ functionally shipped; Main review found merge-readiness hardening needed
 
-T1: TypeScript baseline stabilization
-  └─ shipped/Main-reviewed at `840a67e`; full `pnpm exec tsc --noEmit` is now green
+T1/E1: TypeScript + ESLint baseline stabilization
+  └─ shipped; `pnpm exec tsc --noEmit --pretty false` and `pnpm exec eslint . --max-warnings=0` are now hard green gates
 
-E1: ESLint baseline stabilization
-  └─ active; clears repo-wide `pnpm exec eslint . --max-warnings=0` debt so future slices can use lint as a hard gate
+R1: Real Executions Runtime
+  └─ shipped; owner correction implemented so `/executions` are real clickable live run traces/results, not Scheduled Jobs or one-shot cron definitions
 ```
 
 ---
@@ -271,12 +284,15 @@ A plan is not shipped until:
 
 ## 9. Immediate next action
 
-Start with:
+No detailed implementation plan is active. Builder must not invent new Hermes Workspace product work from historical docs; ask Main/CEO to create or select the next plan and update `docs/handoff/current-slice-status.md`.
 
-`docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
+## 10. After R1 ships
 
-Builder should execute Task 1 first: create a durable ESLint baseline report from current `pnpm exec eslint . --max-warnings=0` output, group rule/file families, and update `docs/handoff/current-slice-status.md` before config-friction cleanup.
+R1 shipped with final dogfood PASS. Evidence recorded in:
 
-## 10. After E1 ships
+- `dogfood-output/real-executions-runtime-final-latest.md`
+- Work item: `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`
+- Execution run: `7b217f97-691c-4976-a6f8-35041a26591b`
+- Screenshot: `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_8a169dfa537a4f6d881ebb770c84d576.png`
 
-When E1 is complete, Builder should update the handoff with full `pnpm exec eslint . --max-warnings=0`, `pnpm exec tsc --noEmit --pretty false`, focused tests, full regression, build, service/root smoke, live browser smoke, final report path, and any remaining blockers. Main/CEO should then review whether the full quality baseline is clean enough to authorize the next product cycle.
+Next product work requires a new detailed plan/slice from Main/CEO.

@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   EXECUTION_DETAIL_BACK_TO_WORK_ITEM_LABEL,
   EXECUTION_DETAIL_JOB_SECTION_TITLE,
+  EXECUTION_DETAIL_LIVE_PROGRESS_SECTION_TITLE,
   EXECUTION_DETAIL_OPEN_SCHEDULED_JOB_LABEL,
+  EXECUTION_DETAIL_OPEN_SESSION_LABEL,
+  EXECUTION_DETAIL_REFRESH_NOW_LABEL,
   EXECUTION_DETAIL_SCREEN_TITLE,
   EXECUTION_DETAIL_SESSION_SECTION_TITLE,
   buildExecutionDetailScreenViewModel,
@@ -46,7 +49,7 @@ describe('execution detail screen view model', () => {
       'Open Scheduled Job definition',
     )
     expect(viewModel.header).toMatchObject({
-      title: 'Execution trace',
+      title: 'Build · mission · work-1',
       executionId: 'exec-build-1',
       state: 'failed',
       phase: 'build',
@@ -70,10 +73,20 @@ describe('execution detail screen view model', () => {
     expect(viewModel.sections.evidence.items).toEqual([
       { label: 'Branch', value: 'mission/work-1' },
       { label: 'Pull request', value: 'https://example.test/pr/1' },
-      { label: 'Artifact', value: 'reports/build.md' },
+      { label: 'Artifacts / results', value: 'reports/build.md' },
       { label: 'Error', value: 'Tests failed' },
     ])
-    expect(viewModel.actions).toEqual([
+    expect(viewModel.actions).toEqual(expect.arrayContaining([
+      {
+        label: 'Refresh now',
+        href: '#refresh',
+        tone: 'secondary',
+      },
+      {
+        label: 'Open Session',
+        href: '/sessions/session-full-key',
+        tone: 'secondary',
+      },
       {
         label: 'Back to Work Item',
         href: '/projects/project-1/work-items/work-1',
@@ -84,7 +97,7 @@ describe('execution detail screen view model', () => {
         href: '/jobs?jobId=job-build-123',
         tone: 'secondary',
       },
-    ])
+    ]))
     const visibleCopy = JSON.stringify(viewModel)
     expect(visibleCopy).not.toMatch(
       /Mission Link|Hermes Job ID|Scheduled Jobs page/,
@@ -123,10 +136,102 @@ describe('execution detail screen view model', () => {
     expect(viewModel.sections.evidence.items).toEqual([
       { label: 'Branch', value: '—' },
       { label: 'Pull request', value: '—' },
-      { label: 'Artifact', value: '—' },
+      { label: 'Artifacts / results', value: '—' },
       { label: 'Error', value: '—' },
     ])
-    expect(viewModel.actions).toEqual([])
+    expect(viewModel.actions).toEqual([
+      { label: 'Refresh now', href: '#refresh', tone: 'secondary' },
+    ])
+  })
+
+  it('renders running immediate executions with live progress, refresh, and session actions', () => {
+    const viewModel = buildExecutionDetailScreenViewModel(
+      makeRun({
+        id: 'exec-live-1',
+        role: 'builder',
+        phase: 'build',
+        state: 'running',
+        engine: 'hermes-session',
+        profile: 'builder',
+        sessionKey: 'session-live-1',
+        jobId: undefined,
+        jobName: undefined,
+        startedAt: '2026-04-29T10:00:00.000Z',
+        lastObservedAt: '2026-04-29T10:02:00.000Z',
+        latestOutputText: 'Installing dependencies and running tests...',
+        summary: 'Builder execution running in Hermes session session-live-1.',
+      }),
+    )
+
+    expect(EXECUTION_DETAIL_LIVE_PROGRESS_SECTION_TITLE).toBe('Live progress')
+    expect(EXECUTION_DETAIL_REFRESH_NOW_LABEL).toBe('Refresh now')
+    expect(EXECUTION_DETAIL_OPEN_SESSION_LABEL).toBe('Open Session')
+    expect(viewModel.header.title).toBe('Build · builder · work-1')
+    expect(viewModel.polling).toMatchObject({ enabled: true, intervalMs: 3000 })
+    expect(viewModel.liveProgress.items).toEqual(
+      expect.arrayContaining([
+        { label: 'Started', value: '2026-04-29T10:00:00.000Z' },
+        { label: 'Last observed', value: '2026-04-29T10:02:00.000Z' },
+        { label: 'Latest output', value: 'Installing dependencies and running tests...' },
+        { label: 'Final response', value: '—' },
+      ]),
+    )
+    expect(viewModel.actions).toEqual(
+      expect.arrayContaining([
+        { label: 'Refresh now', href: '#refresh', tone: 'secondary' },
+        { label: 'Open Session', href: '/sessions/session-live-1', tone: 'secondary' },
+      ]),
+    )
+  })
+
+  it('renders terminal output, artifacts, and failed recovery copy', () => {
+    const succeeded = buildExecutionDetailScreenViewModel(
+      makeRun({
+        id: 'exec-succeeded',
+        state: 'succeeded',
+        engine: 'hermes-session',
+        finalResponse: 'Implemented the plan and all tests passed.',
+        artifactPaths: ['dogfood-output/build-report.md', 'coverage/summary.json'],
+        finishedAt: '2026-04-29T10:10:00.000Z',
+      }),
+    )
+    expect(succeeded.polling.enabled).toBe(false)
+    expect(succeeded.liveProgress.items).toContainEqual({
+      label: 'Final response',
+      value: 'Implemented the plan and all tests passed.',
+    })
+    expect(succeeded.sections.evidence.items).toContainEqual({
+      label: 'Artifacts / results',
+      value: 'dogfood-output/build-report.md, coverage/summary.json',
+    })
+
+    const failed = buildExecutionDetailScreenViewModel(
+      makeRun({
+        id: 'exec-failed',
+        state: 'failed',
+        engine: 'hermes-session',
+        error: 'Provider timed out',
+        latestOutputText: 'Last log line before failure',
+      }),
+    )
+    expect(failed.recoveryGuidance).toContain('Provider timed out')
+    expect(failed.liveProgress.items).toContainEqual({
+      label: 'Error',
+      value: 'Provider timed out',
+    })
+  })
+
+  it('warns when active execution heartbeat is stale', () => {
+    const viewModel = buildExecutionDetailScreenViewModel(
+      makeRun({
+        id: 'exec-stale-heartbeat',
+        state: 'running',
+        lastObservedAt: '2026-04-29T10:00:00.000Z',
+      }),
+      { now: '2026-04-29T10:07:01.000Z' },
+    )
+
+    expect(viewModel.staleWarning).toContain('No heartbeat for 421 seconds')
   })
 })
 

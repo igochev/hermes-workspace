@@ -14,6 +14,8 @@ async function importRoutes() {
   const listRoute = await import('../routes/api/execution-runs')
   const detailRoute =
     await import('../routes/api/execution-runs.$executionRunId')
+  const executionsDetailRoute =
+    await import('../routes/api/executions.$executionId')
   return {
     list: (
       listRoute.Route as unknown as {

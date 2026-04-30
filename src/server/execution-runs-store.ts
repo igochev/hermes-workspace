@@ -5,9 +5,10 @@ import { randomUUID } from 'node:crypto'
 
 import type { WorkItemPhase } from './work-items-store'
 
-export type ExecutionEngine = 'conductor' | 'hermes-cron'
-export type ExecutionRunRole = 'mission' | 'review' | 'supervisor'
+export type ExecutionEngine = 'conductor' | 'hermes-cron' | 'hermes-session' | 'cron-legacy'
+export type ExecutionRunRole = 'mission' | 'review' | 'supervisor' | 'planner' | 'builder' | 'reviewer' | 'deployer'
 export type ExecutionRunState =
+  | 'queued'
   | 'scheduled'
   | 'running'
   | 'succeeded'
@@ -22,16 +23,20 @@ export type ExecutionRunRecord = {
   role: ExecutionRunRole
   phase?: WorkItemPhase
   engine: ExecutionEngine
-  jobId: string
+  jobId?: string
   jobName?: string
   runId?: string
   state: ExecutionRunState
+  profile?: string
   sessionKey?: string
   sessionKeyPrefix?: string
   startedAt?: string
   finishedAt?: string
   lastObservedAt: string
   lastRunAt?: string
+  summary?: string
+  latestOutputText?: string
+  finalResponse?: string
   error?: string
   branchName?: string
   prUrl?: string
@@ -51,16 +56,20 @@ type UpsertExecutionRunInput = {
   role: ExecutionRunRole
   phase?: WorkItemPhase
   engine: ExecutionEngine
-  jobId: string
+  jobId?: string
   jobName?: string
   runId?: string
   state: ExecutionRunState
+  profile?: string
   sessionKey?: string
   sessionKeyPrefix?: string
   startedAt?: string
   finishedAt?: string
   lastObservedAt?: string
   lastRunAt?: string
+  summary?: string
+  latestOutputText?: string
+  finalResponse?: string
   error?: string
   branchName?: string
   prUrl?: string
@@ -77,9 +86,10 @@ export type ListExecutionRunsFilters = {
   q?: string
 }
 
-const VALID_ROLES: Array<ExecutionRunRole> = ['mission', 'review', 'supervisor']
-const VALID_ENGINES: Array<ExecutionEngine> = ['conductor', 'hermes-cron']
+const VALID_ROLES: Array<ExecutionRunRole> = ['mission', 'review', 'supervisor', 'planner', 'builder', 'reviewer', 'deployer']
+const VALID_ENGINES: Array<ExecutionEngine> = ['conductor', 'hermes-cron', 'hermes-session', 'cron-legacy']
 const VALID_STATES: Array<ExecutionRunState> = [
+  'queued',
   'scheduled',
   'running',
   'succeeded',
@@ -182,7 +192,7 @@ function normalizeExecutionRun(
   run: Partial<ExecutionRunRecord> &
     Pick<
       ExecutionRunRecord,
-      'id' | 'workItemId' | 'projectId' | 'jobId' | 'createdAt' | 'updatedAt'
+      'id' | 'workItemId' | 'projectId' | 'createdAt' | 'updatedAt'
     >,
 ): ExecutionRunRecord {
   return {
@@ -192,16 +202,20 @@ function normalizeExecutionRun(
     role: normalizeRole(run.role),
     phase: normalizePhase(run.phase),
     engine: normalizeEngine(run.engine),
-    jobId: run.jobId.trim(),
+    jobId: asOptionalString(run.jobId),
     jobName: asOptionalString(run.jobName),
     runId: asOptionalString(run.runId),
     state: normalizeState(run.state),
+    profile: asOptionalString(run.profile),
     sessionKey: asOptionalString(run.sessionKey),
     sessionKeyPrefix: asOptionalString(run.sessionKeyPrefix),
     startedAt: asOptionalString(run.startedAt),
     finishedAt: asOptionalString(run.finishedAt),
     lastObservedAt: asOptionalString(run.lastObservedAt) ?? run.updatedAt,
     lastRunAt: asOptionalString(run.lastRunAt),
+    summary: asOptionalString(run.summary),
+    latestOutputText: asOptionalString(run.latestOutputText),
+    finalResponse: asOptionalString(run.finalResponse),
     error: asOptionalString(run.error),
     branchName: asOptionalString(run.branchName),
     prUrl: asOptionalString(run.prUrl),
@@ -216,9 +230,13 @@ function dedupeMatches(
   input: UpsertExecutionRunInput,
 ): boolean {
   const inputRunId = asOptionalString(input.runId)
+  const inputJobId = asOptionalString(input.jobId)
+  const inputId = asOptionalString(input.id)
+  if (inputId && run.id === inputId) return true
   if (run.workItemId !== input.workItemId.trim()) return false
   if (run.role !== input.role) return false
-  if (run.jobId !== input.jobId.trim()) return false
+  if (inputJobId && run.jobId !== inputJobId) return false
+  if (!inputJobId && run.jobId) return false
   if (inputRunId) return run.runId === inputRunId
   return run.runId === undefined
 }
@@ -262,8 +280,12 @@ export function listExecutionRuns(
         run.jobName,
         run.runId,
         run.state,
+        run.profile,
         run.sessionKey,
         run.sessionKeyPrefix,
+        run.summary,
+        run.latestOutputText,
+        run.finalResponse,
         run.branchName,
         run.prUrl,
         run.error,
@@ -307,12 +329,16 @@ export function upsertExecutionRun(
     jobName: input.jobName,
     runId: input.runId,
     state: input.state,
+    profile: input.profile,
     sessionKey: input.sessionKey,
     sessionKeyPrefix: input.sessionKeyPrefix,
     startedAt: input.startedAt,
     finishedAt: input.finishedAt,
     lastObservedAt: input.lastObservedAt ?? now,
     lastRunAt: input.lastRunAt,
+    summary: input.summary,
+    latestOutputText: input.latestOutputText,
+    finalResponse: input.finalResponse,
     error: input.error,
     branchName: input.branchName,
     prUrl: input.prUrl,

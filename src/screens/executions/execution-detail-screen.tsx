@@ -9,6 +9,9 @@ export const EXECUTION_DETAIL_SCREEN_TITLE = 'Execution trace'
 export const EXECUTION_DETAIL_SESSION_SECTION_TITLE =
   'Session / engine evidence'
 export const EXECUTION_DETAIL_JOB_SECTION_TITLE = 'Job definition evidence'
+export const EXECUTION_DETAIL_LIVE_PROGRESS_SECTION_TITLE = 'Live progress'
+export const EXECUTION_DETAIL_REFRESH_NOW_LABEL = 'Refresh now'
+export const EXECUTION_DETAIL_OPEN_SESSION_LABEL = 'Open Session'
 export const EXECUTION_DETAIL_RUN_SECTION_TITLE = 'Run evidence'
 export const EXECUTION_DETAIL_EVIDENCE_SECTION_TITLE =
   'Branch, PR, artifact, and error evidence'
@@ -42,6 +45,10 @@ export type ExecutionDetailScreenViewModel = {
     startedAt: string
     finishedAt: string
   }
+  liveProgress: { title: string; items: Array<ExecutionDetailItem> }
+  polling: { enabled: boolean; intervalMs: number }
+  staleWarning: string | null
+  recoveryGuidance: string | null
   sections: {
     session: { title: string; items: Array<ExecutionDetailItem> }
     job: { title: string; items: Array<ExecutionDetailItem> }
@@ -79,17 +86,50 @@ function buildScheduledJobHref(jobId: string | undefined): string | null {
   return `/jobs?jobId=${encodeURIComponent(jobId)}`
 }
 
+type BuildExecutionDetailOptions = { now?: string }
+
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function isActiveExecutionState(state: string): boolean {
+  return state === 'queued' || state === 'scheduled' || state === 'running'
+}
+
+function secondsSince(timestamp: string | undefined, now: string): number | null {
+  if (!hasValue(timestamp)) return null
+  const delta = new Date(now).getTime() - new Date(timestamp).getTime()
+  return Number.isFinite(delta) && delta > 0 ? Math.floor(delta / 1000) : 0
+}
+
+function buildExecutionTitle(run: ExecutionRunRecord): string {
+  const phase = hasValue(run.phase) ? titleCase(run.phase) : 'Execution'
+  const profile = hasValue(run.profile) ? run.profile : run.role
+  const work = hasValue(run.workItemId) ? run.workItemId : run.id
+  return `${phase} · ${profile} · ${work}`
+}
+
 export function buildExecutionDetailScreenViewModel(
   run: ExecutionRunRecord,
+  options: BuildExecutionDetailOptions = {},
 ): ExecutionDetailScreenViewModel {
   const workItemHref = buildWorkItemHref(run)
   const scheduledJobHref = buildScheduledJobHref(run.jobId)
-  const actions: Array<ExecutionDetailAction> = []
+  const actions: Array<ExecutionDetailAction> = [
+    { label: EXECUTION_DETAIL_REFRESH_NOW_LABEL, href: '#refresh', tone: 'secondary' },
+  ]
   if (workItemHref) {
     actions.push({
       label: EXECUTION_DETAIL_BACK_TO_WORK_ITEM_LABEL,
       href: workItemHref,
       tone: 'primary',
+    })
+  }
+  if (hasValue(run.sessionKey)) {
+    actions.push({
+      label: EXECUTION_DETAIL_OPEN_SESSION_LABEL,
+      href: `/sessions/${encodeURIComponent(run.sessionKey)}`,
+      tone: 'secondary',
     })
   }
   if (scheduledJobHref) {
@@ -100,9 +140,21 @@ export function buildExecutionDetailScreenViewModel(
     })
   }
 
+  const active = isActiveExecutionState(run.state)
+  const now = options.now ?? new Date().toISOString()
+  const heartbeatAgeSeconds = secondsSince(run.lastObservedAt, now)
+  const staleWarning =
+    active && heartbeatAgeSeconds !== null && heartbeatAgeSeconds > 300
+      ? `No heartbeat for ${heartbeatAgeSeconds} seconds; execution may be stale.`
+      : null
+  const recoveryGuidance =
+    run.state === 'failed' && hasValue(run.error)
+      ? `Execution failed: ${run.error}. Review the output, then retry or recover from the Work Item.`
+      : null
+
   return {
     header: {
-      title: EXECUTION_DETAIL_SCREEN_TITLE,
+      title: buildExecutionTitle(run),
       executionId: run.id,
       state: run.state,
       phase: present(run.phase),
@@ -115,6 +167,21 @@ export function buildExecutionDetailScreenViewModel(
       startedAt: present(run.startedAt),
       finishedAt: present(run.finishedAt),
     },
+    liveProgress: {
+      title: EXECUTION_DETAIL_LIVE_PROGRESS_SECTION_TITLE,
+      items: [
+        { label: 'Started', value: present(run.startedAt) },
+        { label: 'Last observed', value: present(run.lastObservedAt) },
+        { label: 'Finished', value: present(run.finishedAt) },
+        { label: 'Current session', value: present(run.sessionKey) },
+        { label: 'Latest output', value: present(run.latestOutputText) },
+        { label: 'Final response', value: present(run.finalResponse) },
+        { label: 'Error', value: present(run.error) },
+      ],
+    },
+    polling: { enabled: active, intervalMs: active ? 3000 : 0 },
+    staleWarning,
+    recoveryGuidance,
     sections: {
       session: {
         title: EXECUTION_DETAIL_SESSION_SECTION_TITLE,
@@ -141,7 +208,7 @@ export function buildExecutionDetailScreenViewModel(
           { label: 'Branch', value: present(run.branchName) },
           { label: 'Pull request', value: present(run.prUrl) },
           {
-            label: 'Artifact',
+            label: 'Artifacts / results',
             value:
               run.artifactPaths.length > 0 ? run.artifactPaths.join(', ') : '—',
           },
@@ -199,16 +266,24 @@ function EvidenceSection({
   )
 }
 
-export function ExecutionDetailScreen() {
-  const params = useParams({ from: '/executions/$executionId' })
-  const executionId = params.executionId
-  const query = useQuery({
+export function ExecutionDetailScreen({
+  executionIdOverride,
+}: {
+  executionIdOverride?: string
+} = {}) {
+  const params = useParams({ from: '/executions/$executionId', shouldThrow: false })
+  const executionId = executionIdOverride ?? params?.executionId ?? ''
+  const executionDetailQuery = useQuery({
     queryKey: ['mission-control', 'execution-detail', executionId],
     queryFn: () => fetchExecutionRunDetail(executionId),
-    staleTime: 10_000,
+    staleTime: 5_000,
+    refetchInterval: (detailQuery) => {
+      const state = detailQuery.state.data?.state
+      return state && isActiveExecutionState(state) ? 3000 : false
+    },
   })
 
-  if (query.isLoading) {
+  if (executionDetailQuery.isLoading) {
     return (
       <section className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6 text-[var(--theme-text)] sm:px-6 lg:px-8">
         <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 text-sm text-[var(--theme-muted)]">
@@ -218,18 +293,18 @@ export function ExecutionDetailScreen() {
     )
   }
 
-  if (query.isError || !query.data) {
+  if (executionDetailQuery.isError || !executionDetailQuery.data) {
     return (
       <section className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6 text-[var(--theme-text)] sm:px-6 lg:px-8">
         <div className="rounded-2xl border border-[var(--theme-danger)] bg-[var(--theme-card)] p-5 text-sm text-[var(--theme-text)]">
           Failed to load execution trace:{' '}
-          {query.error instanceof Error ? query.error.message : 'Unknown error'}
+          {executionDetailQuery.error instanceof Error ? executionDetailQuery.error.message : 'Unknown error'}
         </div>
       </section>
     )
   }
 
-  const viewModel = buildExecutionDetailScreenViewModel(query.data)
+  const viewModel = buildExecutionDetailScreenViewModel(executionDetailQuery.data)
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6 text-[var(--theme-text)] sm:px-6 lg:px-8">
@@ -258,8 +333,8 @@ export function ExecutionDetailScreen() {
                   key={action.label}
                   to="/projects/$projectId/work-items/$workItemId"
                   params={{
-                    projectId: query.data.projectId,
-                    workItemId: query.data.workItemId,
+                    projectId: executionDetailQuery.data.projectId,
+                    workItemId: executionDetailQuery.data.workItemId,
                   }}
                   className="rounded-xl border border-[var(--theme-border)] px-3 py-2 text-sm text-[var(--theme-text)]"
                 >
@@ -299,6 +374,20 @@ export function ExecutionDetailScreen() {
         </dl>
       </header>
 
+      {viewModel.staleWarning ? (
+        <div className="rounded-2xl border border-amber-500/60 bg-[var(--theme-card)] p-5 text-sm text-amber-200">
+          {viewModel.staleWarning}
+        </div>
+      ) : null}
+      {viewModel.recoveryGuidance ? (
+        <div className="rounded-2xl border border-[var(--theme-danger)] bg-[var(--theme-card)] p-5 text-sm text-[var(--theme-text)]">
+          {viewModel.recoveryGuidance}
+        </div>
+      ) : null}
+      <EvidenceSection
+        title={viewModel.liveProgress.title}
+        items={viewModel.liveProgress.items}
+      />
       <EvidenceSection
         title={viewModel.sections.session.title}
         items={viewModel.sections.session.items}

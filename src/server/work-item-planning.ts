@@ -13,11 +13,11 @@ import {
   getWorkItem,
   updateWorkItem
 } from './work-items-store'
-import {  launchConductorMission } from './conductor-launch'
+import { launchImmediateExecution } from './immediate-execution-launch'
 import type {WorkItemRecord} from './work-items-store';
 import type {PlanningDraftRecord} from './planning-drafts-store';
 import type {ProjectRecord} from './projects-store';
-import type {ConductorLaunchResult} from './conductor-launch';
+import type {ImmediateExecutionLaunchResult} from './immediate-execution-launch';
 
 export type PrepareWorkItemRequest = {
   orchestratorModel?: unknown
@@ -39,7 +39,7 @@ export type PrepareWorkItemResponse = {
   workItem: WorkItemRecord
   project: ProjectRecord
   draft: PlanningDraftRecord
-  launch: ConductorLaunchResult & {
+  launch: ImmediateExecutionLaunchResult & {
     phase: 'research'
     profile: string
   }
@@ -162,29 +162,24 @@ export async function prepareWorkItemWithPlanner(
     laneContext: request.laneContext,
   })
 
-  const launch = await launchConductorMission({
+  const launch = await launchImmediateExecution({
+    projectId: project.id,
+    workItemId: workItem.id,
+    phase: 'research',
+    role: 'planner',
+    profile: plannerProfile,
     goal,
-    orchestratorModel: readOptionalString(request.orchestratorModel),
-    workerModel: readOptionalString(request.workerModel),
-    projectsDir: readOptionalString(request.projectsDir),
-    maxParallel:
-      typeof request.maxParallel === 'number' && Number.isFinite(request.maxParallel)
-        ? request.maxParallel
-        : undefined,
-    supervised: request.supervised === true,
-    phaseProfiles: { research: plannerProfile },
-    name: `work-item-plan-${project.slug}-${workItem.id.slice(0, 8)}`,
-    deliver: 'local',
+    repoPath: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
   })
 
   const runningDraft = updatePlanningDraft(requestedDraft.id, {
     status: 'running',
-    plannerJobId: launch.jobId,
-    plannerJobName: launch.jobName,
+    plannerJobId: undefined,
+    plannerJobName: undefined,
     plannerSessionKey: launch.sessionKey,
-    plannerSessionKeyPrefix: launch.sessionKeyPrefix,
+    plannerSessionKeyPrefix: launch.sessionKey,
     plannerProfile,
-    plannerLink: `/jobs?jobId=${encodeURIComponent(launch.jobId)}`,
+    plannerLink: launch.link,
   })
 
   if (!runningDraft) throw new Error('Failed to update planning draft')
@@ -193,9 +188,9 @@ export async function prepareWorkItemWithPlanner(
     action: 'note',
     note: `Planner enrichment requested via profile ${plannerProfile}. Draft ${runningDraft.id.slice(0, 8)} is running.`,
     profile: plannerProfile,
-    missionId: launch.jobId,
+    missionId: launch.executionRunId,
     sessionKey: launch.sessionKey,
-    sessionKeyPrefix: launch.sessionKeyPrefix,
+    sessionKeyPrefix: launch.sessionKey,
     phase: 'research',
     status: workItem.status,
   })

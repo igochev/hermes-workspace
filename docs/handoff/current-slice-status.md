@@ -1,117 +1,71 @@
 # Current Slice Execution Status
 
-> Canonical continuation handoff for Builder sessions. Updated after each ESLint Baseline Stabilization task; keep compact.
+> Canonical continuation handoff for Builder sessions. Updated during Real Executions Runtime implementation after owner correction that `/executions` must be real live execution traces, not Scheduled Jobs.
 
 ## Active Plan
 
-- **Project:** Hermes Workspace — ESLint Baseline Stabilization
-- **Active implementation plan:** `docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
+- **Project:** Hermes Workspace — Real Executions Runtime
+- **Active implementation plan:** `docs/plans/2026-04-29-hermes-workspace-real-executions-runtime-plan.md`
 - **Plan index:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
-- **Previous package:** TypeScript Baseline Stabilization committed locally at `840a67e`
+- **Previous package:** Production Dogfood Queue Hygiene + Real Idea Readiness completed; real idea work item created: `697d0059-a3ca-438e-b92c-481f39e7566b`
 
-## Current State / Evidence
+## Owner Correction / Why This Is Active
 
-- TypeScript Baseline Stabilization was Main-reviewed, accepted, and committed at `840a67e`.
-- Task 1 baseline report:
-  - Durable report: `dogfood-output/eslint-baseline-stabilization-2026-04-29T16-07-08Z.md`.
-  - Alias: `dogfood-output/eslint-baseline-stabilization-latest.md`.
-  - Parser/report helper: `scripts/parse-eslint-baseline.mjs`.
-  - Baseline before config cleanup: 249 files with messages, 1,092 errors, 122 warnings, 5 config/parser failures, 1 `.eslintignore` warning.
-- Task 2 config-friction cleanup completed:
-  - Removed unsupported `.eslintignore`; patterns are now represented in `eslint.config.js`.
-  - Ignored legacy/non-TS JS entrypoints that were failing TS parser-project lookup: `public/sw.js`, `scripts/generate-pwa-icons.js`, `server-entry.js`.
-  - Removed stale inactive `react-hooks/exhaustive-deps` disable comments and unused `no-var` disables.
-  - After-config parsed state: 245 files with messages, 1,078 errors, 120 warnings, 0 config/parser failures, 0 `react-hooks/exhaustive-deps` missing-rule messages, 0 `.eslintignore` warning lines.
-- Task 3 import/type-style cleanup completed:
-  - Ran narrow import/style `eslint --fix` with no-unnecessary-condition/array-type/no-useless-escape/prefer-const/type-assertion rules disabled per plan, then manually fixed remaining type-import/import-order cases.
-  - Import/type-style families are zero in `/tmp/hermes-workspace-eslint-after-imports.json`: `import/consistent-type-specifier-style`, `@typescript-eslint/consistent-type-imports`, `import/first`, `import/no-duplicates`, `import/order`, `sort-imports`, `import/newline-after-import`.
-  - After-import parsed state: 200 files with messages, 684 errors, 120 warnings.
-- Task 4 mechanical syntax cleanup completed:
-  - Ran narrow syntax `eslint --fix` with no-unnecessary-condition/import-order/sort-imports disabled, then manually fixed remaining no-useless-escape cases and restored TypeScript-required typing where auto-fix removed too much.
-  - Task 4 families are zero in `/tmp/hermes-workspace-eslint-after-syntax.json`: `@typescript-eslint/array-type`, `prefer-const`, `no-useless-escape`, `@typescript-eslint/no-unnecessary-type-assertion`.
-  - After-syntax parsed state: 163 files with messages, 347 errors, 120 warnings. Remaining error families: `@typescript-eslint/no-unnecessary-condition` (342), `react/no-danger` stale missing-rule disables (2), `no-constant-condition` (1), `no-control-regex` (1), `@typescript-eslint/naming-convention` (1).
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `pnpm vitest run` passes 79 files / 509 tests; `git diff --check` exits `0`.
-  - Current diff is broad but mechanical lint cleanup: 165 files changed plus report/helper/handoff artifacts.
-- Task 5 server/work-item core sub-area completed:
-  - Removed the 3 remaining `@typescript-eslint/no-unnecessary-condition` errors in the Mission Control server/work-item core group; only `src/server/hermes-job-output.ts` required edits.
-  - Touched-file ESLint for `src/server/work-item-launch.ts`, `src/server/work-item-planning.ts`, `src/server/hermes-job-output.ts`, and `src/server/attention-queue.ts` exits `0` with the existing later-task `@typescript-eslint/require-await` warning in `getLatestLocalCronOutput` only.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task5-server-core.json`: 163 files with messages, 344 errors, 120 warnings; `@typescript-eslint/no-unnecessary-condition` now 339.
-  - Verification: `pnpm vitest run src/server/hermes-job-output.test.ts src/server/work-item-planning.test.ts src/server/work-item-orchestrator-planner-launch-evidence.test.ts src/server/work-item-execution.test.ts` passes 4 files / 32 tests; `pnpm exec tsc --noEmit --pretty false` exits `0`; `git diff --check` exits `0`.
-- Task 5 chat/session/operator shell sub-area completed:
-  - Removed 39 `@typescript-eslint/no-unnecessary-condition` errors from `src/screens/chat/chat-screen.tsx`, `src/screens/chat/components/chat-message-list.tsx`, and `src/screens/chat/components/chat-sidebar.tsx`.
-  - Touched-file ESLint for those three chat files exits `0` errors with 15 existing later-task warnings (`no-shadow` / `require-await`) only.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task5-chat-shell.json`: 163 files with messages, 304 errors, 120 warnings; `@typescript-eslint/no-unnecessary-condition` now 300.
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `pnpm vitest run src/screens/chat/chat-screen-utils.test.ts src/screens/chat/components/chat-sidebar-session-freshness.test.tsx src/screens/chat/components/chat-composer-model-switch.test.ts` passes 3 files / 11 tests; `git diff --check` exits `0`.
-- Task 5 legacy gateway/agent-swarm first pass completed:
-  - Removed `@typescript-eslint/no-unnecessary-condition` errors from the largest legacy gateway/agent-swarm targets: `src/screens/gateway/hooks/use-conductor-gateway.ts`, `src/screens/gateway/components/cost-analytics.tsx`, `src/screens/gateway/components/run-console.tsx`, `src/components/agent-view/agent-view-panel.tsx`, `src/screens/gateway/hooks/use-mission-orchestrator.ts`, `src/screens/gateway/components/config-wizards.tsx`, and `src/screens/gateway/conductor.tsx`.
-  - Touched-file ESLint for those seven files exits `0` errors with only the existing later-task `no-shadow` warnings in `src/components/agent-view/agent-view-panel.tsx`.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task5-gateway-surface.json`: 157 files with messages, 240 errors, 120 warnings; `@typescript-eslint/no-unnecessary-condition` now 237.
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `pnpm vitest run src/server/gateway-capabilities.test.ts` passes 1 file / 2 tests; `git diff --check` exits `0`.
-- Task 5 legacy gateway/agent-swarm remaining pass completed:
-  - Removed `@typescript-eslint/no-unnecessary-condition` errors from the remaining named gateway/agent-swarm targets in the handoff: `src/screens/gateway/agents-screen.tsx`, `src/screens/gateway/components/agent-output-panel.tsx`, `src/stores/mission-store.ts`, `src/screens/gateway/components/collaboration-presence.tsx`, `src/screens/gateway/components/office-view.tsx`, `src/screens/gateway/components/live-feed-panel.tsx`, `src/components/agent-swarm/activity-panel.tsx`, `src/components/agent-view/hooks/use-agent-spawn.ts`, `src/screens/gateway/components/agent-chat-panel.tsx`, `src/screens/gateway/components/approvals-page.tsx`, `src/screens/gateway/components/calendar-view.tsx`, `src/screens/gateway/components/hub-utils.tsx`, `src/screens/gateway/components/mission-timeline.tsx`, `src/screens/gateway/components/streaming-text.tsx`, `src/screens/gateway/components/team-panel.tsx`, and `src/screens/gateway/lib/mission-events.ts`.
-  - Touched-file ESLint for those 16 files exits `0`.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task5-gateway-remaining.json`: 141 files with messages, 209 errors, 120 warnings; `@typescript-eslint/no-unnecessary-condition` now 206.
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `pnpm vitest run src/server/gateway-capabilities.test.ts` passes 1 file / 2 tests; `git diff --check` exits `0`.
-- Task 5 settings/terminal/remaining UI group completed:
-  - Removed 73 `@typescript-eslint/no-unnecessary-condition` errors from the prioritized UI group: `src/routes/settings/index.tsx`, `src/components/terminal/*`, `src/hooks/use-modes.ts`, settings dialog, skills/mobile/inspector/usage surfaces.
-  - Touched-file ESLint for those 10 files exits `0` errors; without warning overrides it reports 14 existing later-task `no-shadow` warnings only.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task5-ui-settings-terminal.json`: 133 files with messages, 136 errors, 120 warnings; `@typescript-eslint/no-unnecessary-condition` now 133.
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `pnpm test src/routes/-root-layout-state.test.ts src/screens/skills/skills-screen.test.ts src/screens/skills/workspace-skills-screen.test.ts -- --runInBand` passes 1 file / 2 tests (only existing matched test file); `git diff --check` exits `0`.
-- Task 5 API/server/store leftovers pass completed:
-  - Removed 34 `@typescript-eslint/no-unnecessary-condition` errors from `src/routes/api/send-stream.ts`, `src/server/local-session-store.ts`, `src/server/projects-store.test.ts`, `src/server/work-item-review-decision.ts`, `src/server/tasks-store.ts`, and `src/server/work-items-store.ts`.
-  - Preserved enhanced send-stream duplicate-publish prevention by removing the dead constant branch/publish calls instead of re-enabling realtime publish.
-  - Made local session persistence maps type-honest as partial runtime records while preserving corrupted-cache tolerance.
-  - Touched-file ESLint for those 6 files exits `0` errors with only 3 existing later-task `no-shadow` warnings in `send-stream.ts`.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task5-api-server-leftovers.json`: 128 files with messages, 102 errors, 120 warnings; `@typescript-eslint/no-unnecessary-condition` now 99.
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `pnpm test src/server/projects-store.test.ts src/server/work-item-review-decision.test.ts src/server/work-item-lifecycle.test.ts src/server/work-item-execution.test.ts -- --runInBand` passes 4 files / 66 tests; `git diff --check` exits `0`.
-- Task 5 chat/hooks/UI leftovers pass completed:
-  - Removed 31 `@typescript-eslint/no-unnecessary-condition` errors from the next prioritized leftovers: `src/screens/chat/hooks/use-chat-history.ts`, `src/stores/chat-store.ts`, `src/screens/chat/components/message-item.tsx`, `src/screens/agents/hooks/use-operations.ts`, `src/lib/i18n.ts`, `src/hooks/use-swipe-navigation.ts`, `src/hooks/use-model-suggestions.ts`, `src/hooks/use-agent-behaviors.ts`, and `src/components/keyboard-shortcuts-modal.tsx`.
-  - Preserved runtime-missing waiting-session metadata safety by making `waitingSessionMeta` a partial record instead of removing the fallback.
-  - Touched-file ESLint for those 9 files exits `0` errors with only 2 existing later-task `no-shadow` warnings in `message-item.tsx`.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task5-chat-hook-ui-leftovers.json`: 120 files with messages, 71 errors, 120 warnings; `@typescript-eslint/no-unnecessary-condition` now 68.
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `pnpm test src/screens/chat/chat-screen-utils.test.ts src/screens/chat/components/chat-sidebar-session-freshness.test.tsx src/screens/chat/components/chat-composer-model-switch.test.ts -- --runInBand` passes 3 files / 11 tests; `git diff --check` exits `0`.
-- Task 5 final leftovers pass completed:
-  - Removed the remaining 68 `@typescript-eslint/no-unnecessary-condition` errors from the final 2-count and 1-count leftover files across connection startup/context/search/prompt components, chat/session utilities, jobs, memory, routes, server APIs, gateway helpers, and small hooks.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task5-no-unnecessary-zero.json`: 71 files with messages, 3 errors, 120 warnings; `@typescript-eslint/no-unnecessary-condition` now `0`.
-  - Remaining non-warning errors are next-task cleanup: 2 stale `react/no-danger` missing-rule disables in `src/screens/files/files-screen.tsx` and 1 naming-convention error in `src/screens/projects/projects-screen.tsx`.
-  - Verification: final leftovers touched-file ESLint exits `0` errors with existing later-task `no-shadow` warnings; `pnpm exec tsc --noEmit --pretty false` exits `0`; focused adjacent tests pass 6 files / 23 tests; `git diff --check` exits `0`.
-- Task 6 error-floor substep completed:
-  - Removed the last 3 repo ESLint errors: stale `react/no-danger` disable comments in `src/screens/files/files-screen.tsx` and type parameter naming in `src/screens/projects/projects-screen.tsx`.
-  - Repo ESLint snapshot `/tmp/hermes-workspace-eslint-after-task6-errors-zero.json`: 69 files with messages, 0 errors, 120 warnings (`no-shadow` 69, `@typescript-eslint/require-await` 51).
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `git diff --check` exits `0`.
-- Task 6 warning policy/final gate completed:
-  - Cleared all 120 remaining warnings (`no-shadow` 69, `@typescript-eslint/require-await` 51) mechanically, preserving typed Promise/API shapes where needed.
-  - Final durable report: `dogfood-output/eslint-baseline-stabilization-final-2026-04-29T18-24-34Z.md`; alias: `dogfood-output/eslint-baseline-stabilization-final-latest.md`.
-  - Final ESLint snapshot `/tmp/hermes-workspace-eslint-task6-final.json`: 0 files with messages, 0 errors, 0 warnings; `pnpm exec eslint . --max-warnings=0` exits `0`.
-  - Verification: `pnpm exec tsc --noEmit --pretty false` exits `0`; `pnpm vitest run` passes 79 files / 509 tests; `pnpm build` exits `0` with existing chunk/dynamic-import warnings; `git diff --check` exits `0`; `systemctl --user restart hermes-workspace.service` active and root smoke OK.
-  - Live browser smoke passed: `/dashboard` renders Mission Control/Morning Review; `/projects` renders project links; `/executions?jobId=missing&workItemId=some-id` shows project-context warning and no invalid `/work-items/some-id` link.
+- D3n13r explicitly corrected Main/CEO: `/executions` must be real clickable live execution traces/results, **not** Scheduled Jobs or one-shot cron definitions.
+- Scheduled Jobs are reusable/cron definitions only. Work Item launches must create real immediate execution/run records that show live progress, logs/output, artifacts, final response, and failures.
 
 ## Completed Tasks
 
-- TypeScript Baseline Stabilization review ✅
-- TypeScript Baseline Stabilization commit ✅
-- ESLint Baseline Stabilization plan authored ✅
-- Task 1 — Durable ESLint baseline report and parser (`scripts/parse-eslint-baseline.mjs`, `dogfood-output/eslint-baseline-stabilization-latest.md`) ✅
-- Task 2 — ESLint configuration friction cleanup (`eslint.config.js`, stale inline disables, `.eslintignore`) ✅
-- Task 3 — Mechanical import/type-style cleanup (import/type-style rule families zero) ✅
-- Task 4 — Mechanical syntax cleanup (array-type/prefer-const/no-useless-escape/no-unnecessary-type-assertion zero) ✅
-- Task 5a — No-unnecessary-condition cleanup: Mission Control server/work-item core (`src/server/hermes-job-output.ts`) ✅
-- Task 5b — No-unnecessary-condition cleanup: Chat/session/operator shell (`src/screens/chat/chat-screen.tsx`, `src/screens/chat/components/chat-message-list.tsx`, `src/screens/chat/components/chat-sidebar.tsx`) ✅
-- Task 5c — No-unnecessary-condition cleanup: Legacy gateway/agent-swarm first pass (`src/screens/gateway/hooks/use-conductor-gateway.ts`, `src/screens/gateway/components/cost-analytics.tsx`, `src/screens/gateway/components/run-console.tsx`, `src/components/agent-view/agent-view-panel.tsx`, `src/screens/gateway/hooks/use-mission-orchestrator.ts`, `src/screens/gateway/components/config-wizards.tsx`, `src/screens/gateway/conductor.tsx`) ✅
-- Task 5d — No-unnecessary-condition cleanup: Legacy gateway/agent-swarm remaining handoff targets (`src/screens/gateway/agents-screen.tsx`, `src/screens/gateway/components/agent-output-panel.tsx`, `src/stores/mission-store.ts`, remaining 1-count gateway/agent-swarm files) ✅
-- Task 5e — No-unnecessary-condition cleanup: Settings/terminal/remaining UI group (`src/routes/settings/index.tsx`, `src/components/terminal/*`, `src/hooks/use-modes.ts`, settings dialog, skills/mobile/inspector/usage surfaces) ✅
-- Task 5f — No-unnecessary-condition cleanup: API/server/store leftovers (`src/routes/api/send-stream.ts`, `src/server/local-session-store.ts`, `src/server/projects-store.test.ts`, `src/server/work-item-review-decision.ts`, `src/server/tasks-store.ts`, `src/server/work-items-store.ts`) ✅
-- Task 5g — No-unnecessary-condition cleanup: Chat/hooks/UI prioritized leftovers (`src/screens/chat/hooks/use-chat-history.ts`, `src/stores/chat-store.ts`, `src/screens/chat/components/message-item.tsx`, `src/screens/agents/hooks/use-operations.ts`, `src/lib/i18n.ts`, `src/hooks/use-swipe-navigation.ts`, `src/hooks/use-model-suggestions.ts`, `src/hooks/use-agent-behaviors.ts`, `src/components/keyboard-shortcuts-modal.tsx`) ✅
-- Task 5h — No-unnecessary-condition cleanup: Final leftovers across 2-count/1-count files; `@typescript-eslint/no-unnecessary-condition` is zero repo-wide ✅
-- Task 6a — ESLint error floor cleanup: repo ESLint has 0 errors and 120 warnings remaining ✅
-- Task 6b — Warning policy/final hard gate: repo ESLint has 0 errors and 0 warnings; final gates and browser smoke passed ✅
+- Task 1 — Locked Work Item execution terminology/routing regression coverage (`src/screens/projects/work-item-detail-screen.test.ts`, `src/server/work-item-execution.test.ts`, `src/server/work-item-run-timeline.test.ts`) ✅
+  - `pnpm test src/screens/projects/work-item-detail-screen.test.ts src/server/work-item-execution.test.ts src/server/work-item-run-timeline.test.ts -- --runInBand` — PASS, 53 tests.
+- Task 2 — Added immediate execution launch seam without Scheduled Job creation (`src/server/immediate-execution-launch.ts`, `src/server/immediate-execution-launch.test.ts`, `src/server/execution-runs-store.ts`) ✅
+  - RED observed: `pnpm test src/server/immediate-execution-launch.test.ts -- --runInBand` failed with missing `./immediate-execution-launch` module.
+  - GREEN: `pnpm test src/server/immediate-execution-launch.test.ts -- --runInBand` — PASS, 3 tests.
+  - Adjacent: `pnpm test src/server/immediate-execution-launch.test.ts src/server/execution-runs-store.test.ts src/server/execution-runs-routes.test.ts -- --runInBand` — PASS, 15 tests.
+- Task 3 — Routed Work Item planning/build launches through immediate executions (`src/server/work-item-planning.ts`, `src/server/work-item-launch.ts`, `src/server/work-item-orchestrator.ts`, tests) ✅
+  - RED observed: `pnpm test src/server/work-item-planning.test.ts -- --runInBand` failed on old `launch.jobId` scheduled-job assumptions after immediate-launch test change.
+  - GREEN focused/adjacent: `pnpm test src/server/immediate-execution-launch.test.ts src/server/work-item-launch.test.ts src/server/work-item-planning.test.ts src/server/work-item-run-timeline.test.ts src/screens/projects/work-item-detail-screen.test.ts src/server/work-item-orchestrator.test.ts -- --runInBand` — PASS after orchestrator compatibility fix, 82 tests.
+  - Type/build: `pnpm exec tsc --noEmit --pretty false` — PASS; `pnpm build` — PASS with existing Vite chunk/dynamic-import warnings.
+- Task 4 — Upgraded `/executions/:executionId` detail view model/UI to real live trace copy (`src/screens/executions/execution-detail-screen.tsx`, `.test.ts`) ✅
+  - RED observed: `pnpm test src/screens/executions/execution-detail-screen.test.ts -- --runInBand` failed on missing live progress constants/viewmodel fields.
+  - GREEN: `pnpm test src/screens/executions/execution-detail-screen.test.ts -- --runInBand` — PASS, 5 tests.
+  - Adjacent + build: `pnpm test src/screens/executions/execution-detail-screen.test.ts src/server/immediate-execution-launch.test.ts src/server/work-item-launch.test.ts src/server/work-item-planning.test.ts src/server/work-item-run-timeline.test.ts src/screens/projects/work-item-detail-screen.test.ts -- --runInBand` — PASS, 68 tests; `pnpm exec tsc --noEmit --pretty false` — PASS; `pnpm build` — PASS with existing Vite warnings.
+- Task 5 — Updated Work Item Cockpit/timeline to consume real execution runs first (`src/server/work-item-run-timeline.ts`, `src/screens/projects/work-item-detail-screen.tsx`, tests) ✅
+  - RED observed: `pnpm test src/server/work-item-run-timeline.test.ts src/screens/projects/work-item-detail-screen.test.ts -- --runInBand` failed on immediate Planner profile copy, execution-first cockpit labels, and execution id summary copy.
+  - GREEN focused/adjacent: `pnpm test src/server/work-item-run-timeline.test.ts src/server/work-item-execution.test.ts src/screens/projects/work-item-detail-screen.test.ts -- --runInBand` — PASS, 56 tests.
+  - Slice-adjacent: `pnpm test src/server/immediate-execution-launch.test.ts src/server/work-item-launch.test.ts src/server/work-item-planning.test.ts src/server/work-item-run-timeline.test.ts src/server/work-item-execution.test.ts src/screens/executions/execution-detail-screen.test.ts src/screens/projects/work-item-detail-screen.test.ts -- --runInBand` — PASS, 87 tests.
+  - Full gates: `pnpm vitest run` — PASS, 82 files / 526 tests after updating legacy route/orchestrator tests to mock/assert immediate executions; `pnpm exec tsc --noEmit --pretty false` — PASS; `pnpm exec eslint . --max-warnings=0` — PASS; `pnpm build` — PASS with existing Vite chunk/dynamic-import warnings; `git diff --check` — PASS.
+- Task 6 — Migration/compatibility for existing Scheduled Job-backed runs (`src/server/work-item-execution.ts`, `src/server/work-item-run-timeline.ts`, tests) ✅
+  - RED observed: `pnpm test src/server/work-item-execution.test.ts src/server/work-item-run-timeline.test.ts -- --runInBand` failed because imported `cron-legacy` execution runs were not labeled as legacy and imported local cron output did not persist summary/latest output/final response.
+  - GREEN focused: `pnpm test src/server/work-item-execution.test.ts src/server/work-item-run-timeline.test.ts -- --runInBand` — PASS, 32 tests.
+  - Slice-adjacent: `pnpm test src/server/immediate-execution-launch.test.ts src/server/work-item-launch.test.ts src/server/work-item-planning.test.ts src/server/work-item-run-timeline.test.ts src/server/work-item-execution.test.ts src/screens/executions/execution-detail-screen.test.ts src/screens/projects/work-item-detail-screen.test.ts -- --runInBand` — PASS, 89 tests.
+  - Full gates: `pnpm vitest run` — PASS, 82 files / 528 tests; `pnpm exec tsc --noEmit --pretty false` — PASS; `pnpm exec eslint . --max-warnings=0` — PASS; `pnpm build` — PASS with existing Vite chunk/dynamic-import warnings; `git diff --check` — PASS.
+- Task 7 — Live dogfood acceptance gauntlet (`src/server/immediate-execution-launch.ts`, `src/server/hermes-api.ts`, `src/routes/executions.tsx`, `src/screens/executions/execution-detail-screen.tsx`, reports) ✅
+  - RED observed: `pnpm test src/server/immediate-execution-launch.test.ts -- --runInBand` failed on missing direct chat-completion fallback for zero-fork gateway `POST /api/sessions: 404`; `pnpm test src/routes/-root-layout-state.test.ts -- --runInBand` failed because `/executions/:executionId` rendered the list route.
+  - GREEN focused/adjacent: immediate execution fallback test PASS (4 tests); route/detail tests PASS (8 tests); slice-adjacent execution tests PASS (90 tests).
+  - Live dogfood PASS: work item `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d` created execution `7b217f97-691c-4976-a6f8-35041a26591b`; `/executions/7b217f97-691c-4976-a6f8-35041a26591b` showed `SUCCEEDED`, timestamps, and final response; Scheduled Jobs before/after stayed `[5e26a777bcd0, f5e71ec2a3f0]` (no added jobs).
+  - Evidence: `dogfood-output/real-executions-runtime-final-latest.md`, `dogfood-output/real-executions-runtime-final-2026-04-30T06-18-00Z.md`, screenshot `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_8a169dfa537a4f6d881ebb770c84d576.png`.
+  - Full final gates: `pnpm vitest run` — PASS, 82 files / 529 tests; `pnpm exec tsc --noEmit --pretty false` — PASS; `pnpm exec eslint . --max-warnings=0` — PASS; `pnpm build` — PASS with existing Vite chunk/dynamic-import warnings; `git diff --check` — PASS; service restart/API smoke — PASS.
+
+## Current State / Evidence
+
+- Real ABACUS idea exists: `Daddy Daily Brief — one-screen family runway for today` (`697d0059-a3ca-438e-b92c-481f39e7566b`).
+- Immediate execution path:
+  - `ExecutionRunRecord` supports `engine: 'hermes-session'`, `state: 'queued'`, role-specific Planner/Builder/Reviewer/Deployer records, optional `jobId`, `profile`, `summary`, `latestOutputText`, and `finalResponse`.
+  - `launchImmediateExecution(...)` creates the durable run first, prefers Hermes session launch when `POST /api/sessions` is available, falls back to immediate `/v1/chat/completions` on the current zero-fork gateway, records running/succeeded/failed state transitions, returns `/executions/<executionRunId>`, and does not call `launchConductorMission`/Scheduled Jobs.
+  - `prepareWorkItemWithPlanner(...)` now creates a PlanningDraft and launches Planner via immediate execution; draft `plannerLink` is `/executions/<executionRunId>`.
+  - `launchWorkItemIntoConductor(...)` now uses immediate execution for research/build/review/deploy, stores `missionId=<executionRunId>`, `missionLink=/executions/<executionRunId>`, `missionState=running`, and no longer writes new scheduled-job ids for normal launches.
+- `/executions/:executionId` detail now shows dynamic phase/profile/work-item title, live progress, started/last observed/finished, latest output, final response, error/recovery guidance, stale heartbeat warning, Refresh now, Open Work Item, Open Session, and legacy Scheduled Job definition only when a `jobId` exists.
+- Work Item Cockpit timeline now prefers durable `ExecutionRunRecord` data, preserves Research/Planner execution links through accepted PlanningDrafts, shows run.profile (for example `researcher`) instead of hardcoding role names, leaves Build `not_started` until actual build launch, labels old `missionJobId` fallback as `Legacy scheduled-job output`, and labels imported `cron-legacy` run rows the same way.
+- Legacy Scheduled Job-backed output can be imported into durable `ExecutionRunRecord` rows with `engine: 'cron-legacy'`, `summary: Imported legacy scheduled-job evidence.`, `latestOutputText`, and terminal `finalResponse`, keeping work item `697d0059-a3ca-438e-b92c-481f39e7566b` readable without normalizing cron-backed launches as the new architecture.
+- Work Item detail cockpit copy now says `No execution launched` / `Execution queued`, includes durable execution ids before legacy job ids, and labels artifacts generically as execution artifacts rather than Builder-only changed files.
 
 ## Next Builder Task
 
-ESLint Baseline Stabilization is implementation-complete. Next: Main/CEO review of the broad mechanical diff, then commit the accepted stabilization package. If Main wants another cycle, update this handoff to the next active plan before Builder proceeds.
+**Next:** Real Executions Runtime plan complete and implementation index now marks R1 shipped/no active plan. Ask Main/CEO for the next Hermes Workspace implementation plan/slice before starting new product work.
 
 ## Verification Rules
 
-- This is a quality/stabilization cycle, not a product feature cycle.
-- Preserve full `tsc --noEmit` green status after every lint cleanup family.
-- Preserve PATCH partial-update safety, Scheduled Jobs vs Executions semantics, Morning Review read-only behavior, and single-lane autonomy defaults.
+- Preserve all previous green gates: `pnpm vitest run`, `pnpm exec tsc --noEmit --pretty false`, `pnpm exec eslint . --max-warnings=0`, `pnpm build`.
+- Live browser dogfood is mandatory; constants-only tests are insufficient.
+- Handoff must be updated after each completed task or before stopping.

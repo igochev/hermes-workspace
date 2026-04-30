@@ -77,7 +77,7 @@ function nowPlusSecondsIso(seconds: number): string {
 }
 
 export function buildMissionLink(jobId: string): string {
-  return `/jobs?jobId=${encodeURIComponent(jobId)}`
+  return `/executions?jobId=${encodeURIComponent(jobId)}`
 }
 
 function readOptionalString(value: unknown): string {

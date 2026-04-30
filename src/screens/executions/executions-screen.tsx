@@ -14,8 +14,9 @@ export const EXECUTIONS_SCREEN_TITLE = 'Executions'
 export const EXECUTIONS_SCREEN_HELP_COPY =
   'Work-item execution attempts for Planner, Builder, Reviewer, and Merge-Healer.'
 export const EXECUTIONS_SCREEN_SEARCH_PLACEHOLDER =
-  'Search job, session, work item, or execution...'
+  'Search execution, session, work item, or legacy job...'
 export const EXECUTIONS_NAVIGATION_COPY = 'Executions'
+export const EXECUTIONS_DEFINITIONS_LINK_COPY = 'Open reusable job definitions'
 export const EXECUTIONS_LEGACY_NO_RECORD_TITLE =
   'Execution trace not yet recorded'
 
@@ -144,7 +145,7 @@ export function ExecutionsScreen() {
             to="/jobs"
             className="rounded-xl border border-[var(--theme-border)] px-3 py-2 text-sm text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
           >
-            Open Scheduled Jobs definitions
+            {EXECUTIONS_DEFINITIONS_LINK_COPY}
           </Link>
         </div>
       </header>
@@ -167,7 +168,8 @@ export function ExecutionsScreen() {
             className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-text)]"
           >
             <option value="">Any state</option>
-            <option value="scheduled">Scheduled</option>
+            <option value="queued">Queued</option>
+            <option value="scheduled">Legacy scheduled</option>
             <option value="running">Running</option>
             <option value="succeeded">Succeeded</option>
             <option value="failed">Failed</option>

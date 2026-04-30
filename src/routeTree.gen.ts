@@ -116,6 +116,7 @@ import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/c
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
 import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
+import { Route as ApiExecutionsExecutionIdRouteImport } from './routes/api/executions.$executionId'
 import { Route as ApiExecutionRunsExecutionRunIdRouteImport } from './routes/api/execution-runs.$executionRunId'
 import { Route as ApiAutopilotSuggestionsSuggestionIdRouteImport } from './routes/api/autopilot-suggestions.$suggestionId'
 import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
@@ -676,6 +677,12 @@ const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiHermesJobsRoute,
 } as any)
+const ApiExecutionsExecutionIdRoute =
+  ApiExecutionsExecutionIdRouteImport.update({
+    id: '/api/executions/$executionId',
+    path: '/api/executions/$executionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiExecutionRunsExecutionRunIdRoute =
   ApiExecutionRunsExecutionRunIdRouteImport.update({
     id: '/$executionRunId',
@@ -871,6 +878,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
   '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
+  '/api/executions/$executionId': typeof ApiExecutionsExecutionIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -997,6 +1005,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
   '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
+  '/api/executions/$executionId': typeof ApiExecutionsExecutionIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -1127,6 +1136,7 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
   '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
+  '/api/executions/$executionId': typeof ApiExecutionsExecutionIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -1258,6 +1268,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/api/autopilot-suggestions/$suggestionId'
     | '/api/execution-runs/$executionRunId'
+    | '/api/executions/$executionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1384,6 +1395,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/autopilot-suggestions/$suggestionId'
     | '/api/execution-runs/$executionRunId'
+    | '/api/executions/$executionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1513,6 +1525,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/api/autopilot-suggestions/$suggestionId'
     | '/api/execution-runs/$executionRunId'
+    | '/api/executions/$executionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1633,6 +1646,7 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
+  ApiExecutionsExecutionIdRoute: typeof ApiExecutionsExecutionIdRoute
   ApiHermesProxySplatRoute: typeof ApiHermesProxySplatRoute
   ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
@@ -2406,6 +2420,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesJobsJobIdRouteImport
       parentRoute: typeof ApiHermesJobsRoute
     }
+    '/api/executions/$executionId': {
+      id: '/api/executions/$executionId'
+      path: '/api/executions/$executionId'
+      fullPath: '/api/executions/$executionId'
+      preLoaderRoute: typeof ApiExecutionsExecutionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/execution-runs/$executionRunId': {
       id: '/api/execution-runs/$executionRunId'
       path: '/$executionRunId'
@@ -2895,6 +2916,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
+  ApiExecutionsExecutionIdRoute: ApiExecutionsExecutionIdRoute,
   ApiHermesProxySplatRoute: ApiHermesProxySplatRoute,
   ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,

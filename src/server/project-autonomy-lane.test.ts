@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { selectNextLaneWorkItem } from './project-autonomy-lane'
+import {
+  PRODUCTION_DOGFOOD_BLOCKED_FIXTURE_IDS,
+  PRODUCTION_DOGFOOD_HISTORICAL_EVIDENCE_IDS,
+  PRODUCTION_DOGFOOD_PROJECT_ID,
+  PRODUCTION_DOGFOOD_STALE_TEST_QUEUE_IDS,
+} from './production-dogfood-queue-hygiene'
 import type {ProjectRecord} from './projects-store';
 import type {WorkItemRecord} from './work-items-store';
 
@@ -214,5 +220,78 @@ describe('project autonomy lane selector', () => {
       active: { id: 'p2-active' },
       next: null,
     })
+  })
+
+  it('leaves the ABACUS lane idle after stale dogfood/test queue items are cancelled', () => {
+    const abacusProject = project({ id: PRODUCTION_DOGFOOD_PROJECT_ID })
+    const historicalEvidence = PRODUCTION_DOGFOOD_HISTORICAL_EVIDENCE_IDS.map((id) =>
+      workItem({ id, projectId: PRODUCTION_DOGFOOD_PROJECT_ID, title: `Evidence ${id}`, status: 'done', laneState: 'done' }),
+    )
+    const parkedBlocked = PRODUCTION_DOGFOOD_BLOCKED_FIXTURE_IDS.map((id) =>
+      workItem({
+        id,
+        projectId: PRODUCTION_DOGFOOD_PROJECT_ID,
+        title: `Blocked fixture ${id}`,
+        status: 'blocked',
+        phase: 'build',
+        laneState: 'blocked',
+        laneParkedAt: '2026-04-29T01:00:00.000Z',
+        laneBlockedReason: 'Parked fixture; preserved as evidence.',
+      }),
+    )
+    const archivedStaleQueue = PRODUCTION_DOGFOOD_STALE_TEST_QUEUE_IDS.map((id) =>
+      workItem({ id, projectId: PRODUCTION_DOGFOOD_PROJECT_ID, title: `Dogfood rough idea ${id}`, status: 'cancelled' }),
+    )
+
+    const result = selectNextLaneWorkItem({
+      project: abacusProject,
+      workItems: [...historicalEvidence, ...parkedBlocked, ...archivedStaleQueue],
+      repoSafety: { safe: true },
+    })
+
+    expect(result.active).toBeNull()
+    expect(result.next).toBeNull()
+    expect(result.parked).toHaveLength(2)
+    expect(result.reason).toBe('No queued lane candidate; blocked items are parked.')
+  })
+
+  it('selects a synthetic real ABACUS idea after cleanup instead of historical or parked evidence', () => {
+    const abacusProject = project({ id: PRODUCTION_DOGFOOD_PROJECT_ID })
+    const historicalEvidence = workItem({
+      id: 'b31ad72d-4ef0-4388-b867-e0bf11c14c82',
+      projectId: PRODUCTION_DOGFOOD_PROJECT_ID,
+      title: 'Single Lane E2E Code Delivery',
+      status: 'done',
+      laneState: 'done',
+    })
+    const parkedBlocked = workItem({
+      id: '84bfe2c2-e899-437a-8a6c-a6fa9884886d',
+      projectId: PRODUCTION_DOGFOOD_PROJECT_ID,
+      title: 'Blocked regression fixture',
+      status: 'blocked',
+      phase: 'build',
+      laneState: 'blocked',
+      laneParkedAt: '2026-04-29T01:00:00.000Z',
+      laneBlockedReason: 'Parked fixture; preserved as evidence.',
+    })
+    const realIdea = workItem({
+      id: 'real-family-command-center-idea',
+      projectId: PRODUCTION_DOGFOOD_PROJECT_ID,
+      title: 'Family Command Center ABACUS real owner idea',
+      status: 'ready',
+      phase: 'build',
+      priority: 'high',
+      riskLevel: 'low',
+    })
+
+    const result = selectNextLaneWorkItem({
+      project: abacusProject,
+      workItems: [historicalEvidence, parkedBlocked, realIdea],
+      repoSafety: { safe: true },
+    })
+
+    expect(result.active).toBeNull()
+    expect(result.next).toMatchObject({ id: 'real-family-command-center-idea' })
+    expect(result.reason).toContain('blocked items are parked')
   })
 })

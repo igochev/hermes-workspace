@@ -178,8 +178,8 @@ describe('work item detail screen theme classes', () => {
 
     expect(evidence).toEqual([
       expect.objectContaining({ role: 'Planner', state: 'Succeeded', summary: 'Plan ready.' }),
-      expect.objectContaining({ role: 'Builder', state: 'Agent session running', evidence: 'Builder changed files: src/screens/projects/work-item-detail-screen.tsx' }),
-      expect.objectContaining({ role: 'Reviewer', state: 'Waiting for approval', evidence: 'No code evidence yet' }),
+      expect.objectContaining({ role: 'Builder', state: 'Agent session running', evidence: 'Execution artifacts: src/screens/projects/work-item-detail-screen.tsx' }),
+      expect.objectContaining({ role: 'Reviewer', state: 'Waiting for approval', evidence: 'No execution artifacts yet' }),
       expect.objectContaining({ role: 'Merge-Healer', state: 'No job launched', summary: 'No merge-healer evidence yet.' }),
     ])
   })
@@ -248,7 +248,8 @@ describe('work item detail screen theme classes', () => {
   })
 
   it('uses workflow-specific launch labels instead of a generic conductor label', () => {
-    expect(getWorkItemPrimaryLaunchLabel({ phase: 'research', status: 'active' })).toBe('Plan with Planner')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: 'research', status: 'inbox' })).toBe('Prepare Idea with Researcher')
+    expect(getWorkItemPrimaryLaunchLabel({ phase: 'research', status: 'active' })).toBe('Continue Research Plan')
     expect(getWorkItemPrimaryLaunchLabel({ phase: 'build', status: 'active' })).toBe('Launch Build')
     expect(getWorkItemPrimaryLaunchLabel({ phase: 'build', status: 'blocked' })).toBe('Relaunch Build')
     expect(getWorkItemPrimaryLaunchLabel({ phase: 'review', status: 'active' })).toBe('Launch Review')
@@ -266,7 +267,6 @@ describe('work item detail screen theme classes', () => {
 
   it('derives lifecycle actions from current status and phase', () => {
     expect(getAvailableWorkItemLifecycleActions({ status: 'inbox', phase: 'research' })).toEqual([
-      'send_to_planning',
       'cancel',
     ])
     expect(getAvailableWorkItemLifecycleActions({ status: 'active', phase: 'research' })).toEqual([
@@ -539,7 +539,7 @@ describe('work item detail screen theme classes', () => {
     expect(getPlanningDraftStatusLabel('parse_failed')).toBe('Planner revision needed')
     expect(getPlanningDraftStatusLabel('accepted')).toBe('Accepted')
 
-    expect(getPlanningDraftGuidance()).toContain('Prepare with Planner')
+    expect(getPlanningDraftGuidance()).toContain('Prepare Idea with Researcher')
     expect(getPlanningDraftGuidance('parse_failed')).toContain('Request revision')
     expect(getPlanningDraftGuidance('structured_ready')).toContain('Accept Planner Draft')
 
@@ -613,8 +613,8 @@ describe('work item detail screen theme classes', () => {
   })
   it('exposes Execution Evidence cockpit labels for honest per-profile run states', () => {
     expect(WORK_ITEM_RUNS_SECTION_TITLE).toBe('Execution Evidence')
-    expect(getRunTimelineStateLabel('not_started')).toBe('No job launched')
-    expect(getRunTimelineStateLabel('scheduled')).toBe('Job scheduled')
+    expect(getRunTimelineStateLabel('not_started')).toBe('No execution launched')
+    expect(getRunTimelineStateLabel('scheduled')).toBe('Execution queued')
     expect(getRunTimelineStateLabel('running')).toBe('Agent session running')
     expect(getRunTimelineStateLabel('output_ready')).toBe('Output ready for ingestion')
     expect(getRunTimelineStateLabel('succeeded')).toBe('Succeeded')
@@ -629,16 +629,15 @@ describe('work item detail screen theme classes', () => {
         phase: 'build',
         phaseLabel: 'Build',
         profileRole: 'builder',
-        profileName: 'builder',
-        profileSource: 'execution-run',
+        executionRunId: 'exec-run-123456',
+        jobId: 'job-123456',
+        runId: 'run-abcdef',
+        sessionKeyPrefix: 'sess-deadbeef',
         state: 'running',
         summary: 'Builder is running.',
-        jobId: 'job-1234567890',
-        runId: 'run-abc987654',
-        sessionKeyPrefix: 'sess-deadbeef',
         artifacts: [],
       }),
-    ).toBe('job job-1234 · run run-abc · session sess-dea')
+    ).toBe('execution exec-run · legacy job job-1234 · run run-abc · session sess-dea')
     expect(
       getWorkItemRunTimelineIdCopy({
         phase: 'research',
@@ -648,10 +647,10 @@ describe('work item detail screen theme classes', () => {
         summary: 'No job launched',
         artifacts: [],
       }),
-    ).toBe('No job/session yet')
-    expect(getWorkItemRunTimelineArtifactCopy([])).toBe('No code evidence yet')
+    ).toBe('No execution/session yet')
+    expect(getWorkItemRunTimelineArtifactCopy([])).toBe('No execution artifacts yet')
     expect(getWorkItemRunTimelineArtifactCopy(['lib/quick-capture.ts', 'tests/quick-capture.test.ts'])).toBe(
-      'Builder changed files: lib/quick-capture.ts, tests/quick-capture.test.ts',
+      'Execution artifacts: lib/quick-capture.ts, tests/quick-capture.test.ts',
     )
     expect(getWorkItemRunTimelineLinkLabel({ link: 'http://localhost:3456/jobs/job-123' })).toBe('Open run')
     expect(getWorkItemRunTimelineLinkLabel({ sessionKey: 'sess-123' })).toBe('Open session')

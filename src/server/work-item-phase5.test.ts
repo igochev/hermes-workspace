@@ -5,8 +5,9 @@ import { createWorkItem, getWorkItem } from './work-items-store'
 import { launchWorkItemIntoConductor } from './work-item-launch'
 import { syncWorkItemExecutionState } from './work-item-execution'
 
-const { launchConductorMission, buildMissionLink, getHermesJobById, listHermesJobs, getHermesJobRuns } = vi.hoisted(() => ({
+const { launchConductorMission, launchImmediateExecution, buildMissionLink, getHermesJobById, listHermesJobs, getHermesJobRuns } = vi.hoisted(() => ({
   launchConductorMission: vi.fn(),
+  launchImmediateExecution: vi.fn(),
   buildMissionLink: (jobId: string) => `/jobs?jobId=${encodeURIComponent(jobId)}`,
   getHermesJobById: vi.fn(),
   listHermesJobs: vi.fn(),
@@ -16,6 +17,10 @@ const { launchConductorMission, buildMissionLink, getHermesJobById, listHermesJo
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
   buildMissionLink,
+}))
+
+vi.mock('./immediate-execution-launch', () => ({
+  launchImmediateExecution,
 }))
 
 vi.mock('./hermes-jobs', () => ({
@@ -36,6 +41,7 @@ describe('work-item phase 5 execution linkage', () => {
     previousHermesHome = process.env.HERMES_HOME
     process.env.HERMES_HOME = path.join(tempHome, '.hermes')
     launchConductorMission.mockReset()
+    launchImmediateExecution.mockReset()
     getHermesJobById.mockReset()
     listHermesJobs.mockReset()
     getHermesJobRuns.mockReset()
@@ -63,13 +69,11 @@ describe('work-item phase 5 execution linkage', () => {
       repoPathSnapshot: project.repoPath,
     })
 
-    launchConductorMission.mockResolvedValue({
-      ok: true,
-      sessionKey: 'cron_job-321_pending',
-      sessionKeyPrefix: 'cron_job-321_',
-      jobId: 'job-321',
-      jobName: 'work-item-build-mission-control-demo-1234abcd',
-      runId: null,
+    launchImmediateExecution.mockResolvedValue({
+      executionRunId: 'execution-321',
+      sessionKey: 'session-execution-321',
+      state: 'running',
+      link: '/executions/execution-321',
     })
 
     const result = await launchWorkItemIntoConductor(workItem.id, {
@@ -77,16 +81,27 @@ describe('work-item phase 5 execution linkage', () => {
       phaseProfiles: { build: 'builder' },
     })
 
-    expect(result.workItem.missionId).toBe('job-321')
-    expect(result.workItem.missionJobId).toBe('job-321')
-    expect(result.workItem.missionJobName).toBe('work-item-build-mission-control-demo-1234abcd')
-    expect(result.workItem.missionSessionKeyPrefix).toBe('cron_job-321_')
-    expect(result.workItem.missionState).toBe('scheduled')
+    expect(result.workItem.missionId).toBe('execution-321')
+    expect(result.workItem.missionJobId).toBeUndefined()
+    expect(result.workItem.missionJobName).toBeUndefined()
+    expect(result.workItem.missionSessionKeyPrefix).toBe('session-execution-321')
+    expect(result.workItem.missionLink).toBe('/executions/execution-321')
+    expect(result.workItem.missionState).toBe('running')
+    expect(launchConductorMission).not.toHaveBeenCalled()
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workItemId: workItem.id,
+        projectId: project.id,
+        phase: 'build',
+        role: 'builder',
+        profile: 'builder',
+      }),
+    )
 
     const persisted = getWorkItem(workItem.id)
-    expect(persisted?.missionJobId).toBe('job-321')
-    expect(persisted?.missionJobName).toBe('work-item-build-mission-control-demo-1234abcd')
-    expect(persisted?.missionSessionKeyPrefix).toBe('cron_job-321_')
+    expect(persisted?.missionId).toBe('execution-321')
+    expect(persisted?.missionLink).toBe('/executions/execution-321')
+    expect(persisted?.missionSessionKeyPrefix).toBe('session-execution-321')
   })
 
   it('returns enriched execution details including canonical job identity and latest run', async () => {
