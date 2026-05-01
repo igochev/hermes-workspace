@@ -86,6 +86,13 @@ export type ProjectAutonomyAlwaysOnPolicy = {
   }
 }
 
+export type ProjectAiMergeHealingPolicy = {
+  enabled: boolean
+  maxAttemptsPerWorkItem: number
+  requireCleanRepo: boolean
+  requireEvidenceArtifacts: boolean
+}
+
 export type ProjectAutonomyLanePolicy = {
   enabled: boolean
   mode: 'single_lane'
@@ -96,6 +103,7 @@ export type ProjectAutonomyLanePolicy = {
   plannerTiming: 'on_lane_entry'
   blockedBehavior: 'park_and_continue_when_repo_clean'
   mergeHealerEnabled: boolean
+  aiMergeHealing?: ProjectAiMergeHealingPolicy
   allowParallelWorktrees: false
   alwaysOn: ProjectAutonomyAlwaysOnPolicy
   releaseAudit?: ProjectReleaseAuditPolicy
@@ -378,6 +386,18 @@ function normalizeReleaseAuditPolicy(value: unknown): ProjectReleaseAuditPolicy 
   }
 }
 
+function normalizeAiMergeHealingPolicy(value: unknown): ProjectAiMergeHealingPolicy {
+  const candidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+  return {
+    enabled: candidate.enabled === true,
+    maxAttemptsPerWorkItem: positiveIntegerOrDefault(candidate.maxAttemptsPerWorkItem, 1),
+    requireCleanRepo: candidate.requireCleanRepo === false ? false : true,
+    requireEvidenceArtifacts: candidate.requireEvidenceArtifacts === false ? false : true,
+  }
+}
+
 function normalizeAutonomyLanePolicy(
   value: unknown,
   projectDefaultBranch?: string,
@@ -393,6 +413,7 @@ function normalizeAutonomyLanePolicy(
     plannerTiming: 'on_lane_entry',
     blockedBehavior: 'park_and_continue_when_repo_clean',
     mergeHealerEnabled: candidate.mergeHealerEnabled === false ? false : true,
+    aiMergeHealing: normalizeAiMergeHealingPolicy(candidate.aiMergeHealing),
     allowParallelWorktrees: false,
     alwaysOn: normalizeAutonomyAlwaysOnPolicy(candidate.alwaysOn),
     releaseAudit: normalizeReleaseAuditPolicy(candidate.releaseAudit),
@@ -517,6 +538,10 @@ function mergeAlwaysOnPolicyPatch(current: ProjectAutonomyAlwaysOnPolicy, update
   })
 }
 
+function defaultAiMergeHealingPolicy(): ProjectAiMergeHealingPolicy {
+  return normalizeAiMergeHealingPolicy(undefined)
+}
+
 function mergeAutonomyLanePolicyPatch(
   current: ProjectAutonomyLanePolicy,
   updates: unknown,
@@ -531,6 +556,10 @@ function mergeAutonomyLanePolicyPatch(
       patch.releaseAudit && typeof patch.releaseAudit === 'object' && !Array.isArray(patch.releaseAudit)
         ? normalizeReleaseAuditPolicy({ ...current.releaseAudit, ...patch.releaseAudit })
         : current.releaseAudit,
+    aiMergeHealing:
+      patch.aiMergeHealing && typeof patch.aiMergeHealing === 'object' && !Array.isArray(patch.aiMergeHealing)
+        ? normalizeAiMergeHealingPolicy({ ...(current.aiMergeHealing ?? defaultAiMergeHealingPolicy()), ...patch.aiMergeHealing })
+        : current.aiMergeHealing,
   } as ProjectAutonomyLanePolicy
 }
 

@@ -1,0 +1,6 @@
+
+session_id: 20260501_231621_a4a225
+MERGE_HEALER_REPAIR_DECISION: manual_review
+PROFILE: merge-healer
+SAFETY_BOUNDARIES_CONFIRMED: yes
+SUMMARY: synthetic controlled repair routing dry-run only.

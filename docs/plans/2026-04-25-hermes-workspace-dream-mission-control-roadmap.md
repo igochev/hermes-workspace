@@ -13,6 +13,8 @@
 > **Post-R6 CEO decision, 2026-05-01:** R6 made the release-audit gate explicit, but the branch is still a mixed in-flight release-lane package. Do not create `deployer`/`supervisor` profiles ad hoc. First run R7 packaging/profile-readiness: classify and verify the R3/R4/R5/R6 package, then create dedicated profiles only through a separate owner-approved profile-creation/mapping task.
 >
 > **Post-R7 CEO decision, 2026-05-01:** R7 is package-ready. To reduce repeated owner round-trips, Main created a five-plan Builder batch: R8 package baseline, R9 release profile contracts/no-fallback, R10 Supervisor profile/audit launch, R11 Merge-Healer profile controlled repair, and R12 profile-backed release-lane gauntlet. Profile creation must still wait until the package baseline and contracts are clean.
+>
+> **Post-R12 CEO decision, 2026-05-01:** R12 correctly blocked before Builder launch because the canonical repo path was dirty with local profile-batch artifacts. Main created the next sequential batch: R13 package/checkpoint the verified R10/R11/R12 artifacts into a clean baseline, R14 rerun the profile-backed gauntlet from that clean baseline, and only then R15 return to the roadmap with Slice N rough idea → Planner-prepared draft workflow. Do not move to Slice N while the release-lane proof is unresolved.
 
 ---
 

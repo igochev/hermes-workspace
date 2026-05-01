@@ -1,0 +1,64 @@
+
+╭────────────────────── Hermes Agent v0.12.0 (2026.4.30) ──────────────────────╮
+│                                   Available Tools                            │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   browser: browser_back, browser_click, ...  │
+│  ⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀   browser-cdp: browser_cdp, browser_dialog   │
+│  ⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀   clarify: clarify                           │
+│  ⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀   code_execution: execute_code               │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   cronjob: cronjob                           │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   delegation: delegate_task                  │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   file: patch, read_file, search_files,      │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   write_file                                 │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   hermes-yuanbao: yb_query_group_info, ...   │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   (and 13 more toolsets...)                  │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀                                              │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   Available Skills                           │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   autonomous-ai-agents: claude-code, codex,  │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   hermes-agent, opencode                     │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   creative: architecture-diagram,            │
+│                                   ascii-art, ascii-video, b...               │
+│      gpt-5.5 · Nous Research      data-science: jupyter-live-kernel          │
+│            /home/d3ni3            devops: webhook-subscriptions              │
+│  Session: 20260501_224517_417861  email: himalaya                            │
+│                                   gaming: minecraft-modpack-server,          │
+│                                   pokemon-player                             │
+│                                   general: dogfood, yuanbao                  │
+│                                   github: codebase-inspection, github-auth,  │
+│                                   github-code-r...                           │
+│                                   mcp: native-mcp                            │
+│                                   media: gif-search, heartmula, songsee,     │
+│                                   spotify, youtub...                         │
+│                                   mlops: audiocraft-audio-generation,        │
+│                                   axolotl, dspy, eva...                      │
+│                                   note-taking: obsidian                      │
+│                                   productivity: airtable, google-workspace,  │
+│                                   linear, maps, nano-...                     │
+│                                   red-teaming: godmode                       │
+│                                   research: arxiv, blogwatcher, llm-wiki,    │
+│                                   polymarket, resea...                       │
+│                                   smart-home: openhue                        │
+│                                   social-media: xurl                         │
+│                                   software-development:                      │
+│                                   debugging-hermes-tui-commands,             │
+│                                   hermes-agent-ski...                        │
+│                                                                              │
+│                                   Profile: supervisor                        │
+│                                   30 tools · 83 skills · /help for commands  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+Query: You are performing a read-only dry-run release audit for Hermes Workspace
+R10 Supervisor Profile Creation + Release Audit Launch. Repository path:
+/home/d3ni3/.Hermes/workspace/projects/hermes-workspace. Do not mutate files,
+branches, commits, services, profiles, or gateways. Inspect only the evidence
+necessary from the prompt context and respond exactly in this contract:
+SUPERVISOR_AUDIT_DECISION: APPROVED | VETOED | MANUAL_REVIEW;
+SUPERVISOR_AUDIT_SUMMARY: <one concise paragraph>; SUPERVISOR_AUDIT_FINDINGS:
+bullet list; SUPERVISOR_AUDIT_REQUIRED_ACTIONS: bullet list or none;
+SUPERVISOR_AUDIT_CONFIDENCE: low | medium | high. Evidence context: focused
+Workspace tests and lint/typecheck were run locally during R10; this is a
+dry-run to verify the supervisor profile identity/output contract only, not a
+release approval.
+No Codex credentials stored. Run `hermes auth` to authenticate. Run `hermes
+model` to re-authenticate.
+
+Goodbye! ⚕

@@ -1,0 +1,21 @@
+{
+  "profiles": [
+    "default",
+    "builder",
+    "merge-healer",
+    "planner",
+    "researcher",
+    "supervisor",
+    "websonar"
+  ],
+  "checks": {
+    "mergeHealerProfileExists": true,
+    "supervisorProfilePreserved": true,
+    "mergeHealerGatewayStopped": true,
+    "discordEnabledFalse": true,
+    "telegramGatewayFalse": true,
+    "slackGatewayFalse": true,
+    "soulContractPresent": true
+  },
+  "ready": true
+}

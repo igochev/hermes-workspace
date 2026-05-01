@@ -6,12 +6,19 @@ import {
   listPlanningDrafts,
 } from './planning-drafts-store'
 import { getLatestHermesJobOutput } from './hermes-job-output'
-import { listExecutionRuns } from './execution-runs-store'
+import { getExecutionRun, listExecutionRuns } from './execution-runs-store'
+import { launchImmediateExecution } from './immediate-execution-launch'
+import { listProfiles } from './profiles-browser'
 import {
   buildWorkItemBranchName,
   ensureWorkItemBranch,
 } from './project-branch-manager'
 import { evaluateReleaseAuditGate } from './work-item-release-audit-gate'
+import {
+  launchReleaseAuditForWorkItem,
+  parseSupervisorAuditOutput,
+  recordSupervisorAuditOutput,
+} from './work-item-release-audit-launch'
 import { runWorkItemMergeHealer } from './work-item-merge-healer'
 import { selectNextLaneWorkItem } from './project-autonomy-lane'
 import { launchWorkItemIntoConductor } from './work-item-launch'
@@ -43,6 +50,7 @@ export type WorkItemOrchestratorAction =
   | 'request_review'
   | 'launch_review'
   | 'request_deploy_approval'
+  | 'launch_release_audit'
   | 'run_merge_healer'
   | 'mark_done'
   | 'noop'
@@ -153,10 +161,189 @@ function readErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function readExecutionOutput(run: ExecutionRunRecord): string {
+  return [run.finalResponse, run.latestOutputText, run.summary]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .join('\n')
+}
+
+function syncSupervisorReleaseAudit(workItem: WorkItemRecord): {
+  workItem: WorkItemRecord
+  changed: boolean
+  message: string
+} | null {
+  if (!workItem.releaseAuditExecutionId || workItem.releaseAuditState !== 'running') return null
+  const run = getExecutionRun(workItem.releaseAuditExecutionId)
+  if (!run) return null
+  if (run.state === 'running' || run.state === 'queued' || run.state === 'scheduled') return null
+
+  if (run.state === 'succeeded') {
+    const output = readExecutionOutput(run)
+    try {
+      const updated = recordSupervisorAuditOutput(
+        workItem.id,
+        parseSupervisorAuditOutput(output),
+      )
+      return {
+        workItem: updated,
+        changed: true,
+        message: `Recorded Supervisor release audit output from execution ${run.id}.`,
+      }
+    } catch (error) {
+      const errorMessage = readErrorMessage(error)
+      const updated = updateWorkItem(workItem.id, {
+        releaseAuditState: 'manual_review',
+        releaseAuditDecision: 'manual_review',
+        releaseAuditSummary: `Supervisor audit output could not be parsed: ${errorMessage}`,
+        releaseAuditMissingEvidence: ['parseable Supervisor audit output'],
+        releaseAuditObservedAt: new Date().toISOString(),
+      })
+      if (!updated) throw new Error('Failed to persist Supervisor audit parse failure')
+      return {
+        workItem: updated,
+        changed: true,
+        message: `Supervisor audit output parse failed for execution ${run.id}: ${errorMessage}`,
+      }
+    }
+  }
+
+  const summary = run.error || run.summary || `Supervisor audit execution ended with state ${run.state}.`
+  const updated = updateWorkItem(workItem.id, {
+    releaseAuditState: 'failed',
+    releaseAuditDecision: 'manual_review',
+    releaseAuditSummary: summary,
+    releaseAuditMissingEvidence: ['successful Supervisor release audit'],
+    releaseAuditObservedAt: new Date().toISOString(),
+  })
+  if (!updated) throw new Error('Failed to persist Supervisor audit failure')
+  return {
+    workItem: updated,
+    changed: true,
+    message: `Supervisor release audit execution ${run.id} did not approve release: ${summary}`,
+  }
+}
+
 function mergeHealerTestCommand(): string | undefined {
   return (
     process.env.HERMES_WORKSPACE_MERGE_HEALER_TEST_COMMAND?.trim() || undefined
   )
+}
+
+function readMappedMergeHealerProfile(project: NonNullable<ReturnType<typeof getProject>>): string {
+  return project.runtimeProfiles.mergeHealerProfile?.trim() || ''
+}
+
+function buildMergeHealerRepairGoal(params: {
+  workItem: WorkItemRecord
+  project: NonNullable<ReturnType<typeof getProject>>
+  repoPath: string
+  blockedReason: string
+  conflictFiles: Array<string>
+  artifactPaths: Array<string>
+}): string {
+  return [
+    `You are acting as the controlled Merge-Healer for Hermes Mission Control work item "${params.workItem.title}" of project "${params.project.name}".`,
+    `Work item ID: ${params.workItem.id}`,
+    `Project ID: ${params.project.id}`,
+    `Repository path: ${params.repoPath}`,
+    `Base branch: ${params.workItem.baseBranch ?? params.project.defaultBranch ?? 'main'}`,
+    `Feature branch: ${params.workItem.branchName ?? 'not recorded'}`,
+    `Merge target branch: ${params.workItem.mergeTargetBranch ?? params.workItem.baseBranch ?? params.project.defaultBranch ?? 'main'}`,
+    `Deterministic Merge-Healer blocker: ${params.blockedReason}`,
+    `Conflict files: ${params.conflictFiles.length > 0 ? params.conflictFiles.join(', ') : 'none recorded'}`,
+    `Existing merge/test artifacts: ${params.artifactPaths.length > 0 ? params.artifactPaths.join(', ') : 'none recorded'}`,
+    '',
+    'Repair boundaries:',
+    '- Inspect repo hygiene first. Stop if unrelated dirty files are present.',
+    '- Repair only bounded merge/conflict/test failures for this work item and its feature branch.',
+    '- Do not push, force-push, publish PRs, deploy, start gateways, alter Hermes profiles, or perform broad refactors/formatting sweeps.',
+    '- Capture exact commands, changed files, and verification evidence.',
+    '',
+    'Required final report:',
+    '- MERGE_HEALER_REPAIR_DECISION: repaired | blocked | manual_review',
+    '- Summary of repair actions or blocker.',
+    '- Commands run and results.',
+    '- Files changed and evidence artifacts.',
+  ].join('\n')
+}
+
+async function maybeLaunchAiMergeHealerRepair(params: {
+  workItem: WorkItemRecord
+  project: NonNullable<ReturnType<typeof getProject>>
+  repoPath: string
+  merge: Awaited<ReturnType<typeof runWorkItemMergeHealer>>
+}): Promise<{ launched: boolean; message?: string; executionRunId?: string; artifactPath?: string }> {
+  const policy = params.project.autonomyLanePolicy.aiMergeHealing ?? {
+    enabled: false,
+    maxAttemptsPerWorkItem: 1,
+    requireCleanRepo: true,
+    requireEvidenceArtifacts: true,
+  }
+  if (!policy.enabled) return { launched: false }
+
+  const profile = readMappedMergeHealerProfile(params.project)
+  if (!profile) {
+    return {
+      launched: false,
+      message: 'AI-assisted Merge-Healer repair requires a mapped merge-healer profile; refusing fallback to Builder.',
+    }
+  }
+
+  const availableProfiles = new Set(listProfiles().map((item) => item.name))
+  if (!availableProfiles.has(profile)) {
+    return {
+      launched: false,
+      message: `AI-assisted Merge-Healer repair profile "${profile}" is not available; refusing fallback to Builder.`,
+    }
+  }
+
+  const attemptCount = listExecutionRuns({ workItemId: params.workItem.id, role: 'merge-healer' }).length
+  if (attemptCount >= policy.maxAttemptsPerWorkItem) {
+    return {
+      launched: false,
+      message: `AI-assisted Merge-Healer repair budget exhausted (${attemptCount}/${policy.maxAttemptsPerWorkItem}).`,
+    }
+  }
+
+  if (policy.requireCleanRepo && params.merge.repoHygiene?.dirtyStatus) {
+    return {
+      launched: false,
+      message: `AI-assisted Merge-Healer repair blocked: candidate repo is dirty (${params.merge.repoHygiene.dirtyStatus}).`,
+    }
+  }
+
+  const evidenceArtifacts = [...params.merge.mergeArtifactPaths]
+  if (params.merge.mergeConflictFiles.length > 0) evidenceArtifacts.push(`conflicts:${params.merge.mergeConflictFiles.join(',')}`)
+  if (policy.requireEvidenceArtifacts && evidenceArtifacts.length === 0) {
+    return {
+      launched: false,
+      message: 'AI-assisted Merge-Healer repair blocked: deterministic merge produced no conflict or test evidence artifact.',
+    }
+  }
+
+  const launch = await launchImmediateExecution({
+    projectId: params.project.id,
+    workItemId: params.workItem.id,
+    phase: 'deploy',
+    role: 'merge-healer',
+    profile,
+    repoPath: params.repoPath,
+    goal: buildMergeHealerRepairGoal({
+      workItem: params.workItem,
+      project: params.project,
+      repoPath: params.repoPath,
+      blockedReason: params.merge.mergeBlockedReason ?? 'Merge-Healer blocked autonomous completion.',
+      conflictFiles: params.merge.mergeConflictFiles,
+      artifactPaths: evidenceArtifacts,
+    }),
+  })
+
+  return {
+    launched: true,
+    message: `AI-assisted Merge-Healer repair launched using profile ${profile}; deterministic merge remains blocked until repair evidence is reviewed.`,
+    executionRunId: launch.executionRunId,
+    artifactPath: launch.link,
+  }
 }
 
 type LaneBranchPreparationPurpose = 'Planner' | 'Builder'
@@ -606,8 +793,73 @@ export async function reconcileWorkItemAutonomy(
     workItem.mergeState !== 'merged'
 
   if (project && shouldRunMergeHealer) {
+    const syncedAudit = syncSupervisorReleaseAudit(workItem)
+    if (syncedAudit) {
+      return {
+        workItemId,
+        changed: syncedAudit.changed,
+        blocked: true,
+        events: [
+          createEvent({
+            workItem,
+            action: 'launch_release_audit',
+            jobId: workItem.releaseAuditExecutionId,
+            runId: workItem.releaseAuditExecutionId,
+            statusAfter: syncedAudit.workItem.status,
+            phaseAfter: syncedAudit.workItem.phase,
+            message: syncedAudit.message,
+          }),
+        ],
+      }
+    }
+
     const auditGate = evaluateReleaseAuditGate(workItem, project)
     if (auditGate.status === 'waiting') {
+      if (project.runtimeProfiles.supervisorProfile && !workItem.releaseAuditExecutionId && workItem.releaseAuditState !== 'running') {
+        try {
+          const auditLaunch = await launchReleaseAuditForWorkItem(workItem, project)
+          return {
+            workItemId,
+            changed: true,
+            blocked: true,
+            events: [
+              createEvent({
+                workItem,
+                action: 'launch_release_audit',
+                jobId: auditLaunch.executionRunId,
+                runId: auditLaunch.executionRunId,
+                statusAfter: workItem.status,
+                phaseAfter: 'deploy',
+                message: `Supervisor release audit launched using profile ${auditLaunch.profile}; Merge-Healer is waiting for approval evidence.`,
+              }),
+            ],
+          }
+        } catch (error) {
+          const errorMessage = readErrorMessage(error)
+          const updated = updateWorkItem(workItem.id, {
+            releaseAuditState: 'failed',
+            releaseAuditSummary: `Release audit launch failed: ${errorMessage}`,
+            releaseAuditMissingEvidence: ['successful release audit'],
+            releaseAuditObservedAt: workItem.releaseAuditObservedAt ?? new Date().toISOString(),
+          })
+          if (!updated) throw new Error('Failed to persist release audit launch failure')
+          return {
+            workItemId,
+            changed: true,
+            blocked: true,
+            events: [
+              createEvent({
+                workItem,
+                action: 'launch_release_audit',
+                statusAfter: updated.status,
+                phaseAfter: updated.phase,
+                message: `Release audit launch failed: ${errorMessage}`,
+              }),
+            ],
+          }
+        }
+      }
+
       const nextAuditState =
         workItem.releaseAuditState === 'pending' ? workItem.releaseAuditState : 'pending'
       const nextObservedAt = workItem.releaseAuditObservedAt ?? new Date().toISOString()
@@ -759,20 +1011,36 @@ export async function reconcileWorkItemAutonomy(
 
     const blockedReason =
       merge.mergeBlockedReason ?? 'Merge-Healer blocked autonomous completion.'
+    const aiRepair = await maybeLaunchAiMergeHealerRepair({
+      workItem: mergeReadyWorkItem,
+      project,
+      repoPath,
+      merge,
+    })
+    const finalBlockedReason = aiRepair.message ?? blockedReason
+    const finalArtifactPaths = aiRepair.artifactPath
+      ? Array.from(new Set([...mergeUpdates.mergeArtifactPaths, aiRepair.artifactPath]))
+      : mergeUpdates.mergeArtifactPaths
     const updated = updateWorkItem(workItem.id, {
       ...mergeUpdates,
+      mergeArtifactPaths: finalArtifactPaths,
+      artifactPaths: Array.from(
+        new Set([...workItem.artifactPaths, ...finalArtifactPaths]),
+      ),
       status: 'blocked',
       phase: workItem.phase,
       blockedReason: 'other',
       laneParkedAt: new Date().toISOString(),
-      laneBlockedReason: blockedReason,
+      laneBlockedReason: finalBlockedReason,
     })
     if (!updated) throw new Error('Failed to persist Merge-Healer blocker')
     appendWorkItemHistoryEntry(updated.id, {
       action: 'status-change',
       status: 'blocked',
       phase: updated.phase,
-      note: blockedReason,
+      note: finalBlockedReason,
+      missionId: aiRepair.executionRunId,
+      profile: aiRepair.launched ? readMappedMergeHealerProfile(project) : undefined,
     })
     return {
       workItemId,
@@ -782,9 +1050,11 @@ export async function reconcileWorkItemAutonomy(
         createEvent({
           workItem,
           action: 'run_merge_healer',
+          jobId: aiRepair.executionRunId,
+          runId: aiRepair.executionRunId,
           statusAfter: 'blocked',
           phaseAfter: workItem.phase,
-          message: blockedReason,
+          message: finalBlockedReason,
         }),
       ],
     }

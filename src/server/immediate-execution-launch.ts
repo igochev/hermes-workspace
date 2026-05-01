@@ -6,7 +6,7 @@ import { isLocalHermesCliAvailable, launchLocalHermesCliExecution } from './loca
 import type { ExecutionEngine } from './execution-runs-store'
 import type { WorkItemPhase } from './work-items-store'
 
-export type ImmediateExecutionRole = 'planner' | 'builder' | 'reviewer' | 'deployer'
+export type ImmediateExecutionRole = 'planner' | 'builder' | 'reviewer' | 'deployer' | 'supervisor' | 'merge-healer'
 
 export type ImmediateExecutionLaunchInput = {
   projectId: string

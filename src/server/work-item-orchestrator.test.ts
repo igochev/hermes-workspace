@@ -29,11 +29,17 @@ const {
   launchWorkItemIntoConductor,
   prepareWorkItemWithPlanner,
   syncWorkItemExecutionState,
+  launchReleaseAuditForWorkItem,
+  launchImmediateExecution,
+  listProfiles,
 } = vi.hoisted(() => ({
   getLatestHermesJobOutput: vi.fn(),
   launchWorkItemIntoConductor: vi.fn(),
   prepareWorkItemWithPlanner: vi.fn(),
   syncWorkItemExecutionState: vi.fn(),
+  launchReleaseAuditForWorkItem: vi.fn(),
+  launchImmediateExecution: vi.fn(),
+  listProfiles: vi.fn(),
 }))
 
 vi.mock('./hermes-job-output', () => ({
@@ -53,6 +59,18 @@ vi.mock('./work-item-execution', () => ({
   syncWorkItemExecutionState,
 }))
 
+vi.mock('./work-item-release-audit-launch', () => ({
+  launchReleaseAuditForWorkItem,
+}))
+
+vi.mock('./immediate-execution-launch', () => ({
+  launchImmediateExecution,
+}))
+
+vi.mock('./profiles-browser', () => ({
+  listProfiles,
+}))
+
 describe('work-item-orchestrator', () => {
   let tempHome: string
   let previousHermesHome: string | undefined
@@ -65,6 +83,15 @@ describe('work-item-orchestrator', () => {
     launchWorkItemIntoConductor.mockReset()
     prepareWorkItemWithPlanner.mockReset()
     syncWorkItemExecutionState.mockReset()
+    launchReleaseAuditForWorkItem.mockReset()
+    launchImmediateExecution.mockReset()
+    launchImmediateExecution.mockResolvedValue({
+      executionRunId: 'exec-merge-healer-repair',
+      state: 'running',
+      link: '/executions/exec-merge-healer-repair',
+    })
+    listProfiles.mockReset()
+    listProfiles.mockReturnValue([])
   })
 
   afterEach(() => {
@@ -759,6 +786,52 @@ describe('work-item-orchestrator', () => {
     expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoPath, encoding: 'utf8' }).trim()).toBe(baseCommit)
   })
 
+  it('launches mapped Supervisor audit before Merge-Healer when release audit is required', async () => {
+    const { repoPath, baseCommit } = createMergeReadyRepo('mission/audit-supervisor-launch')
+    const project = createProject({
+      name: 'Release Audit Supervisor Demo',
+      repoPath,
+      defaultBranch: 'main',
+      runtimeProfiles: { supervisorProfile: 'supervisor' },
+      autonomyLanePolicy: { enabled: true, releaseAudit: { required: true, supervisorRequired: true } } as any,
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Audit item with Supervisor profile',
+      status: 'active',
+      phase: 'deploy',
+      laneState: 'reviewing',
+      reviewDecision: 'approved',
+      priority: 'medium',
+      riskLevel: 'medium',
+      repoPathSnapshot: repoPath,
+      branchName: 'mission/audit-supervisor-launch',
+      baseBranch: 'main',
+      mergeBaseCommit: baseCommit,
+      mergeTargetBranch: 'main',
+      mergeState: 'not_started',
+    } as any)
+    launchReleaseAuditForWorkItem.mockResolvedValue({
+      executionRunId: 'audit-run-1',
+      state: 'running',
+      link: '/executions/audit-run-1',
+      profile: 'supervisor',
+    })
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+
+    expect(launchReleaseAuditForWorkItem).toHaveBeenCalledWith(expect.objectContaining({ id: workItem.id }), expect.objectContaining({ id: project.id }))
+    expect(result.changed).toBe(true)
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]).toMatchObject({
+      action: 'launch_release_audit',
+      jobId: 'audit-run-1',
+      statusAfter: 'active',
+      phaseAfter: 'deploy',
+    })
+    expect(result.events[0]?.message).toMatch(/Supervisor release audit/i)
+  })
+
   it('does not fallback to Builder when required Supervisor audit profile is missing', async () => {
     const { repoPath, baseCommit } = createMergeReadyRepo('mission/audit-no-supervisor')
     const project = createProject({ name: 'Release Audit Missing Supervisor Demo', repoPath, defaultBranch: 'main', phaseProfiles: { build: 'builder' }, runtimeProfiles: {}, autonomyLanePolicy: { enabled: true, releaseAudit: { required: true, supervisorRequired: true } } as any })
@@ -911,6 +984,24 @@ describe('work-item-orchestrator', () => {
     })
   })
 
+  function createConflictingRepo(name: string, branchName: string): string {
+    const repoPath = join(tempHome, name)
+    mkdirSync(repoPath, { recursive: true })
+    execFileSync('git', ['init', '-b', 'main'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.email', 'hermes@example.test'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.name', 'Hermes Test'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'base\n', 'utf8')
+    execFileSync('git', ['add', 'shared.txt'], { cwd: repoPath })
+    execFileSync('git', ['commit', '-m', 'initial'], { cwd: repoPath })
+    execFileSync('git', ['checkout', '-b', branchName], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'feature\n', 'utf8')
+    execFileSync('git', ['commit', '-am', 'feature'], { cwd: repoPath })
+    execFileSync('git', ['checkout', 'main'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'main\n', 'utf8')
+    execFileSync('git', ['commit', '-am', 'main'], { cwd: repoPath })
+    return repoPath
+  }
+
   it('parks the lane when Merge-Healer hits a merge conflict', async () => {
     const repoPath = join(tempHome, 'merge-healer-conflict-repo')
     mkdirSync(repoPath, { recursive: true })
@@ -961,6 +1052,243 @@ describe('work-item-orchestrator', () => {
       mergeTestPassed: false,
     })
     expect(updated?.laneBlockedReason).toMatch(/conflict/i)
+    expect(launchImmediateExecution).not.toHaveBeenCalled()
+  })
+
+  it('launches AI-assisted Merge-Healer repair through the mapped profile after conflict readiness checks', async () => {
+    const repoPath = join(tempHome, 'merge-healer-ai-conflict-repo')
+    mkdirSync(repoPath, { recursive: true })
+    execFileSync('git', ['init', '-b', 'main'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.email', 'hermes@example.test'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.name', 'Hermes Test'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'base\n', 'utf8')
+    execFileSync('git', ['add', 'shared.txt'], { cwd: repoPath })
+    execFileSync('git', ['commit', '-m', 'initial'], { cwd: repoPath })
+    execFileSync('git', ['checkout', '-b', 'mission/ai-conflict'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'feature\n', 'utf8')
+    execFileSync('git', ['commit', '-am', 'feature'], { cwd: repoPath })
+    execFileSync('git', ['checkout', 'main'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'main\n', 'utf8')
+    execFileSync('git', ['commit', '-am', 'main'], { cwd: repoPath })
+    listProfiles.mockReturnValue([{ name: 'merge-healer' }])
+    const project = createProject({
+      name: 'AI Merge Healer Conflict Demo',
+      repoPath,
+      defaultBranch: 'main',
+      runtimeProfiles: { mergeHealerProfile: 'merge-healer' },
+      autonomyLanePolicy: {
+        enabled: true,
+        aiMergeHealing: { enabled: true, maxAttemptsPerWorkItem: 1 },
+      },
+    } as any)
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Reviewed item with AI repair conflict',
+      status: 'active',
+      phase: 'deploy',
+      laneState: 'reviewing',
+      reviewDecision: 'approved',
+      priority: 'medium',
+      riskLevel: 'low',
+      repoPathSnapshot: repoPath,
+      branchName: 'mission/ai-conflict',
+      baseBranch: 'main',
+      mergeTargetBranch: 'main',
+      mergeState: 'not_started',
+    })
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id)
+
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'merge-healer',
+        profile: 'merge-healer',
+        phase: 'deploy',
+        repoPath,
+        workItemId: workItem.id,
+      }),
+    )
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]?.message).toMatch(/AI-assisted Merge-Healer repair launched using profile merge-healer/i)
+    expect(updated?.mergeArtifactPaths).toContain('/executions/exec-merge-healer-repair')
+    expect(updated?.laneBlockedReason).toMatch(/AI-assisted Merge-Healer repair launched/i)
+  })
+
+  it('does not launch AI-assisted Merge-Healer repair after the per-work-item budget is exhausted', async () => {
+    const repoPath = createConflictingRepo('merge-healer-ai-budget-repo', 'mission/ai-budget')
+    listProfiles.mockReturnValue([{ name: 'merge-healer' }])
+    const project = createProject({
+      name: 'AI Merge Healer Budget Demo',
+      repoPath,
+      defaultBranch: 'main',
+      runtimeProfiles: { mergeHealerProfile: 'merge-healer' },
+      autonomyLanePolicy: {
+        enabled: true,
+        aiMergeHealing: { enabled: true, maxAttemptsPerWorkItem: 1 },
+      },
+    } as any)
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Reviewed item with exhausted AI repair budget',
+      status: 'active',
+      phase: 'deploy',
+      laneState: 'reviewing',
+      reviewDecision: 'approved',
+      priority: 'medium',
+      riskLevel: 'low',
+      repoPathSnapshot: repoPath,
+      branchName: 'mission/ai-budget',
+      baseBranch: 'main',
+      mergeTargetBranch: 'main',
+      mergeState: 'not_started',
+    })
+    upsertExecutionRun({
+      id: 'existing-merge-healer-attempt',
+      workItemId: workItem.id,
+      projectId: project.id,
+      role: 'merge-healer',
+      phase: 'deploy',
+      engine: 'local-hermes-cli',
+      state: 'failed',
+      profile: 'merge-healer',
+      artifactPaths: ['/executions/existing-merge-healer-attempt'],
+    })
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id)
+
+    expect(launchImmediateExecution).not.toHaveBeenCalled()
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]?.message).toMatch(/budget exhausted/i)
+    expect(updated?.laneBlockedReason).toMatch(/budget exhausted/i)
+  })
+
+  it('blocks AI-assisted Merge-Healer repair when clean-repo readiness fails', async () => {
+    const repoPath = createConflictingRepo('merge-healer-ai-dirty-repo', 'mission/ai-dirty')
+    writeFileSync(join(repoPath, 'unrelated.txt'), 'operator change\n', 'utf8')
+    listProfiles.mockReturnValue([{ name: 'merge-healer' }])
+    const project = createProject({
+      name: 'AI Merge Healer Dirty Repo Demo',
+      repoPath,
+      defaultBranch: 'main',
+      runtimeProfiles: { mergeHealerProfile: 'merge-healer' },
+      autonomyLanePolicy: {
+        enabled: true,
+        aiMergeHealing: { enabled: true, maxAttemptsPerWorkItem: 1, requireCleanRepo: true },
+      },
+    } as any)
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Reviewed item with dirty repo',
+      status: 'active',
+      phase: 'deploy',
+      laneState: 'reviewing',
+      reviewDecision: 'approved',
+      priority: 'medium',
+      riskLevel: 'low',
+      repoPathSnapshot: repoPath,
+      branchName: 'mission/ai-dirty',
+      baseBranch: 'main',
+      mergeTargetBranch: 'main',
+      mergeState: 'not_started',
+    })
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id)
+
+    expect(launchImmediateExecution).not.toHaveBeenCalled()
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]?.message).toMatch(/candidate repo is dirty/i)
+    expect(updated?.laneBlockedReason).toMatch(/candidate repo is dirty/i)
+  })
+
+  it('blocks AI-assisted Merge-Healer repair when deterministic merge evidence is missing', async () => {
+    const repoPath = createConflictingRepo('merge-healer-ai-no-evidence-repo', 'mission/ai-no-evidence')
+    listProfiles.mockReturnValue([{ name: 'merge-healer' }])
+    const project = createProject({
+      name: 'AI Merge Healer Evidence Demo',
+      repoPath,
+      defaultBranch: 'main',
+      runtimeProfiles: { mergeHealerProfile: 'merge-healer' },
+      autonomyLanePolicy: {
+        enabled: true,
+        aiMergeHealing: { enabled: true, maxAttemptsPerWorkItem: 1, requireEvidenceArtifacts: true },
+      },
+    } as any)
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Reviewed item with missing branch evidence',
+      status: 'active',
+      phase: 'deploy',
+      laneState: 'reviewing',
+      reviewDecision: 'approved',
+      priority: 'medium',
+      riskLevel: 'low',
+      repoPathSnapshot: repoPath,
+      baseBranch: 'main',
+      mergeTargetBranch: 'main',
+      mergeState: 'not_started',
+    })
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id)
+
+    expect(launchImmediateExecution).not.toHaveBeenCalled()
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]?.message).toMatch(/no conflict or test evidence artifact/i)
+    expect(updated?.laneBlockedReason).toMatch(/no conflict or test evidence artifact/i)
+  })
+
+  it('refuses AI-assisted Merge-Healer repair without falling back to Builder when the mapped profile is missing', async () => {
+    const repoPath = join(tempHome, 'merge-healer-ai-missing-profile-repo')
+    mkdirSync(repoPath, { recursive: true })
+    execFileSync('git', ['init', '-b', 'main'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.email', 'hermes@example.test'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.name', 'Hermes Test'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'base\n', 'utf8')
+    execFileSync('git', ['add', 'shared.txt'], { cwd: repoPath })
+    execFileSync('git', ['commit', '-m', 'initial'], { cwd: repoPath })
+    execFileSync('git', ['checkout', '-b', 'mission/ai-missing-profile'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'feature\n', 'utf8')
+    execFileSync('git', ['commit', '-am', 'feature'], { cwd: repoPath })
+    execFileSync('git', ['checkout', 'main'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'shared.txt'), 'main\n', 'utf8')
+    execFileSync('git', ['commit', '-am', 'main'], { cwd: repoPath })
+    const project = createProject({
+      name: 'AI Merge Healer Missing Profile Demo',
+      repoPath,
+      defaultBranch: 'main',
+      runtimeProfiles: { mergeHealerProfile: 'merge-healer' },
+      autonomyLanePolicy: {
+        enabled: true,
+        aiMergeHealing: { enabled: true, maxAttemptsPerWorkItem: 1 },
+      },
+    } as any)
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Reviewed item with missing AI repair profile',
+      status: 'active',
+      phase: 'deploy',
+      laneState: 'reviewing',
+      reviewDecision: 'approved',
+      priority: 'medium',
+      riskLevel: 'low',
+      repoPathSnapshot: repoPath,
+      branchName: 'mission/ai-missing-profile',
+      baseBranch: 'main',
+      mergeTargetBranch: 'main',
+      mergeState: 'not_started',
+    })
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id) as any
+
+    expect(launchImmediateExecution).not.toHaveBeenCalled()
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]?.message).toMatch(/profile "merge-healer" is not available/i)
+    expect(updated.assignedProfile).not.toBe('builder')
+    expect(updated.laneBlockedReason).toMatch(/refusing fallback to Builder/i)
   })
 
   it('ingests completed planner output for a running planning draft', async () => {

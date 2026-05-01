@@ -2,15 +2,15 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md`
+> **Current active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md`
 >
-> **Queued batch plans:** R8 package baseline → R9 release profile contracts → R10 Supervisor profile/audit launch → R11 Merge-Healer profile controlled repair → R12 profile-backed release-lane gauntlet.
+> **Queued batch plans:** R13 profile batch package / clean baseline → R14 clean R12 profile-backed gauntlet retry → R15 roadmap re-entry Slice N idea intake + Planner enrichment.
 >
-> **Previous active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r7-release-lane-packaging-profile-readiness-plan.md`
+> **Previous active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md`
 >
-> **Most recently completed implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r7-release-lane-packaging-profile-readiness-plan.md` (package-ready; report `dogfood-output/release-lane-packaging-profile-readiness-latest.md`)
+> **Most recently completed/attempted implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md` (attempted; correctly blocked because canonical repo path was dirty; report `dogfood-output/profile-backed-release-lane-gauntlet-latest.md`)
 >
-> **Next roadmap task selected by Main/CEO:** Batch queue created to reduce owner round-trips. R8 first packages/commits/pushes the classified release-lane bundle; R9 defines profile contracts; R10 creates/wires Supervisor; R11 creates/wires Merge-Healer under controlled repair policy; R12 runs the profile-backed release-lane gauntlet. Live work item ids are recorded in `docs/handoff/current-slice-status.md`.
+> **Next roadmap task selected by Main/CEO:** First complete the release-lane proof safely: R13 packages/checkpoints the verified local profile batch so the repo is clean, R14 retries R12 from that clean baseline, then R15 returns to roadmap Slice N only after R14 passes or an explicit owner-approved blocked proceed. Live work item ids are recorded in `docs/handoff/current-slice-status.md`.
 >
 > **Previous stabilization plan:** `docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
 >
@@ -38,7 +38,7 @@
 >
 > **Roadmap correction, 2026-04-27:** Default execution model is **single-lane autonomy per repo/project**: one active work item, one dedicated feature branch, Planner → Builder → Reviewer → Merge-Healer, persistent evidence, visible recovery controls. Parallel worktrees are future opt-in optimization only after single-lane autonomy and merge healing are proven.
 >
-> **Release-lane design update, 2026-05-01:** The target release lane is evidence-gated auto-merge, not blind auto-commit: Researcher/Planner prepares plans and acceptance criteria, Builder implements, Planner/Reviewer independently reviews, Merge-Healer integrates only when policy/approval/test gates pass, and a future Supervisor profile audits/vetoes the chain. Deploy/Merge and Supervisor should become dedicated profiles in a future slice; the current ABACUS deploy proof uses the deterministic server-side Merge-Healer with Deploy/Supervisor intentionally unmapped.
+> **Release-lane design update, 2026-05-01:** The target release lane is evidence-gated auto-merge, not blind auto-commit: Researcher/Planner prepares plans and acceptance criteria, Builder implements, Planner/Reviewer independently reviews, Supervisor audits/vetoes the chain, and Merge-Healer integrates only when policy/approval/test gates pass. R10 created the dedicated Supervisor profile; R11 is the first slice authorized to create/wire the dedicated Merge-Healer profile. Deploy remains deterministic/server-side until a later CEO-owned profile-design slice defines a separate deployer profile.
 >
 > **Repo:** `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
 
@@ -131,11 +131,14 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 | R5 | `2026-05-01-hermes-workspace-r5-branch-evidence-recovery-plan.md` | Supported recovery for R4 blocker: add validated branch-evidence recovery API, create real ABACUS recovery branch from `main`, attach evidence through API, and retry existing Merge-Healer without force-merge or manual success evidence | Completed / ACCEPTED MERGED: validated branch evidence attached through API, Merge-Healer merged ABACUS commit `b744cfa16be2a5d3c5d6f36cbc81af89765169ac`; final report `dogfood-output/real-abacus-branch-evidence-recovery-latest.md`. |
 | R6 | `2026-05-01-hermes-workspace-r6-release-supervisor-audit-gate-plan.md` | Make the release/deploy Supervisor audit gate explicit before Merge-Healer: durable audit state, gate helper, orchestrator behavior, visible Work Item evidence, and no silent Supervisor→Builder fallback | Complete / Builder-verified; final report `dogfood-output/release-supervisor-audit-gate-latest.md`. |
 | R7 | `2026-05-01-hermes-workspace-r7-release-lane-packaging-profile-readiness-plan.md` | Package/review release-lane R3/R4/R5/R6 work, resolve stale docs, rerun final gates, and produce deployer/merge-healer + supervisor profile-readiness matrix without creating profiles yet | Complete / package-ready; final report `dogfood-output/release-lane-packaging-profile-readiness-latest.md`. Awaiting D3n13r/Main packaging authorization before commit/push. |
-| R8 | `2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md` | Stage only the R7-classified release-lane package, rerun gates, commit/push if owner-authorized, and create a clean baseline before profiles | Active / ready for Builder |
-| R9 | `2026-05-01-hermes-workspace-r9-release-profile-contracts-plan.md` | Define first-class release role contracts/readiness and prove no Builder fallback before live profile creation | Queued after R8 |
-| R10 | `2026-05-01-hermes-workspace-r10-supervisor-profile-creation-audit-launch-plan.md` | Create/wire the read-only Supervisor profile and structured release audit launch | Queued after R9 |
-| R11 | `2026-05-01-hermes-workspace-r11-merge-healer-profile-controlled-repair-plan.md` | Create/wire dedicated Merge-Healer profile for bounded conflict/test repair under policy gates | Queued after R10 |
-| R12 | `2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md` | Prove the profile-backed release lane on one controlled work item with API/UI/evidence | Queued after R11 |
+| R8 | `2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md` | Stage only the R7-classified release-lane package, rerun gates, commit/push if owner-authorized, and create a clean baseline before profiles | Complete / committed+pushed at `d6847771b3b2ea327801f22ab0ecf20d57c56aa8` |
+| R9 | `2026-05-01-hermes-workspace-r9-release-profile-contracts-plan.md` | Define first-class release role contracts/readiness and prove no Builder fallback before live profile creation | Complete locally / verified; report `dogfood-output/release-profile-contracts-latest.md` |
+| R10 | `2026-05-01-hermes-workspace-r10-supervisor-profile-creation-audit-launch-plan.md` | Create/wire the read-only Supervisor profile and structured release audit launch | Complete locally / verified; report `dogfood-output/supervisor-profile-audit-launch-latest.md` |
+| R11 | `2026-05-01-hermes-workspace-r11-merge-healer-profile-controlled-repair-plan.md` | Create/wire dedicated Merge-Healer profile for bounded conflict/test repair under policy gates | Complete locally / verified; report `dogfood-output/merge-healer-profile-controlled-repair-latest.md` |
+| R12 | `2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md` | Prove the profile-backed release lane on one controlled work item with API/UI/evidence | Attempted / correctly blocked by dirty canonical repo; report `dogfood-output/profile-backed-release-lane-gauntlet-latest.md` |
+| R13 | `2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md` | Package/checkpoint verified local profile-batch artifacts so the canonical repo is clean | Active next; live work item `8a076c35-501b-42f0-ab1b-ea35570502ef` |
+| R14 | `2026-05-01-hermes-workspace-r14-clean-r12-profile-backed-gauntlet-retry-plan.md` | Retry R12 profile-backed release-lane gauntlet from a clean repo baseline using existing Supervisor/Merge-Healer profiles | Queued after R13; live work item `21bc5095-1520-4dc1-90c6-66b06fa63079` |
+| R15 | `2026-05-01-hermes-workspace-r15-roadmap-reentry-slice-n-idea-intake-planner-enrichment-plan.md` | Return to roadmap Slice N: rough ideas become Planner-prepared drafts without Builder launch | Queued after R14 pass or explicit owner-approved blocked proceed; live work item `3c5637b9-cb68-448f-a1f7-a9aae1620eac` |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -304,8 +307,17 @@ R6: Release Supervisor Audit Gate
 R7: Release Lane Packaging + Profile Readiness
   └─ complete / package-ready; report dogfood-output/release-lane-packaging-profile-readiness-latest.md; no Deploy/Supervisor profiles created or mapped
 
-R8 → R12: Release profile enablement batch
-  └─ R8 clean package baseline first; R9 contracts/no-fallback; R10 Supervisor profile; R11 Merge-Healer profile; R12 profile-backed release-lane gauntlet. Do not jump to profile creation before R8/R9 pass.
+R12: Profile-Backed Release Lane Gauntlet
+  └─ attempted and correctly blocked by dirty canonical repo; no fake lifecycle success. R12 will be retried only after R13 creates a clean package baseline.
+
+R13: Profile Batch Package / Clean Baseline
+  └─ active next; package/checkpoint verified R10/R11/R12 profile-batch artifacts, run gates, commit/push if clean, and leave canonical repo clean.
+
+R14: Clean R12 Profile-Backed Gauntlet Retry
+  └─ queued after R13; rerun the profile-backed lane from clean repo state with existing `supervisor` and `merge-healer` profiles.
+
+R15: Roadmap Re-entry / Slice N Idea Intake + Planner Enrichment
+  └─ queued after R14 pass or explicit owner-approved blocked proceed; return to rough idea → Planner-prepared draft workflow.
 ```
 
 ---
@@ -327,15 +339,13 @@ A plan is not shipped until:
 
 ## 9. Immediate next action
 
-Main/CEO created a five-plan Builder batch so D3n13r does not need to request every next handoff manually:
+Main/CEO created the next three-plan Builder batch after reviewing the R12 blocked result:
 
-1. R8 `2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md` — package/commit/push the R7-classified release-lane bundle first.
-2. R9 `2026-05-01-hermes-workspace-r9-release-profile-contracts-plan.md` — define release role contracts/readiness and no-fallback behavior.
-3. R10 `2026-05-01-hermes-workspace-r10-supervisor-profile-creation-audit-launch-plan.md` — create/wire Supervisor for read-only release audit.
-4. R11 `2026-05-01-hermes-workspace-r11-merge-healer-profile-controlled-repair-plan.md` — create/wire Merge-Healer for controlled repair.
-5. R12 `2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md` — prove the profile-backed release lane end-to-end.
+1. R13 `2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md` — package/checkpoint the verified local R10/R11/R12 profile-batch artifacts, run gates, commit/push if clean, and leave the canonical repo clean.
+2. R14 `2026-05-01-hermes-workspace-r14-clean-r12-profile-backed-gauntlet-retry-plan.md` — rerun the R12 profile-backed release-lane gauntlet from that clean baseline using existing Supervisor/Merge-Healer profiles.
+3. R15 `2026-05-01-hermes-workspace-r15-roadmap-reentry-slice-n-idea-intake-planner-enrichment-plan.md` — only after R14 pass or explicit owner-approved blocked proceed, return to the roadmap with Slice N rough idea → Planner-prepared draft workflow.
 
-Builder must execute them in order. Do not create profiles before R8 and R9 pass, do not map missing profiles to Builder, and do not create Discord gateways unless D3n13r explicitly authorizes them.
+Builder must execute them in order. Do not recreate profiles, do not enable release-profile gateways, and do not start Slice N while the release-lane proof remains unresolved.
 
 ## 10. After R1 ships
 

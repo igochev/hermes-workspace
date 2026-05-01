@@ -12,7 +12,7 @@ export type ExecutionEngine =
   | 'portable-chat-completions'
   | 'local-hermes-cli'
   | 'cron-legacy'
-export type ExecutionRunRole = 'mission' | 'review' | 'supervisor' | 'planner' | 'builder' | 'reviewer' | 'deployer'
+export type ExecutionRunRole = 'mission' | 'review' | 'supervisor' | 'planner' | 'builder' | 'reviewer' | 'deployer' | 'merge-healer'
 export type ExecutionRunState =
   | 'queued'
   | 'scheduled'
@@ -92,7 +92,7 @@ export type ListExecutionRunsFilters = {
   q?: string
 }
 
-const VALID_ROLES: Array<ExecutionRunRole> = ['mission', 'review', 'supervisor', 'planner', 'builder', 'reviewer', 'deployer']
+const VALID_ROLES: Array<ExecutionRunRole> = ['mission', 'review', 'supervisor', 'planner', 'builder', 'reviewer', 'deployer', 'merge-healer']
 const VALID_ENGINES: Array<ExecutionEngine> = [
   'conductor',
   'hermes-cron',
