@@ -505,6 +505,13 @@ export function getWorkItemProfileReadinessDecision(
   return report.roles.find((role) => role.role === phase)
 }
 
+export function getWorkItemReleaseProfileReadinessDecisions(
+  report: ProfileReadinessReport | null | undefined,
+): Array<ProfileReadinessRoleReport> {
+  if (!report) return []
+  return report.roles.filter((role) => role.role === 'merge-healer' || role.role === 'supervisor')
+}
+
 export function getWorkItemProfileReadinessAdvisory(
   decision: ProfileReadinessRoleReport | undefined,
 ): string {
@@ -513,8 +520,12 @@ export function getWorkItemProfileReadinessAdvisory(
   const profile = decision.mappedProfile ?? 'Unmapped'
   const source = WORK_ITEM_PROFILE_READINESS_SOURCE_LABELS[decision.source]
   const status = WORK_ITEM_PROFILE_READINESS_STATUS_LABELS[decision.status]
+  const releaseNoFallback =
+    decision.role === 'merge-healer' || decision.role === 'supervisor'
+      ? ` Release role contract: ${decision.contract} No Builder fallback will be used.`
+      : ''
   const fixHint = decision.status === 'ready' ? '' : ` ${decision.fixHint}`
-  return `Selected phase profile: ${profile} (${source}). ${status}${fixHint}`
+  return `Selected phase profile: ${profile} (${source}). ${status}${releaseNoFallback}${fixHint}`
 }
 
 export function getWorkItemExecutionSyncWarningMessage(warning?: string): string | null {
@@ -1356,8 +1367,15 @@ export function WorkItemDetailScreen({
     workItem?.phase,
   )
   const profileReadinessAdvisory = getWorkItemProfileReadinessAdvisory(profileReadinessDecision)
+  const releaseProfileReadinessDecisions = getWorkItemReleaseProfileReadinessDecisions(
+    profileReadinessQuery.data?.report,
+  )
   const profileReadinessIsWarning =
-    profileReadinessDecision?.status === 'missing' || profileReadinessDecision?.status === 'unknown'
+    profileReadinessDecision?.status === 'missing' ||
+    profileReadinessDecision?.status === 'unknown' ||
+    releaseProfileReadinessDecisions.some(
+      (decision) => decision.status === 'missing' || decision.status === 'unknown',
+    )
 
   useEffect(() => {
     if (!executionSyncWarning) return
@@ -1546,6 +1564,15 @@ export function WorkItemDetailScreen({
                     {WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE}
                   </div>
                   <div className="mt-1 text-[var(--theme-text)]">{profileReadinessAdvisory}</div>
+                  {releaseProfileReadinessDecisions.length > 0 ? (
+                    <div className="mt-2 space-y-1 text-[var(--theme-text)]">
+                      {releaseProfileReadinessDecisions.map((decision) => (
+                        <div key={decision.role}>
+                          {decision.label}: {getWorkItemProfileReadinessAdvisory(decision)}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button

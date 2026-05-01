@@ -59,6 +59,7 @@ import {
   getWorkItemRecoveryActionButtonLabel,
   getWorkItemRecoveryPanelItems,
   getWorkItemReleaseAuditEvidenceRows,
+  getWorkItemReleaseProfileReadinessDecisions,
   getWorkItemRunTimelineArtifactCopy,
   getWorkItemRunTimelineIdCopy,
   getWorkItemRunTimelineLinkHref,
@@ -380,6 +381,9 @@ describe('work item detail screen theme classes', () => {
       roles: [
         {
           role: 'build' as const,
+          label: 'Builder',
+          contract: 'Implements approved plans.',
+          capabilities: ['edit code'],
           mappedProfile: 'missing-specialist',
           source: 'work-item-assigned-profile' as const,
           status: 'missing' as const,
@@ -409,6 +413,9 @@ describe('work item detail screen theme classes', () => {
     expect(
       getWorkItemProfileReadinessAdvisory({
         role: 'review',
+        label: 'Reviewer',
+        contract: 'Reviews Builder output.',
+        capabilities: ['inspect diffs'],
         mappedProfile: 'planner',
         source: 'project-phase-profile',
         status: 'ready',
@@ -416,6 +423,58 @@ describe('work item detail screen theme classes', () => {
         fixHint: 'Hermes profile planner is available for review.',
       }),
     ).toBe('Selected phase profile: planner (project phase mapping). Ready for launch.')
+  })
+
+  it('surfaces release profile contracts with explicit no Builder fallback copy', () => {
+    const report = {
+      overallStatus: 'missing' as const,
+      severity: 'warning' as const,
+      roles: [
+        {
+          role: 'build' as const,
+          label: 'Builder',
+          contract: 'Implements approved plans.',
+          capabilities: ['edit code'],
+          mappedProfile: 'builder',
+          source: 'project-phase-profile' as const,
+          status: 'ready' as const,
+          severity: 'ready' as const,
+          fixHint: 'Hermes profile builder is available for build.',
+        },
+        {
+          role: 'merge-healer' as const,
+          label: 'Merge-Healer',
+          contract: 'Performs bounded merge/rebase/test repair after review and policy gates pass.',
+          capabilities: ['merge approved branches'],
+          mappedProfile: 'merge-healer',
+          source: 'project-runtime-profile' as const,
+          status: 'missing' as const,
+          severity: 'warning' as const,
+          fixHint: 'Create or rename Hermes profile merge-healer.',
+        },
+        {
+          role: 'supervisor' as const,
+          label: 'Supervisor',
+          contract: 'Audits release evidence before merge.',
+          capabilities: ['read-only release audit'],
+          mappedProfile: null,
+          source: 'project-runtime-profile' as const,
+          status: 'unmapped' as const,
+          severity: 'info' as const,
+          fixHint: 'Map a Hermes profile for supervisor.',
+        },
+      ],
+    }
+
+    const releaseDecisions = getWorkItemReleaseProfileReadinessDecisions(report)
+
+    expect(releaseDecisions.map((decision) => decision.role)).toEqual(['merge-healer', 'supervisor'])
+    expect(getWorkItemProfileReadinessAdvisory(releaseDecisions[0])).toContain(
+      'No Builder fallback will be used.',
+    )
+    expect(getWorkItemProfileReadinessAdvisory(releaseDecisions[0])).toContain(
+      'Create or rename Hermes profile merge-healer.',
+    )
   })
 
   it('builds the work-item recovery panel item list from open attention actions', () => {

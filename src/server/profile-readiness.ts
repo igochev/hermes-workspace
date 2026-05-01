@@ -7,6 +7,7 @@ export type ProfileReadinessRole =
   | 'build'
   | 'review'
   | 'deploy'
+  | 'merge-healer'
   | 'supervisor'
   | 'autopilot-scout'
 
@@ -24,11 +25,22 @@ export type ProfileReadinessSource =
 
 export type ProfileReadinessRoleReport = {
   role: ProfileReadinessRole
+  label: string
+  contract: string
+  capabilities: Array<string>
   mappedProfile: string | null
   source: ProfileReadinessSource
   status: ProfileReadinessStatus
   severity: ProfileReadinessSeverity
   fixHint: string
+}
+
+export type ProfileReadinessRoleContract = {
+  role: ProfileReadinessRole
+  label: string
+  contract: string
+  capabilities: Array<string>
+  runtimeProfileKey?: 'mergeHealerProfile' | 'supervisorProfile'
 }
 
 export type ProfileReadinessReport = {
@@ -53,6 +65,56 @@ type Mapping = {
 }
 
 const PHASE_ROLES: Array<ConductorPhaseKey> = ['research', 'build', 'review', 'deploy']
+
+export const PROFILE_READINESS_ROLE_CONTRACTS: Record<
+  ProfileReadinessRole,
+  ProfileReadinessRoleContract
+> = {
+  research: {
+    role: 'research',
+    label: 'Research / Planner',
+    contract: 'Prepares plans, acceptance criteria, and grounded implementation guidance.',
+    capabilities: ['inspect repository state', 'draft plans', 'prepare acceptance criteria'],
+  },
+  build: {
+    role: 'build',
+    label: 'Builder',
+    contract: 'Implements approved plans with tests and concrete evidence.',
+    capabilities: ['edit code', 'run tests', 'produce build evidence'],
+  },
+  review: {
+    role: 'review',
+    label: 'Reviewer',
+    contract: 'Reviews Builder output and emits structured approval or change requests.',
+    capabilities: ['inspect diffs', 'validate acceptance criteria', 'emit structured decisions'],
+  },
+  deploy: {
+    role: 'deploy',
+    label: 'Deploy',
+    contract: 'Performs deploy/release actions only when policy allows a deploy phase.',
+    capabilities: ['release execution', 'deployment evidence capture'],
+  },
+  'merge-healer': {
+    role: 'merge-healer',
+    label: 'Merge-Healer',
+    contract: 'Performs bounded merge/rebase/test repair after review and policy gates pass.',
+    capabilities: ['merge approved branches', 'repair bounded conflicts', 'run merge tests'],
+    runtimeProfileKey: 'mergeHealerProfile',
+  },
+  supervisor: {
+    role: 'supervisor',
+    label: 'Supervisor',
+    contract: 'Audits release evidence and can approve, veto, or require manual review before merge.',
+    capabilities: ['read-only release audit', 'veto unsafe releases', 'record audit evidence'],
+    runtimeProfileKey: 'supervisorProfile',
+  },
+  'autopilot-scout': {
+    role: 'autopilot-scout',
+    label: 'Autopilot Scout',
+    contract: 'Scans configured sources and proposes suggestions without directly mutating work items.',
+    capabilities: ['scan configured sources', 'propose suggestions'],
+  },
+}
 
 function normalizeProfileName(profile: string | null | undefined): string | null {
   const trimmed = typeof profile === 'string' ? profile.trim() : ''
@@ -95,6 +157,13 @@ function getSupervisorMapping(
   }
 }
 
+function getMergeHealerMapping(project: ProjectRecord): Mapping {
+  return {
+    profile: normalizeProfileName(project.runtimeProfiles.mergeHealerProfile),
+    source: 'project-runtime-profile',
+  }
+}
+
 function getAutopilotScoutMapping(
   project: ProjectRecord,
   defaults: EvaluateProfileReadinessInput['defaults'],
@@ -116,11 +185,24 @@ function evaluateRole(
   mapping: Mapping,
   availableProfiles: Set<string> | null,
 ): ProfileReadinessRoleReport {
+  const contract = PROFILE_READINESS_ROLE_CONTRACTS[role]
+  const contractFields = {
+    label: contract.label,
+    contract: contract.contract,
+    capabilities: contract.capabilities,
+  }
+
   if (!mapping.profile) {
     return {
       role,
+      ...contractFields,
       mappedProfile: null,
-      source: mapping.source === 'none' ? 'project-phase-profile' : mapping.source,
+      source:
+        mapping.source === 'none' && (role === 'supervisor' || role === 'merge-healer')
+          ? 'project-runtime-profile'
+          : mapping.source === 'none'
+            ? 'project-phase-profile'
+            : mapping.source,
       status: 'unmapped',
       severity: 'info',
       fixHint: `Map a Hermes profile for ${role} when this role should launch through a dedicated profile.`,
@@ -130,6 +212,7 @@ function evaluateRole(
   if (availableProfiles === null) {
     return {
       role,
+      ...contractFields,
       mappedProfile: mapping.profile,
       source: mapping.source,
       status: 'unknown',
@@ -141,6 +224,7 @@ function evaluateRole(
   if (!availableProfiles.has(mapping.profile)) {
     return {
       role,
+      ...contractFields,
       mappedProfile: mapping.profile,
       source: mapping.source,
       status: 'missing',
@@ -151,6 +235,7 @@ function evaluateRole(
 
   return {
     role,
+    ...contractFields,
     mappedProfile: mapping.profile,
     source: mapping.source,
     status: 'ready',
@@ -187,6 +272,7 @@ export function evaluateProfileReadiness({
   )
   const roles: Array<ProfileReadinessRoleReport> = [
     ...phaseReports,
+    evaluateRole('merge-healer', getMergeHealerMapping(project), availableProfileSet),
     evaluateRole('supervisor', getSupervisorMapping(project, defaults), availableProfileSet),
     evaluateRole('autopilot-scout', getAutopilotScoutMapping(project, defaults), availableProfileSet),
   ]

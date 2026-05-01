@@ -193,6 +193,7 @@ export const PROJECT_PROFILE_READINESS_ROLE_LABELS: Record<ProfileReadinessRole,
   build: 'Build',
   review: 'Review',
   deploy: 'Deploy',
+  'merge-healer': 'Merge-Healer',
   supervisor: 'Supervisor',
   'autopilot-scout': 'Autopilot Scout',
 }

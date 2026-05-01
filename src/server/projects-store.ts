@@ -34,6 +34,7 @@ export type ProjectAutopilotPolicy = {
 }
 
 export type ProjectRuntimeProfiles = {
+  mergeHealerProfile?: string
   supervisorProfile?: string
 }
 
@@ -265,6 +266,7 @@ function normalizeAutopilotPolicy(value: unknown): ProjectAutopilotPolicy {
 function normalizeRuntimeProfiles(value: unknown): ProjectRuntimeProfiles {
   const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
   return {
+    mergeHealerProfile: asOptionalString(candidate.mergeHealerProfile),
     supervisorProfile: asOptionalString(candidate.supervisorProfile),
   }
 }

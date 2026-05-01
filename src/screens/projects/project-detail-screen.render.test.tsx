@@ -15,6 +15,9 @@ import type { PhaseProfiles, ProjectAutopilotPolicy, ReviewAutoApprovalPolicy } 
 function roleReport(role: ProfileReadinessRoleReport['role'], status: ProfileReadinessRoleReport['status']): ProfileReadinessRoleReport {
   return {
     role,
+    label: role,
+    contract: `${role} role contract`,
+    capabilities: [],
     mappedProfile: null,
     source: 'none',
     status,

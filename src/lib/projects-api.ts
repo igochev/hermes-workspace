@@ -36,6 +36,7 @@ export type ProjectAutopilotPolicy = {
 }
 
 export type ProjectRuntimeProfiles = {
+  mergeHealerProfile?: string
   supervisorProfile?: string
 }
 

@@ -144,6 +144,7 @@ describe('project detail screen board constants', () => {
       'autopilot-scout': 'Autopilot Scout',
       build: 'Build',
       deploy: 'Deploy',
+      'merge-healer': 'Merge-Healer',
       research: 'Research',
       review: 'Review',
       supervisor: 'Supervisor',

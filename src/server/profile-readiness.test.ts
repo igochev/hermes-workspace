@@ -110,12 +110,15 @@ function makeWorkItem(overrides: Partial<WorkItemRecord> = {}): WorkItemRecord {
 describe('evaluateProfileReadiness', () => {
   it('marks all mapped roles ready when mapped profiles are available', () => {
     const report = evaluateProfileReadiness({
-      project: makeProject(),
+      project: makeProject({
+        runtimeProfiles: { mergeHealerProfile: 'merge-healer' },
+      }),
       availableProfiles: [
         'researcher',
         'builder',
         'planner',
         'deployer',
+        'merge-healer',
         'supervisor',
       ],
       defaults: { supervisorProfile: 'supervisor' },
@@ -127,6 +130,7 @@ describe('evaluateProfileReadiness', () => {
       ['build', 'ready'],
       ['review', 'ready'],
       ['deploy', 'ready'],
+      ['merge-healer', 'ready'],
       ['supervisor', 'ready'],
       ['autopilot-scout', 'ready'],
     ])
@@ -250,6 +254,70 @@ describe('evaluateProfileReadiness', () => {
       source: 'project-phase-profile',
       status: 'unmapped',
       severity: 'info',
+    })
+  })
+
+  it('surfaces first-class release role contracts without defaulting to Builder', () => {
+    const report = evaluateProfileReadiness({
+      project: makeProject({
+        phaseProfiles: {
+          research: 'researcher',
+          build: 'builder',
+          review: 'planner',
+          deploy: '',
+        },
+        runtimeProfiles: {},
+      }),
+      availableProfiles: ['researcher', 'builder', 'planner'],
+    })
+
+    expect(report.roles.map((role) => role.role)).toEqual([
+      'research',
+      'build',
+      'review',
+      'deploy',
+      'merge-healer',
+      'supervisor',
+      'autopilot-scout',
+    ])
+    expect(report.roles.find((role) => role.role === 'merge-healer')).toMatchObject({
+      mappedProfile: null,
+      source: 'project-runtime-profile',
+      status: 'unmapped',
+      severity: 'info',
+    })
+    expect(report.roles.find((role) => role.role === 'supervisor')).toMatchObject({
+      mappedProfile: null,
+      source: 'project-runtime-profile',
+      status: 'unmapped',
+      severity: 'info',
+    })
+    expect(report.roles.find((role) => role.mappedProfile === 'builder')?.role).toBe('build')
+  })
+
+  it('marks missing release role profiles explicitly when mapped profiles are absent', () => {
+    const report = evaluateProfileReadiness({
+      project: makeProject({
+        runtimeProfiles: {
+          mergeHealerProfile: 'merge-healer',
+          supervisorProfile: 'supervisor',
+        },
+      } as Partial<ProjectRecord>),
+      availableProfiles: ['researcher', 'builder', 'planner', 'deployer'],
+    })
+
+    expect(report.overallStatus).toBe('missing')
+    expect(report.roles.find((role) => role.role === 'merge-healer')).toMatchObject({
+      mappedProfile: 'merge-healer',
+      source: 'project-runtime-profile',
+      status: 'missing',
+      severity: 'warning',
+    })
+    expect(report.roles.find((role) => role.role === 'supervisor')).toMatchObject({
+      mappedProfile: 'supervisor',
+      source: 'project-runtime-profile',
+      status: 'missing',
+      severity: 'warning',
     })
   })
 })
