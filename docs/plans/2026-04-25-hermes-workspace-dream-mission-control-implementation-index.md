@@ -2,13 +2,13 @@
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md`
+> **Current active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r14-clean-r12-profile-backed-gauntlet-retry-plan.md`
 >
-> **Queued batch plans:** R13 profile batch package / clean baseline → R14 clean R12 profile-backed gauntlet retry → R15 roadmap re-entry Slice N idea intake + Planner enrichment.
+> **Queued batch plans:** R14 clean R12 profile-backed gauntlet retry → R15 roadmap re-entry Slice N idea intake + Planner enrichment.
 >
-> **Previous active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md`
+> **Previous active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md`
 >
-> **Most recently completed/attempted implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md` (attempted; correctly blocked because canonical repo path was dirty; report `dogfood-output/profile-backed-release-lane-gauntlet-latest.md`)
+> **Most recently completed implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md` (committed+pushed as `8a69832`; report `dogfood-output/profile-batch-package-clean-baseline-latest.md`)
 >
 > **Next roadmap task selected by Main/CEO:** First complete the release-lane proof safely: R13 packages/checkpoints the verified local profile batch so the repo is clean, R14 retries R12 from that clean baseline, then R15 returns to roadmap Slice N only after R14 passes or an explicit owner-approved blocked proceed. Live work item ids are recorded in `docs/handoff/current-slice-status.md`.
 >
@@ -136,8 +136,8 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 | R10 | `2026-05-01-hermes-workspace-r10-supervisor-profile-creation-audit-launch-plan.md` | Create/wire the read-only Supervisor profile and structured release audit launch | Complete locally / verified; report `dogfood-output/supervisor-profile-audit-launch-latest.md` |
 | R11 | `2026-05-01-hermes-workspace-r11-merge-healer-profile-controlled-repair-plan.md` | Create/wire dedicated Merge-Healer profile for bounded conflict/test repair under policy gates | Complete locally / verified; report `dogfood-output/merge-healer-profile-controlled-repair-latest.md` |
 | R12 | `2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md` | Prove the profile-backed release lane on one controlled work item with API/UI/evidence | Attempted / correctly blocked by dirty canonical repo; report `dogfood-output/profile-backed-release-lane-gauntlet-latest.md` |
-| R13 | `2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md` | Package/checkpoint verified local profile-batch artifacts so the canonical repo is clean | Active next; live work item `8a076c35-501b-42f0-ab1b-ea35570502ef` |
-| R14 | `2026-05-01-hermes-workspace-r14-clean-r12-profile-backed-gauntlet-retry-plan.md` | Retry R12 profile-backed release-lane gauntlet from a clean repo baseline using existing Supervisor/Merge-Healer profiles | Queued after R13; live work item `21bc5095-1520-4dc1-90c6-66b06fa63079` |
+| R13 | `2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md` | Package/checkpoint verified local profile-batch artifacts so the canonical repo is clean | Complete / committed+pushed at `8a69832`; final report `dogfood-output/profile-batch-package-clean-baseline-latest.md` |
+| R14 | `2026-05-01-hermes-workspace-r14-clean-r12-profile-backed-gauntlet-retry-plan.md` | Retry R12 profile-backed release-lane gauntlet from a clean repo baseline using existing Supervisor/Merge-Healer profiles | Active next; live work item `21bc5095-1520-4dc1-90c6-66b06fa63079` |
 | R15 | `2026-05-01-hermes-workspace-r15-roadmap-reentry-slice-n-idea-intake-planner-enrichment-plan.md` | Return to roadmap Slice N: rough ideas become Planner-prepared drafts without Builder launch | Queued after R14 pass or explicit owner-approved blocked proceed; live work item `3c5637b9-cb68-448f-a1f7-a9aae1620eac` |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
@@ -311,10 +311,10 @@ R12: Profile-Backed Release Lane Gauntlet
   └─ attempted and correctly blocked by dirty canonical repo; no fake lifecycle success. R12 will be retried only after R13 creates a clean package baseline.
 
 R13: Profile Batch Package / Clean Baseline
-  └─ active next; package/checkpoint verified R10/R11/R12 profile-batch artifacts, run gates, commit/push if clean, and leave canonical repo clean.
+  └─ complete / committed+pushed at `8a69832`; report dogfood-output/profile-batch-package-clean-baseline-latest.md; canonical repo clean for R14 retry.
 
 R14: Clean R12 Profile-Backed Gauntlet Retry
-  └─ queued after R13; rerun the profile-backed lane from clean repo state with existing `supervisor` and `merge-healer` profiles.
+  └─ active next; rerun the profile-backed lane from clean repo state with existing `supervisor` and `merge-healer` profiles.
 
 R15: Roadmap Re-entry / Slice N Idea Intake + Planner Enrichment
   └─ queued after R14 pass or explicit owner-approved blocked proceed; return to rough idea → Planner-prepared draft workflow.
@@ -339,11 +339,10 @@ A plan is not shipped until:
 
 ## 9. Immediate next action
 
-Main/CEO created the next three-plan Builder batch after reviewing the R12 blocked result:
+Main/CEO created the next three-plan Builder batch after reviewing the R12 blocked result. R13 is complete and produced the clean package baseline (`8a69832`; report `dogfood-output/profile-batch-package-clean-baseline-latest.md`). Remaining queue:
 
-1. R13 `2026-05-01-hermes-workspace-r13-profile-batch-package-clean-baseline-plan.md` — package/checkpoint the verified local R10/R11/R12 profile-batch artifacts, run gates, commit/push if clean, and leave the canonical repo clean.
-2. R14 `2026-05-01-hermes-workspace-r14-clean-r12-profile-backed-gauntlet-retry-plan.md` — rerun the R12 profile-backed release-lane gauntlet from that clean baseline using existing Supervisor/Merge-Healer profiles.
-3. R15 `2026-05-01-hermes-workspace-r15-roadmap-reentry-slice-n-idea-intake-planner-enrichment-plan.md` — only after R14 pass or explicit owner-approved blocked proceed, return to the roadmap with Slice N rough idea → Planner-prepared draft workflow.
+1. R14 `2026-05-01-hermes-workspace-r14-clean-r12-profile-backed-gauntlet-retry-plan.md` — rerun the R12 profile-backed release-lane gauntlet from that clean baseline using existing Supervisor/Merge-Healer profiles.
+2. R15 `2026-05-01-hermes-workspace-r15-roadmap-reentry-slice-n-idea-intake-planner-enrichment-plan.md` — only after R14 pass or explicit owner-approved blocked proceed, return to the roadmap with Slice N rough idea → Planner-prepared draft workflow.
 
 Builder must execute them in order. Do not recreate profiles, do not enable release-profile gateways, and do not start Slice N while the release-lane proof remains unresolved.
 
