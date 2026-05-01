@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 
 import { createSession, sendImmediateChatCompletion, streamChat } from './hermes-api'
 import { upsertExecutionRun } from './execution-runs-store'
+import { isLocalHermesCliAvailable, launchLocalHermesCliExecution } from './local-hermes-execution'
+import type { ExecutionEngine } from './execution-runs-store'
 import type { WorkItemPhase } from './work-items-store'
 
 export type ImmediateExecutionRole = 'planner' | 'builder' | 'reviewer' | 'deployer'
@@ -73,6 +75,81 @@ function extractFinalResponse(result: Record<string, unknown>): string | undefin
 }
 
 const MAX_EXECUTION_OUTPUT_CHARS = 12_000
+const PORTABLE_CHAT_COMPLETIONS_ENGINE: ExecutionEngine = 'portable-chat-completions'
+
+type PortableFallbackFailureReason =
+  | 'fallback_timeout'
+  | 'fallback_empty_response'
+  | 'fallback_fetch_failed'
+  | 'fallback_provider_error'
+
+function buildPortableFallbackOutput(params: {
+  state: 'running' | 'succeeded' | 'failed'
+  sessionError: unknown
+  response?: string
+  failureReason?: PortableFallbackFailureReason
+  error?: string
+}): string {
+  return [
+    'Transport: portable-chat-completions',
+    'Session capability: session_api_missing (/api/sessions returned 404).',
+    params.state === 'running'
+      ? 'Status: waiting on portable chat completions fallback.'
+      : params.state === 'succeeded'
+        ? 'Status: portable chat completions fallback completed.'
+        : `Status: portable chat completions fallback failed (${params.failureReason}).`,
+    params.response ? `Final response:\n${params.response}` : undefined,
+    params.error ? `Error: ${params.error}` : undefined,
+    params.state === 'failed'
+      ? 'Recovery: session API is unavailable; use Resume Build after fixing portable chat completions transport/provider behavior.'
+      : undefined,
+    `Session API error: ${params.sessionError instanceof Error ? params.sessionError.message : String(params.sessionError)}`,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join('\n')
+}
+
+function classifyPortableFallbackError(error: unknown): {
+  reason: PortableFallbackFailureReason
+  message: string
+} {
+  const message = error instanceof Error ? error.message : String(error)
+  const lower = message.toLowerCase()
+  if (lower.includes('timeout') || lower.includes('timed out')) {
+    return { reason: 'fallback_timeout', message }
+  }
+  if (lower.includes('fetch failed')) {
+    return { reason: 'fallback_fetch_failed', message }
+  }
+  return { reason: 'fallback_provider_error', message }
+}
+
+function emptyPortableFallbackError(): Error {
+  return new Error('portable chat completions returned no final response')
+}
+
+function getPortableFallbackTimeoutMs(): number {
+  const raw = Number(process.env.HERMES_IMMEDIATE_CHAT_FALLBACK_TIMEOUT_MS)
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 300_000
+}
+
+function withPortableFallbackTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`portable chat completions timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+    promise.then(
+      (value) => {
+        clearTimeout(timeout)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timeout)
+        reject(error)
+      },
+    )
+  })
+}
 
 function appendOutputExcerpt(current: string | undefined, next: string | undefined): string | undefined {
   const normalized = next?.trim()
@@ -276,35 +353,85 @@ export async function launchImmediateExecution(
   } catch (error) {
     const failedAt = new Date().toISOString()
     if (isMissingSessionCreationError(error)) {
+      const fallbackPrompt = buildImmediateExecutionPrompt({
+        goal,
+        projectId,
+        workItemId,
+        phase: input.phase,
+        role: input.role,
+        profile: input.profile,
+        repoPath,
+      })
+
+      if (isLocalHermesCliAvailable(input.profile)) {
+        const localLaunch = launchLocalHermesCliExecution({
+          executionRunId,
+          prompt: fallbackPrompt,
+          repoPath,
+          role: input.role,
+          profile: input.profile,
+          projectId,
+          workItemId,
+          phase: input.phase,
+        })
+        upsertExecutionRun({
+          id: executionRunId,
+          workItemId,
+          projectId,
+          role: input.role,
+          phase: input.phase,
+          engine: 'local-hermes-cli',
+          state: 'running',
+          profile: input.profile,
+          startedAt: failedAt,
+          lastObservedAt: failedAt,
+          latestOutputText: [
+            'Transport: local-hermes-cli',
+            'Session capability: session_api_missing (/api/sessions returned 404).',
+            `Command: ${localLaunch.commandLine}`,
+            localLaunch.processId ? `PID: ${localLaunch.processId}` : undefined,
+          ]
+            .filter((line): line is string => Boolean(line))
+            .join('\n'),
+          summary: `${roleTitle(input.role)} execution running in local Hermes CLI worker.`,
+          artifactPaths: [],
+        })
+        return {
+          executionRunId,
+          state: 'running',
+          link: `/executions/${encodeURIComponent(executionRunId)}`,
+        }
+      }
+
       upsertExecutionRun({
         id: executionRunId,
         workItemId,
         projectId,
         role: input.role,
         phase: input.phase,
-        engine: 'hermes-session',
+        engine: PORTABLE_CHAT_COMPLETIONS_ENGINE,
         state: 'running',
         profile: input.profile,
         startedAt: failedAt,
         lastObservedAt: failedAt,
-        latestOutputText: 'Immediate execution is waiting on immediate chat completion fallback.',
-        summary: `${roleTitle(input.role)} execution running via immediate chat completion.`,
+        latestOutputText: buildPortableFallbackOutput({
+          state: 'running',
+          sessionError: error,
+        }),
+        summary: `${roleTitle(input.role)} execution running via portable chat completions after session API was unavailable.`,
         artifactPaths: [],
       })
 
-      void sendImmediateChatCompletion({
-        message: buildImmediateExecutionPrompt({
-          goal,
-          projectId,
-          workItemId,
-          phase: input.phase,
-          role: input.role,
-          profile: input.profile,
-          repoPath,
+      void withPortableFallbackTimeout(
+        sendImmediateChatCompletion({
+          message: fallbackPrompt,
+          model: input.model?.trim() || undefined,
         }),
-        model: input.model?.trim() || undefined,
-      })
+        getPortableFallbackTimeoutMs(),
+      )
         .then((result) => {
+          const finalResponse = extractFinalResponse(result)
+          if (!finalResponse) throw emptyPortableFallbackError()
           const finishedAt = new Date().toISOString()
           upsertExecutionRun({
             id: executionRunId,
@@ -312,35 +439,52 @@ export async function launchImmediateExecution(
             projectId,
             role: input.role,
             phase: input.phase,
-            engine: 'hermes-session',
+            engine: PORTABLE_CHAT_COMPLETIONS_ENGINE,
             state: 'succeeded',
             profile: input.profile,
             startedAt: failedAt,
             finishedAt,
             lastObservedAt: finishedAt,
-            latestOutputText: extractFinalResponse(result),
-            finalResponse: extractFinalResponse(result),
-            summary: `${roleTitle(input.role)} execution completed via immediate chat completion.`,
+            latestOutputText: buildPortableFallbackOutput({
+              state: 'succeeded',
+              sessionError: error,
+              response: finalResponse,
+            }),
+            finalResponse,
+            summary: `${roleTitle(input.role)} execution completed via portable chat completions after session API was unavailable.`,
             artifactPaths: [],
           })
         })
         .catch((fallbackError: unknown) => {
           const fallbackFailedAt = new Date().toISOString()
+          const failure =
+            fallbackError instanceof Error &&
+            fallbackError.message === 'portable chat completions returned no final response'
+              ? {
+                  reason: 'fallback_empty_response' as const,
+                  message: fallbackError.message,
+                }
+              : classifyPortableFallbackError(fallbackError)
           upsertExecutionRun({
             id: executionRunId,
             workItemId,
             projectId,
             role: input.role,
             phase: input.phase,
-            engine: 'hermes-session',
+            engine: PORTABLE_CHAT_COMPLETIONS_ENGINE,
             state: 'failed',
             profile: input.profile,
             startedAt: failedAt,
             finishedAt: fallbackFailedAt,
             lastObservedAt: fallbackFailedAt,
-            latestOutputText: 'Immediate execution failed while waiting on immediate chat completion fallback.',
-            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-            summary: `${roleTitle(input.role)} execution failed to complete via immediate chat completion.`,
+            latestOutputText: buildPortableFallbackOutput({
+              state: 'failed',
+              sessionError: error,
+              failureReason: failure.reason,
+              error: failure.message,
+            }),
+            error: `${failure.reason}: ${failure.message}`,
+            summary: `${roleTitle(input.role)} execution failed via portable chat completions: ${failure.reason}.`,
             artifactPaths: [],
           })
         })

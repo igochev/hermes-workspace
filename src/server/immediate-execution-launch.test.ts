@@ -12,12 +12,16 @@ const {
   streamChat,
   sendImmediateChatCompletion,
   launchConductorMission,
+  isLocalHermesCliAvailable,
+  launchLocalHermesCliExecution,
 } = vi.hoisted(() => ({
   createSession: vi.fn(),
   sendChat: vi.fn(),
   streamChat: vi.fn(),
   sendImmediateChatCompletion: vi.fn(),
   launchConductorMission: vi.fn(),
+  isLocalHermesCliAvailable: vi.fn(),
+  launchLocalHermesCliExecution: vi.fn(),
 }))
 
 vi.mock('./hermes-api', () => ({
@@ -29,6 +33,11 @@ vi.mock('./hermes-api', () => ({
 
 vi.mock('./conductor-launch', () => ({
   launchConductorMission,
+}))
+
+vi.mock('./local-hermes-execution', () => ({
+  isLocalHermesCliAvailable,
+  launchLocalHermesCliExecution,
 }))
 
 describe('immediate execution launch', () => {
@@ -44,6 +53,9 @@ describe('immediate execution launch', () => {
     streamChat.mockReset()
     sendImmediateChatCompletion.mockReset()
     launchConductorMission.mockReset()
+    isLocalHermesCliAvailable.mockReset()
+    isLocalHermesCliAvailable.mockReturnValue(false)
+    launchLocalHermesCliExecution.mockReset()
   })
 
   afterEach(() => {
@@ -104,7 +116,7 @@ describe('immediate execution launch', () => {
     expect(runs[0].jobId).toBeUndefined()
   })
 
-  it('falls back to immediate chat completions when the Hermes gateway lacks session creation', async () => {
+  it('falls back to explicit portable chat completions when the Hermes gateway lacks session creation', async () => {
     createSession.mockRejectedValue(new Error('Hermes API POST /api/sessions: 404 404: Not Found'))
     sendImmediateChatCompletion.mockResolvedValue({ finalResponse: 'Planner completed via direct chat.' })
 
@@ -130,11 +142,53 @@ describe('immediate execution launch', () => {
 
     await vi.waitFor(() => {
       expect(getExecutionRun(result.executionRunId)).toMatchObject({
-        engine: 'hermes-session',
+        engine: 'portable-chat-completions',
         state: 'succeeded',
-        summary: 'Planner execution completed via immediate chat completion.',
+        summary: 'Planner execution completed via portable chat completions after session API was unavailable.',
+        latestOutputText: expect.stringContaining('Transport: portable-chat-completions'),
         finalResponse: 'Planner completed via direct chat.',
       })
+    })
+  })
+
+  it('uses a local Hermes CLI worker instead of slow portable chat completions when sessions are missing and a profile CLI is available', async () => {
+    createSession.mockRejectedValue(new Error('Hermes API POST /api/sessions: 404 404: Not Found'))
+    isLocalHermesCliAvailable.mockReturnValue(true)
+    launchLocalHermesCliExecution.mockReturnValue({
+      processId: 4242,
+      commandLine: 'builder chat -q <prompt> --source hermes-workspace',
+    })
+
+    const result = await launchImmediateExecution({
+      projectId: 'project-1',
+      workItemId: 'work-item-1',
+      phase: 'build',
+      role: 'builder',
+      profile: 'builder',
+      goal: 'Build the Daily Brief.',
+      repoPath: '/repos/demo',
+    })
+
+    expect(result).toMatchObject({
+      state: 'running',
+      link: `/executions/${result.executionRunId}`,
+    })
+    expect(sendImmediateChatCompletion).not.toHaveBeenCalled()
+    expect(launchLocalHermesCliExecution).toHaveBeenCalledWith({
+      executionRunId: result.executionRunId,
+      prompt: expect.stringContaining('Build the Daily Brief.'),
+      repoPath: '/repos/demo',
+      role: 'builder',
+      profile: 'builder',
+      projectId: 'project-1',
+      workItemId: 'work-item-1',
+      phase: 'build',
+    })
+    expect(getExecutionRun(result.executionRunId)).toMatchObject({
+      engine: 'local-hermes-cli',
+      state: 'running',
+      summary: 'Builder execution running in local Hermes CLI worker.',
+      latestOutputText: expect.stringContaining('builder chat -q <prompt>'),
     })
   })
 
@@ -240,7 +294,7 @@ describe('immediate execution launch', () => {
     })
   })
 
-  it('records running fallback observability while waiting on immediate chat completion', async () => {
+  it('records running fallback observability while waiting on portable chat completions', async () => {
     createSession.mockRejectedValue(new Error('Hermes API POST /api/sessions: 404 404: Not Found'))
     sendImmediateChatCompletion.mockReturnValue(new Promise(() => {}))
 
@@ -254,9 +308,83 @@ describe('immediate execution launch', () => {
     })
 
     expect(getExecutionRun(result.executionRunId)).toMatchObject({
+      engine: 'portable-chat-completions',
       state: 'running',
-      latestOutputText: expect.stringContaining('waiting on immediate chat completion'),
-      summary: 'Planner execution running via immediate chat completion.',
+      latestOutputText: expect.stringContaining('Transport: portable-chat-completions'),
+      summary: 'Planner execution running via portable chat completions after session API was unavailable.',
     })
+  })
+
+  it('fails portable chat completions with structured empty-response evidence', async () => {
+    createSession.mockRejectedValue(new Error('Hermes API POST /api/sessions: 404 404: Not Found'))
+    sendImmediateChatCompletion.mockResolvedValue({ raw: { choices: [] } })
+
+    const result = await launchImmediateExecution({
+      projectId: 'project-1',
+      workItemId: 'work-item-1',
+      phase: 'build',
+      role: 'builder',
+      goal: 'Build the Daily Brief.',
+      repoPath: '/repos/demo',
+    })
+
+    await vi.waitFor(() => {
+      expect(getExecutionRun(result.executionRunId)).toMatchObject({
+        engine: 'portable-chat-completions',
+        state: 'failed',
+        error: 'fallback_empty_response: portable chat completions returned no final response',
+        latestOutputText: expect.stringContaining('session_api_missing'),
+        summary: 'Builder execution failed via portable chat completions: fallback_empty_response.',
+      })
+    })
+  })
+
+  it('fails portable chat completions with structured fetch-failed evidence', async () => {
+    createSession.mockRejectedValue(new Error('Hermes API POST /api/sessions: 404 404: Not Found'))
+    sendImmediateChatCompletion.mockRejectedValue(new TypeError('fetch failed'))
+
+    const result = await launchImmediateExecution({
+      projectId: 'project-1',
+      workItemId: 'work-item-1',
+      phase: 'build',
+      role: 'builder',
+      goal: 'Build the Daily Brief.',
+      repoPath: '/repos/demo',
+    })
+
+    await vi.waitFor(() => {
+      expect(getExecutionRun(result.executionRunId)).toMatchObject({
+        engine: 'portable-chat-completions',
+        state: 'failed',
+        error: 'fallback_fetch_failed: fetch failed',
+        latestOutputText: expect.stringContaining('Recovery: session API is unavailable'),
+        summary: 'Builder execution failed via portable chat completions: fallback_fetch_failed.',
+      })
+    })
+  })
+
+  it('bounds portable chat completions fallback with structured timeout evidence', async () => {
+    process.env.HERMES_IMMEDIATE_CHAT_FALLBACK_TIMEOUT_MS = '5'
+    createSession.mockRejectedValue(new Error('Hermes API POST /api/sessions: 404 404: Not Found'))
+    sendImmediateChatCompletion.mockReturnValue(new Promise(() => {}))
+
+    const result = await launchImmediateExecution({
+      projectId: 'project-1',
+      workItemId: 'work-item-1',
+      phase: 'build',
+      role: 'builder',
+      goal: 'Build the Daily Brief.',
+      repoPath: '/repos/demo',
+    })
+
+    await vi.waitFor(() => {
+      expect(getExecutionRun(result.executionRunId)).toMatchObject({
+        engine: 'portable-chat-completions',
+        state: 'failed',
+        error: 'fallback_timeout: portable chat completions timed out after 5ms',
+        summary: 'Builder execution failed via portable chat completions: fallback_timeout.',
+      })
+    })
+    delete process.env.HERMES_IMMEDIATE_CHAT_FALLBACK_TIMEOUT_MS
   })
 })

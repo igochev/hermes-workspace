@@ -28,6 +28,8 @@ import {
   WORK_ITEM_OPERATOR_SUMMARY_TITLE,
   WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE,
   WORK_ITEM_RECOVERY_PANEL_TITLE,
+  WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS,
+  WORK_ITEM_RELEASE_AUDIT_EVIDENCE_TITLE,
   WORK_ITEM_RUNS_SECTION_TITLE,
   buildPlanningDraftDiff,
   buildWorkItemAcceptanceCriteriaStatus,
@@ -56,6 +58,7 @@ import {
   getWorkItemProfileReadinessDecision,
   getWorkItemRecoveryActionButtonLabel,
   getWorkItemRecoveryPanelItems,
+  getWorkItemReleaseAuditEvidenceRows,
   getWorkItemRunTimelineArtifactCopy,
   getWorkItemRunTimelineIdCopy,
   getWorkItemRunTimelineLinkHref,
@@ -686,6 +689,43 @@ describe('work item detail screen theme classes', () => {
     })
   })
 
+  it('summarizes release supervisor audit evidence for operator-visible truth', () => {
+    expect(WORK_ITEM_RELEASE_AUDIT_EVIDENCE_TITLE).toBe('Release supervisor audit evidence')
+    expect(WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS).toEqual({
+      state: 'Audit state',
+      decision: 'Audit decision',
+      profile: 'Supervisor profile',
+      execution: 'Audit execution',
+      summary: 'Audit summary',
+      missingEvidence: 'Missing evidence',
+      reasons: 'Gate reasons',
+      observedAt: 'Observed at',
+    })
+
+    expect(
+      getWorkItemReleaseAuditEvidenceRows({
+        releaseAuditState: 'pending',
+        releaseAuditDecision: undefined,
+        releaseAuditProfile: undefined,
+        releaseAuditExecutionId: 'exec-audit-123456',
+        releaseAuditMissionId: 'legacy-audit-123456',
+        releaseAuditSummary: 'Waiting for supervisor audit approval.',
+        releaseAuditMissingEvidence: ['release audit approval', 'mapped Supervisor profile'],
+        releaseAuditReasons: ['Audit required by conservative lane policy.'],
+        releaseAuditObservedAt: '2026-05-01T12:00:00.000Z',
+      }),
+    ).toEqual([
+      { label: 'Audit state', value: 'Pending' },
+      { label: 'Audit decision', value: 'No supervisor decision recorded' },
+      { label: 'Supervisor profile', value: 'No Supervisor profile recorded' },
+      { label: 'Audit execution', value: 'exec-audit-123456' },
+      { label: 'Audit summary', value: 'Waiting for supervisor audit approval.' },
+      { label: 'Missing evidence', value: 'release audit approval, mapped Supervisor profile' },
+      { label: 'Gate reasons', value: 'Audit required by conservative lane policy.' },
+      { label: 'Observed at', value: '2026-05-01T12:00:00.000Z' },
+    ])
+  })
+
   it('summarizes always-on evidence rows for retry and policy affordances', () => {
     expect(WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE).toBe('Always-on policy evidence')
     expect(WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS).toEqual({
@@ -726,6 +766,7 @@ describe('work item detail screen theme classes', () => {
       { surface: 'profile-preflight-card', label: WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE, kind: 'static', target: null },
       { surface: 'operator-summary-cockpit', label: WORK_ITEM_OPERATOR_SUMMARY_TITLE, kind: 'static', target: null },
       { surface: 'runs-agents-cockpit', label: WORK_ITEM_RUNS_SECTION_TITLE, kind: 'link', target: 'job/session deep links from run timeline' },
+      { surface: 'release-supervisor-audit-evidence', label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_TITLE, kind: 'static', target: null },
       { surface: 'open-conductor', label: WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL, kind: 'link', target: '/conductor?mode=work-item&id=:workItemId' },
       { surface: 'recovery-actions', label: WORK_ITEM_RECOVERY_PANEL_TITLE, kind: 'button', target: 'execute selected recovery action' },
       { surface: 'approvals-attention-card', label: 'Approvals Attention', kind: 'static', target: null },

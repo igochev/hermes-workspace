@@ -21,7 +21,7 @@ import type {
 import type { AttentionQueueItem } from '@/server/attention-queue-store'
 import type { WorkItemRecoveryAction } from '@/server/work-item-recovery-actions'
 import type {WorkItemExecutionPayload} from '@/lib/work-item-execution-api';
-import type {PlannerStructuredOutput, PlanningDraftRecord, PlanningDraftStatus, WorkItemApprovalDecision, WorkItemBlockedReason, WorkItemCriterionStatus, WorkItemLifecycleAction, WorkItemRecord, WorkItemRiskLevel, WorkItemRunTimelineRow, WorkItemRunTimelineState, WorkItemStatus} from '@/lib/projects-api';
+import type {PlannerStructuredOutput, PlanningDraftRecord, PlanningDraftStatus, WorkItemApprovalDecision, WorkItemBlockedReason, WorkItemCriterionStatus, WorkItemLifecycleAction, WorkItemRecord, WorkItemReleaseAuditState, WorkItemRiskLevel, WorkItemRunTimelineRow, WorkItemRunTimelineState, WorkItemStatus} from '@/lib/projects-api';
 import { toast } from '@/components/ui/toast'
 import {
 
@@ -109,6 +109,17 @@ export const WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS = {
   pr: 'PR evidence',
   cleanup: 'Cleanup evidence',
 } as const
+export const WORK_ITEM_RELEASE_AUDIT_EVIDENCE_TITLE = 'Release supervisor audit evidence'
+export const WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS = {
+  state: 'Audit state',
+  decision: 'Audit decision',
+  profile: 'Supervisor profile',
+  execution: 'Audit execution',
+  summary: 'Audit summary',
+  missingEvidence: 'Missing evidence',
+  reasons: 'Gate reasons',
+  observedAt: 'Observed at',
+} as const
 export const WORK_ITEM_OPERATOR_EVIDENCE_LABELS = {
   baseBranch: 'Base branch',
   featureBranch: 'Feature branch',
@@ -131,6 +142,7 @@ export const WORK_ITEM_DETAIL_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescrip
   { surface: 'profile-preflight-card', label: WORK_ITEM_PROFILE_READINESS_PREFLIGHT_TITLE, kind: 'static', target: null },
   { surface: 'operator-summary-cockpit', label: WORK_ITEM_OPERATOR_SUMMARY_TITLE, kind: 'static', target: null },
   { surface: 'runs-agents-cockpit', label: WORK_ITEM_RUNS_SECTION_TITLE, kind: 'link', target: 'job/session deep links from run timeline' },
+  { surface: 'release-supervisor-audit-evidence', label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_TITLE, kind: 'static', target: null },
   {
     surface: 'open-conductor',
     label: WORK_ITEM_DETAIL_OPEN_CONDUCTOR_LABEL,
@@ -378,6 +390,65 @@ export function getWorkItemAlwaysOnEvidenceRows(
     { label: WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS.repo, value: summary.repoSafety },
     { label: WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS.pr, value: summary.prEvidence },
     { label: WORK_ITEM_ALWAYS_ON_EVIDENCE_LABELS.cleanup, value: summary.cleanupEvidence },
+  ]
+}
+
+function releaseAuditStateLabel(state: WorkItemReleaseAuditState | undefined): string {
+  if (!state) return 'No release audit recorded'
+  return state
+    .split('_')
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(' ')
+}
+
+export function getWorkItemReleaseAuditEvidenceRows(
+  workItem: Pick<
+    WorkItemRecord,
+    | 'releaseAuditState'
+    | 'releaseAuditDecision'
+    | 'releaseAuditProfile'
+    | 'releaseAuditExecutionId'
+    | 'releaseAuditMissionId'
+    | 'releaseAuditSummary'
+    | 'releaseAuditMissingEvidence'
+    | 'releaseAuditReasons'
+    | 'releaseAuditObservedAt'
+  >,
+): Array<{ label: string; value: string }> {
+  const executionId = workItem.releaseAuditExecutionId ?? workItem.releaseAuditMissionId
+  return [
+    {
+      label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS.state,
+      value: releaseAuditStateLabel(workItem.releaseAuditState),
+    },
+    {
+      label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS.decision,
+      value: workItem.releaseAuditDecision ?? 'No supervisor decision recorded',
+    },
+    {
+      label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS.profile,
+      value: workItem.releaseAuditProfile ?? 'No Supervisor profile recorded',
+    },
+    {
+      label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS.execution,
+      value: executionId ?? 'No audit execution recorded',
+    },
+    {
+      label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS.summary,
+      value: workItem.releaseAuditSummary ?? 'No audit summary recorded',
+    },
+    {
+      label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS.missingEvidence,
+      value: (workItem.releaseAuditMissingEvidence ?? []).length > 0 ? (workItem.releaseAuditMissingEvidence ?? []).join(', ') : '—',
+    },
+    {
+      label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS.reasons,
+      value: (workItem.releaseAuditReasons ?? []).length > 0 ? (workItem.releaseAuditReasons ?? []).join('; ') : '—',
+    },
+    {
+      label: WORK_ITEM_RELEASE_AUDIT_EVIDENCE_LABELS.observedAt,
+      value: workItem.releaseAuditObservedAt ?? '—',
+    },
   ]
 }
 
@@ -1264,6 +1335,7 @@ export function WorkItemDetailScreen({
       })
     : null
   const alwaysOnEvidenceRows = workItem ? getWorkItemAlwaysOnEvidenceRows(workItem) : []
+  const releaseAuditEvidenceRows = workItem ? getWorkItemReleaseAuditEvidenceRows(workItem) : []
   const advancedExecutionMetadataRows = workItem ? getWorkItemAdvancedExecutionMetadataRows(workItem) : []
   const planningDraftStatusLabel = getPlanningDraftStatusLabel(latestPlanningDraft?.status)
   const planningDraftGuidance = getPlanningDraftGuidance(latestPlanningDraft?.status)
@@ -1825,6 +1897,9 @@ export function WorkItemDetailScreen({
                   ) : null}
                   {alwaysOnEvidenceRows.map((row) => (
                     <Detail key={row.label} label={`${WORK_ITEM_ALWAYS_ON_EVIDENCE_TITLE} · ${row.label}`} value={row.value} />
+                  ))}
+                  {releaseAuditEvidenceRows.map((row) => (
+                    <Detail key={row.label} label={`${WORK_ITEM_RELEASE_AUDIT_EVIDENCE_TITLE} · ${row.label}`} value={row.value} />
                   ))}
                   {workItem.reviewJobId ? (
                     <>

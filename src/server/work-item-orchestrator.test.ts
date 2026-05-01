@@ -96,6 +96,29 @@ describe('work-item-orchestrator', () => {
     })
   }
 
+
+
+  function createMergeReadyRepo(branchName: string): { repoPath: string; baseCommit: string } {
+    const repoPath = join(tempHome, `release-audit-${branchName.replace(/[^a-z0-9-]/gi, '-')}`)
+    mkdirSync(repoPath, { recursive: true })
+    execFileSync('git', ['init', '-b', 'main'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.email', 'hermes@example.test'], { cwd: repoPath })
+    execFileSync('git', ['config', 'user.name', 'Hermes Test'], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'README.md'), '# Release audit repo\n', 'utf8')
+    execFileSync('git', ['add', 'README.md'], { cwd: repoPath })
+    execFileSync('git', ['commit', '-m', 'initial'], { cwd: repoPath })
+    const baseCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repoPath,
+      encoding: 'utf8',
+    }).trim()
+    execFileSync('git', ['checkout', '-b', branchName], { cwd: repoPath })
+    writeFileSync(join(repoPath, 'feature.ts'), `export const ${branchName.replace(/[^a-z0-9]/gi, '') || 'feature'} = true\n`, 'utf8')
+    execFileSync('git', ['add', 'feature.ts'], { cwd: repoPath })
+    execFileSync('git', ['commit', '-m', 'feature'], { cwd: repoPath })
+    execFileSync('git', ['checkout', 'main'], { cwd: repoPath })
+    return { repoPath, baseCommit }
+  }
+
   it('auto-launches Planner for a new inbox research item with no planning draft', async () => {
     const workItem = createDemoWorkItem({ status: 'inbox', phase: 'research' })
     prepareWorkItemWithPlanner.mockResolvedValue({})
@@ -665,6 +688,109 @@ describe('work-item-orchestrator', () => {
       workItemId: queued.id,
       action: 'launch_planner',
     })
+  })
+
+
+
+  it('blocks Merge-Healer for audit-required deploy items until release audit is approved', async () => {
+    const { repoPath, baseCommit } = createMergeReadyRepo('mission/audit-required')
+    const project = createProject({
+      name: 'Release Audit Required Demo',
+      repoPath,
+      defaultBranch: 'main',
+      autonomyLanePolicy: { enabled: true, releaseAudit: { required: true } } as any,
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Audit-required item ready to merge',
+      status: 'active',
+      phase: 'deploy',
+      laneState: 'reviewing',
+      reviewDecision: 'approved',
+      priority: 'medium',
+      riskLevel: 'low',
+      repoPathSnapshot: repoPath,
+      branchName: 'mission/audit-required',
+      baseBranch: 'main',
+      mergeBaseCommit: baseCommit,
+      mergeTargetBranch: 'main',
+      mergeState: 'not_started',
+    } as any)
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id) as any
+
+    expect(result.changed).toBe(true)
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]).toMatchObject({ action: 'run_merge_healer', statusAfter: 'active', phaseAfter: 'deploy' })
+    expect(result.events[0]?.message).toMatch(/release audit/i)
+    expect(updated).toMatchObject({ status: 'active', phase: 'deploy', laneState: 'reviewing', mergeState: 'not_started', releaseAuditState: 'pending' })
+    expect(updated?.releaseAuditMissingEvidence).toContain('release audit approval')
+    expect(execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoPath, encoding: 'utf8' }).trim()).toBe('main')
+    expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoPath, encoding: 'utf8' }).trim()).toBe(baseCommit)
+  })
+
+  it('runs Merge-Healer when required release audit is approved', async () => {
+    const { repoPath, baseCommit } = createMergeReadyRepo('mission/audit-approved')
+    const project = createProject({ name: 'Release Audit Approved Demo', repoPath, defaultBranch: 'main', autonomyLanePolicy: { enabled: true, releaseAudit: { required: true } } as any })
+    const workItem = createWorkItem({ projectId: project.id, title: 'Audit-approved item ready to merge', status: 'active', phase: 'deploy', laneState: 'reviewing', reviewDecision: 'approved', priority: 'medium', riskLevel: 'medium', repoPathSnapshot: repoPath, branchName: 'mission/audit-approved', baseBranch: 'main', mergeBaseCommit: baseCommit, mergeTargetBranch: 'main', mergeState: 'not_started', releaseAuditState: 'approved', releaseAuditDecision: 'approved', releaseAuditSummary: 'Supervisor audit approved release evidence.' } as any)
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id) as any
+
+    expect(result.changed).toBe(true)
+    expect(result.events[0]).toMatchObject({ action: 'run_merge_healer', statusAfter: 'done' })
+    expect(updated).toMatchObject({ status: 'done', laneState: 'done', mergeState: 'merged', releaseAuditState: 'approved' })
+  })
+
+  it('blocks Merge-Healer when release audit vetoes deploy evidence', async () => {
+    const { repoPath, baseCommit } = createMergeReadyRepo('mission/audit-vetoed')
+    const project = createProject({ name: 'Release Audit Veto Demo', repoPath, defaultBranch: 'main', autonomyLanePolicy: { enabled: true, releaseAudit: { required: true } } as any })
+    const workItem = createWorkItem({ projectId: project.id, title: 'Audit-vetoed item', status: 'active', phase: 'deploy', laneState: 'reviewing', reviewDecision: 'approved', priority: 'medium', riskLevel: 'high', repoPathSnapshot: repoPath, branchName: 'mission/audit-vetoed', baseBranch: 'main', mergeBaseCommit: baseCommit, mergeTargetBranch: 'main', mergeState: 'not_started', releaseAuditState: 'vetoed', releaseAuditDecision: 'vetoed', releaseAuditReasons: ['Release evidence is incomplete.'] } as any)
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id) as any
+
+    expect(result.changed).toBe(true)
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]?.message).toMatch(/veto/i)
+    expect(updated).toMatchObject({ status: 'blocked', phase: 'deploy', laneState: 'blocked', mergeState: 'not_started', blockedReason: 'other', releaseAuditState: 'vetoed' })
+    expect(updated?.laneBlockedReason).toMatch(/Release audit vetoed/i)
+    expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoPath, encoding: 'utf8' }).trim()).toBe(baseCommit)
+  })
+
+  it('does not fallback to Builder when required Supervisor audit profile is missing', async () => {
+    const { repoPath, baseCommit } = createMergeReadyRepo('mission/audit-no-supervisor')
+    const project = createProject({ name: 'Release Audit Missing Supervisor Demo', repoPath, defaultBranch: 'main', phaseProfiles: { build: 'builder' }, runtimeProfiles: {}, autonomyLanePolicy: { enabled: true, releaseAudit: { required: true, supervisorRequired: true } } as any })
+    const workItem = createWorkItem({ projectId: project.id, title: 'Audit item with no supervisor profile', status: 'active', phase: 'deploy', laneState: 'reviewing', reviewDecision: 'approved', priority: 'medium', riskLevel: 'medium', repoPathSnapshot: repoPath, branchName: 'mission/audit-no-supervisor', baseBranch: 'main', mergeBaseCommit: baseCommit, mergeTargetBranch: 'main', mergeState: 'not_started' } as any)
+
+    const result = await reconcileWorkItemAutonomy(workItem.id)
+    const updated = getWorkItem(workItem.id) as any
+
+    expect(result.blocked).toBe(true)
+    expect(result.events[0]?.message).toMatch(/Supervisor profile/i)
+    expect(updated?.releaseAuditProfile).toBeUndefined()
+    expect(updated?.assignedProfile).not.toBe('builder')
+    expect(updated?.releaseAuditMissingEvidence).toContain('mapped Supervisor profile')
+    expect(updated?.mergeState).toBe('not_started')
+  })
+
+  it('keeps repeated release-audit blocking reconcile idempotent', async () => {
+    const { repoPath, baseCommit } = createMergeReadyRepo('mission/audit-idempotent')
+    const project = createProject({ name: 'Release Audit Idempotent Demo', repoPath, defaultBranch: 'main', autonomyLanePolicy: { enabled: true, releaseAudit: { required: true } } as any })
+    const workItem = createWorkItem({ projectId: project.id, title: 'Audit idempotent item', status: 'active', phase: 'deploy', laneState: 'reviewing', reviewDecision: 'approved', priority: 'medium', riskLevel: 'medium', repoPathSnapshot: repoPath, branchName: 'mission/audit-idempotent', baseBranch: 'main', mergeBaseCommit: baseCommit, mergeTargetBranch: 'main', mergeState: 'not_started' } as any)
+
+    const first = await reconcileWorkItemAutonomy(workItem.id)
+    const firstUpdated = getWorkItem(workItem.id) as any
+    const second = await reconcileWorkItemAutonomy(workItem.id)
+    const secondUpdated = getWorkItem(workItem.id) as any
+
+    expect(first.blocked).toBe(true)
+    expect(second.blocked).toBe(true)
+    expect(second.changed).toBe(false)
+    expect(second.events[0]?.message).toBe(first.events[0]?.message)
+    expect(secondUpdated.releaseAuditObservedAt).toBe(firstUpdated.releaseAuditObservedAt)
+    expect(secondUpdated.mergeState).toBe('not_started')
   })
 
   it('runs Merge-Healer after lane review approval and marks the item done with merge evidence', async () => {

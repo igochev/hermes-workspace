@@ -46,6 +46,12 @@ export type ProjectAutonomyAlwaysOnNotificationEvent =
   | 'pr_published'
   | 'cleanup_recommended'
 
+export type ProjectReleaseAuditPolicy = {
+  required: boolean
+  requiredRiskLevels: Array<'medium' | 'high'>
+  supervisorRequired: boolean
+}
+
 export type ProjectAutonomyAlwaysOnPolicy = {
   enabled: boolean
   retry: {
@@ -91,6 +97,7 @@ export type ProjectAutonomyLanePolicy = {
   mergeHealerEnabled: boolean
   allowParallelWorktrees: false
   alwaysOn: ProjectAutonomyAlwaysOnPolicy
+  releaseAudit?: ProjectReleaseAuditPolicy
 }
 
 export type ProjectRecord = {
@@ -347,6 +354,28 @@ export function normalizeAutonomyAlwaysOnPolicy(value: unknown): ProjectAutonomy
   }
 }
 
+
+function normalizeReleaseAuditPolicy(value: unknown): ProjectReleaseAuditPolicy {
+  const candidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+  const rawLevels = Array.isArray(candidate.requiredRiskLevels)
+    ? candidate.requiredRiskLevels
+    : ['medium', 'high']
+  const requiredRiskLevels = Array.from(
+    new Set(
+      rawLevels.filter(
+        (level): level is 'medium' | 'high' => level === 'medium' || level === 'high',
+      ),
+    ),
+  )
+  return {
+    required: candidate.required === true,
+    requiredRiskLevels: requiredRiskLevels.length > 0 ? requiredRiskLevels : ['medium', 'high'],
+    supervisorRequired: candidate.supervisorRequired === true,
+  }
+}
+
 function normalizeAutonomyLanePolicy(
   value: unknown,
   projectDefaultBranch?: string,
@@ -364,6 +393,7 @@ function normalizeAutonomyLanePolicy(
     mergeHealerEnabled: candidate.mergeHealerEnabled === false ? false : true,
     allowParallelWorktrees: false,
     alwaysOn: normalizeAutonomyAlwaysOnPolicy(candidate.alwaysOn),
+    releaseAudit: normalizeReleaseAuditPolicy(candidate.releaseAudit),
   }
 }
 
@@ -495,6 +525,10 @@ function mergeAutonomyLanePolicyPatch(
     ...current,
     ...patch,
     alwaysOn: mergeAlwaysOnPolicyPatch(current.alwaysOn, patch.alwaysOn),
+    releaseAudit:
+      patch.releaseAudit && typeof patch.releaseAudit === 'object' && !Array.isArray(patch.releaseAudit)
+        ? normalizeReleaseAuditPolicy({ ...current.releaseAudit, ...patch.releaseAudit })
+        : current.releaseAudit,
   } as ProjectAutonomyLanePolicy
 }
 

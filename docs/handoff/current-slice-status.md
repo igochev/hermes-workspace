@@ -1,46 +1,40 @@
 # Current Slice Execution Status
 
-> Canonical continuation handoff for Builder sessions. Main/CEO updated this after committing Real Executions Runtime at `bf6706a` and selecting the next roadmap-grounded hardening slice.
+> Canonical continuation handoff. Builder must continue from this file, not upstream HANDOFF docs.
 
 ## Active Plan
 
-- **Project:** Hermes Workspace — Immediate Execution Observability Hardening
-- **Active implementation plan:** `docs/plans/2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md`
-- **Plan index:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
-- **Previous package:** Real Executions Runtime committed/pushed at `bf6706a`; final evidence `dogfood-output/real-executions-runtime-final-latest.md`
+- **Project:** Hermes Workspace — Release profile enablement batch
+- **Active plan:** R8 `docs/plans/2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md`
+- **Batch queue:** R8 → R9 → R10 → R11 → R12 (execute in order; no profile creation before R8/R9 pass)
+- **Branch:** `my-hermes-workspace-dev`
+- **Index:** `docs/plans/2026-04-25-hermes-workspace-dream-mission-control-implementation-index.md`
 
-## CEO Decision / Why This Is Active
+## Live Work Items
 
-- R1 shipped the owner correction: Work Item launches now create first-class `/executions/<executionRunId>` records instead of normal Scheduled Jobs.
-- Main review patched one gap before commit: Planner review launches now use `launchImmediateExecution(...)` with regression coverage, not `launchConductorMission(...)`.
-- The next roadmap-grounded gap is observability/supervisor hardening: active immediate runs need heartbeat/latest-output truth, and review sync must parse `ExecutionRunRecord` final output instead of assuming `reviewJobId` is a Scheduled Job id.
+- R8 package baseline: `e1969209-26e4-4f8d-bf2d-4090ab0a9708`
+- R9 profile contracts/no-fallback: `c00e6b2a-8dc0-44b9-ad8d-686ee55c7aca`
+- R10 Supervisor profile/audit launch: `78d93b05-eed0-41ce-ba24-9fc218c4c2d6`
+- R11 Merge-Healer profile controlled repair: `0b9a5e05-8f66-4982-9c61-61065af29883`
+- R12 profile-backed release-lane gauntlet: `97e69d95-f9f0-497f-9215-ab4686983431`
 
-## Current State / Evidence
+## Current State
 
-- Branch: `my-hermes-workspace-dev`
-- Latest pushed package commit: `bf6706a`
-- Final package gates before commit: focused execution tests PASS (91), route/detail tests PASS (8), full `pnpm vitest run` PASS (82 files / 531 tests), `pnpm exec tsc --noEmit --pretty false` PASS, `pnpm exec eslint . --max-warnings=0` PASS, `pnpm build` PASS with existing Vite chunk/dynamic-import warnings, `git diff --check` PASS, service active/root smoke PASS after readiness retry.
-- Independent re-review PASS: no normal Work Item launch/review path still creates Scheduled Jobs; remaining live progress/review-sync risk is the active hardening slice.
-- Task 1 shipped in working tree: immediate `ExecutionRunRecord` review sync now parses terminal reviewer execution output before legacy Scheduled Jobs and keeps running immediate review executions pending/not-ready without fake approval. Evidence: RED observed in `pnpm test src/server/work-item-execution.test.ts -- --runInBand` (2 expected failures), then GREEN `pnpm test src/server/work-item-execution.test.ts -- --runInBand` (19 pass), `pnpm exec tsc --noEmit --pretty false` PASS, focused ESLint on changed files PASS, `git diff --check` PASS.
-- Task 2 shipped in working tree: immediate session-backed runs now use `streamChat(...)` and stream heartbeat/latest-output/final/failure state into `ExecutionRunRecord`; direct chat fallback records explicit waiting/final/failure observability. Evidence: RED observed in `pnpm test src/server/immediate-execution-launch.test.ts -- --runInBand` (3 expected failures), then GREEN focused launch tests (6 pass), adjacent `pnpm test src/server/work-item-execution.test.ts src/server/immediate-execution-launch.test.ts -- --runInBand` PASS (25), `pnpm exec tsc --noEmit --pretty false` PASS, focused ESLint on changed launch files PASS, `git diff --check` PASS.
-- Task 3 shipped in working tree: Work Item run timeline rows now preserve immediate `latestOutputText`/`finalResponse`, immediate Builder/Reviewer rows link to `/executions/<id>` without legacy Scheduled Job wording, and the Work Item Runs / Agents cockpit renders Latest output / Final response. Evidence: RED observed in `pnpm test src/server/work-item-run-timeline.test.ts src/screens/executions/execution-detail-screen.test.ts -- --runInBand` (3 expected failures), then GREEN adjacent `pnpm test src/server/work-item-execution.test.ts src/server/immediate-execution-launch.test.ts src/server/work-item-run-timeline.test.ts src/screens/executions/execution-detail-screen.test.ts -- --runInBand` PASS (47), `pnpm exec tsc --noEmit --pretty false` PASS, focused ESLint on changed Task 3 files PASS, `git diff --check` PASS, `pnpm build` PASS with existing Vite warnings.
-- Task 4 live dogfood PASS in working tree: full `pnpm vitest run` PASS (82 files / 537 tests), repo-wide `pnpm exec eslint . --max-warnings=0` PASS, service restart/root smoke PASS after one readiness retry, live ABACUS work item `3c4e7252-ee14-4288-a38f-bf3deb81c4db` launched immediate Planner execution `239bc80f-61b4-4b90-ad3c-2fd2ff1f3e13` and rendered Latest output / Final response in `/executions/<id>` plus Work Item evidence, and `/api/hermes-jobs` before/after stayed `f5e71ec2a3f0`, `5e26a777bcd0` (no new Scheduled Job). Report: `dogfood-output/immediate-execution-observability-final-latest.md`; screenshots: `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_5ed5a09986324ec79a040c58e8aeb195.png`, `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_dd6ac95f8ded43ccad2ef1fce2c17221.png`.
-- Main/CEO review PASS after one patch: independent review found normal immediate mission sync could still be rewritten into legacy Scheduled Job-shaped fields; Main added `ExecutionRunRecord` mission sync detection/regression coverage. Final gates PASS (`pnpm vitest run`, `pnpm exec tsc --noEmit --pretty false`, `pnpm exec eslint . --max-warnings=0`, `pnpm build`, `git diff --check`), service/root smoke PASS after readiness retry 2, live `/executions/239bc80f-61b4-4b90-ad3c-2fd2ff1f3e13` browser check PASS/console clean. Main review report: `dogfood-output/immediate-execution-observability-main-review-latest.md`.
-
-## Completed Tasks
-
-- Task 1 — Lock immediate review sync with RED tests (`src/server/work-item-execution.test.ts`, `src/server/work-item-execution.ts`) ✅
-- Task 2 — Stream/session heartbeat into `ExecutionRunRecord` (`src/server/immediate-execution-launch.test.ts`, `src/server/immediate-execution-launch.ts`) ✅
-- Task 3 — Work Item timeline/UI regression coverage for active immediate runs (`src/server/work-item-run-timeline.test.ts`, `src/server/work-item-run-timeline.ts`, `src/lib/projects-api.ts`, `src/screens/projects/work-item-detail-screen.tsx`) ✅
-- Task 4 — Live dogfood gauntlet and no-new-Scheduled-Jobs evidence (`dogfood-output/immediate-execution-observability-final-latest.md`) ✅
+- R7 is complete/package-ready: report `dogfood-output/release-lane-packaging-profile-readiness-latest.md`.
+- Main/CEO decision: **do not create Merge-Healer profile now on a dirty/mixed package**. First make a clean release-lane baseline (R8), then contracts/no-fallback (R9), then Supervisor (R10), Merge-Healer (R11), and gauntlet (R12).
+- Backup before batch work-item creation: `/home/d3ni3/.hermes/backups/r8-r12-batch-work-items-20260501T175931Z`.
+- New plan files exist under `docs/plans/2026-05-01-hermes-workspace-r8...` through `r12...`.
+- No new Hermes profiles/gateways/directories were created by Main in this activation step.
 
 ## Next Builder Task
 
-**Next:** Immediate Execution Observability Hardening plan is complete in the working tree. Request Main/CEO review/commit of this package, then have Main select the next roadmap-grounded plan. Do not implement unrelated roadmap work until the next active plan is written.
+```text
+Proceed on Hermes Workspace from /home/d3ni3/.Hermes/workspace/projects/hermes-workspace. Read docs/handoff/current-slice-status.md, then execute R8: docs/plans/2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md. D3n13r/Main authorizes packaging/commit/push for the release-lane bundle only. Stage only the files classified by dogfood-output/release-lane-packaging-profile-readiness-latest.md, run the required gates, commit/push only that package, write the R8 report, and update handoff to R9. Do not create profiles.
+```
 
 ## Verification Rules
 
-- Preserve hard green gates: `pnpm vitest run`, `pnpm exec tsc --noEmit --pretty false`, `pnpm exec eslint . --max-warnings=0`, `pnpm build`, `git diff --check`.
-- Live browser/API dogfood is mandatory; constants-only tests are insufficient.
-- Confirm `/api/hermes-jobs` before/after does not gain a normal Work Item execution/review Scheduled Job.
-- Update this handoff after each completed task or before stopping.
+- Preserve PATCH partial-update safety, R5 branch-evidence recovery, R6 release-audit semantics, and real `/executions` behavior.
+- Missing Supervisor/Deploy/Merge-Healer profiles must not fall back to Builder.
+- Do not create Discord gateways for release profiles unless D3n13r explicitly authorizes them.
+- Keep the batch sequential: one active release-lane work item at a time; no parallel worktrees by default.

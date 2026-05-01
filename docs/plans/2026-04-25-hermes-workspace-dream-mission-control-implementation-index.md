@@ -1,10 +1,16 @@
-# Hermes Workspace — Dream Mission Control Implementation Plan Index (Updated 2026-04-30)
+# Hermes Workspace — Dream Mission Control Implementation Plan Index (Updated 2026-05-01)
 
 > **For Hermes:** This is the implementation entrypoint for Dream Mission Control. Builder should start here only after reading `docs/handoff/current-slice-status.md`.
 >
-> **Current active implementation plan:** `docs/plans/2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md`
+> **Current active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md`
 >
-> **Most recently shipped implementation plan:** `docs/plans/2026-04-29-hermes-workspace-real-executions-runtime-plan.md` (committed/pushed at `bf6706a`)
+> **Queued batch plans:** R8 package baseline → R9 release profile contracts → R10 Supervisor profile/audit launch → R11 Merge-Healer profile controlled repair → R12 profile-backed release-lane gauntlet.
+>
+> **Previous active implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r7-release-lane-packaging-profile-readiness-plan.md`
+>
+> **Most recently completed implementation plan:** `docs/plans/2026-05-01-hermes-workspace-r7-release-lane-packaging-profile-readiness-plan.md` (package-ready; report `dogfood-output/release-lane-packaging-profile-readiness-latest.md`)
+>
+> **Next roadmap task selected by Main/CEO:** Batch queue created to reduce owner round-trips. R8 first packages/commits/pushes the classified release-lane bundle; R9 defines profile contracts; R10 creates/wires Supervisor; R11 creates/wires Merge-Healer under controlled repair policy; R12 runs the profile-backed release-lane gauntlet. Live work item ids are recorded in `docs/handoff/current-slice-status.md`.
 >
 > **Previous stabilization plan:** `docs/plans/2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md`
 >
@@ -31,6 +37,8 @@
 > **Previous CEO/Architect gap analysis:** `docs/plans/2026-04-26-hermes-workspace-next-cycle-gap-analysis.md`
 >
 > **Roadmap correction, 2026-04-27:** Default execution model is **single-lane autonomy per repo/project**: one active work item, one dedicated feature branch, Planner → Builder → Reviewer → Merge-Healer, persistent evidence, visible recovery controls. Parallel worktrees are future opt-in optimization only after single-lane autonomy and merge healing are proven.
+>
+> **Release-lane design update, 2026-05-01:** The target release lane is evidence-gated auto-merge, not blind auto-commit: Researcher/Planner prepares plans and acceptance criteria, Builder implements, Planner/Reviewer independently reviews, Merge-Healer integrates only when policy/approval/test gates pass, and a future Supervisor profile audits/vetoes the chain. Deploy/Merge and Supervisor should become dedicated profiles in a future slice; the current ABACUS deploy proof uses the deterministic server-side Merge-Healer with Deploy/Supervisor intentionally unmapped.
 >
 > **Repo:** `/home/d3ni3/.Hermes/workspace/projects/hermes-workspace`
 
@@ -117,7 +125,17 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 |---:|---|---|---|
 | Q1 | `2026-04-29-hermes-workspace-production-dogfood-queue-hygiene-real-idea-readiness-plan.md` | Clean stale ABACUS dummy/test queue items safely, preserve historical evidence, prove no stale item can auto-run, and prepare the lane for one real Family Command Center idea | Shipped; real idea created (`697d0059-a3ca-438e-b92c-481f39e7566b`) |
 | R1 | `2026-04-29-hermes-workspace-real-executions-runtime-plan.md` | Replace Scheduled Job-backed Work Item launches with first-class real `/executions` runs: clickable live progress, logs/output, final results, artifacts, errors, and no normal Work Item cron-job creation | Shipped; committed/pushed at `bf6706a`; final dogfood PASS with work item `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`, execution `7b217f97-691c-4976-a6f8-35041a26591b`, report `dogfood-output/real-executions-runtime-final-latest.md` |
-| R2 | `2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md` | Hardening after R1: stream/session heartbeat into immediate `ExecutionRunRecord`, parse immediate review final output from execution records, preserve legacy Scheduled Job compatibility, and dogfood no-new-jobs evidence | Active; Builder starts with Task 1 immediate review sync RED tests |
+| R2 | `2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md` | Hardening after R1: stream/session heartbeat into immediate `ExecutionRunRecord`, parse immediate review final output from execution records, preserve legacy Scheduled Job compatibility, and dogfood no-new-jobs evidence | Shipped; committed/pushed at `da9681e`; final report `dogfood-output/immediate-execution-observability-final-latest.md`; Main review `dogfood-output/immediate-execution-observability-main-review-latest.md` |
+| R3 | `2026-04-30-hermes-workspace-real-abacus-daily-brief-autonomous-gauntlet-plan.md` | Real product proof: take D3n13r's real Family Command Center ABACUS Daily Brief idea through Planner → Builder → Reviewer/Merge-Healer evidence using `/executions`, not dummy dogfood items | Conditionally accepted through review: Planner accepted; latest Builder execution `8581323c-20e3-4900-9764-d2aa67a2d52d` succeeded; latest Reviewer execution `867839e9-afe5-4ae7-a2fc-9e75d4f19228` returned `DECISION: APPROVED`; review approval `03d15c23-7896-4154-9c37-bd5e79c9117d` is approved. Deploy/release remains blocked by R4 missing branch evidence. |
+| R4 | `2026-05-01-hermes-workspace-autonomous-release-policy-activation-plan.md` | Owner-approved conservative lane activation for the real ABACUS project: backup first, enable `autonomyLanePolicy.enabled` only, keep always-on/retry/PR/cleanup disabled/manual/dry-run, run Merge-Healer reconcile for the approved work item, and record merge/block evidence | Completed / BLOCKED BY MERGE-HEALER: backup `/home/d3ni3/.hermes/backups/autonomous-release-policy-20260501T150739Z`; policy enabled conservatively; reconcile only for work item `697d0059-a3ca-438e-b92c-481f39e7566b`; final state `blocked/deploy`, `laneState=blocked`, `mergeState=failed`, reason `Merge-Healer blocked: work item has no feature branch evidence.` Report: `dogfood-output/real-abacus-autonomous-release-latest.md`. |
+| R5 | `2026-05-01-hermes-workspace-r5-branch-evidence-recovery-plan.md` | Supported recovery for R4 blocker: add validated branch-evidence recovery API, create real ABACUS recovery branch from `main`, attach evidence through API, and retry existing Merge-Healer without force-merge or manual success evidence | Completed / ACCEPTED MERGED: validated branch evidence attached through API, Merge-Healer merged ABACUS commit `b744cfa16be2a5d3c5d6f36cbc81af89765169ac`; final report `dogfood-output/real-abacus-branch-evidence-recovery-latest.md`. |
+| R6 | `2026-05-01-hermes-workspace-r6-release-supervisor-audit-gate-plan.md` | Make the release/deploy Supervisor audit gate explicit before Merge-Healer: durable audit state, gate helper, orchestrator behavior, visible Work Item evidence, and no silent Supervisor→Builder fallback | Complete / Builder-verified; final report `dogfood-output/release-supervisor-audit-gate-latest.md`. |
+| R7 | `2026-05-01-hermes-workspace-r7-release-lane-packaging-profile-readiness-plan.md` | Package/review release-lane R3/R4/R5/R6 work, resolve stale docs, rerun final gates, and produce deployer/merge-healer + supervisor profile-readiness matrix without creating profiles yet | Complete / package-ready; final report `dogfood-output/release-lane-packaging-profile-readiness-latest.md`. Awaiting D3n13r/Main packaging authorization before commit/push. |
+| R8 | `2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md` | Stage only the R7-classified release-lane package, rerun gates, commit/push if owner-authorized, and create a clean baseline before profiles | Active / ready for Builder |
+| R9 | `2026-05-01-hermes-workspace-r9-release-profile-contracts-plan.md` | Define first-class release role contracts/readiness and prove no Builder fallback before live profile creation | Queued after R8 |
+| R10 | `2026-05-01-hermes-workspace-r10-supervisor-profile-creation-audit-launch-plan.md` | Create/wire the read-only Supervisor profile and structured release audit launch | Queued after R9 |
+| R11 | `2026-05-01-hermes-workspace-r11-merge-healer-profile-controlled-repair-plan.md` | Create/wire dedicated Merge-Healer profile for bounded conflict/test repair under policy gates | Queued after R10 |
+| R12 | `2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md` | Prove the profile-backed release lane on one controlled work item with API/UI/evidence | Queued after R11 |
 
 ### Production Acceptance Cycle — superseded by single-lane correction
 
@@ -132,7 +150,7 @@ This index keeps Builder sessions cheap and reliable. Historical roadmaps and sh
 Current inspected baseline:
 
 - Branch: `my-hermes-workspace-dev`
-- Commit inspected for this update: `bf6706a` plus active Immediate Execution Observability Hardening planning docs
+- Commit inspected for this update: `da9681e` plus active Real ABACUS Daily Brief Autonomous Gauntlet planning docs
 - Test command: `pnpm vitest run` or `pnpm test`
 - Build command: `pnpm build`
 - Service: `hermes-workspace.service`
@@ -216,7 +234,9 @@ Then live verify UI/API changes.
 | Document | Status | How to use now |
 |---|---|---|
 | `2026-04-29-hermes-workspace-real-executions-runtime-plan.md` | Shipped | Historical; final dogfood PASS proved clickable live `/executions/:executionId` trace for work item `a77f3914-26cd-4cb0-b2dd-fc06eba33e7d`, execution `7b217f97-691c-4976-a6f8-35041a26591b`; report `dogfood-output/real-executions-runtime-final-latest.md` |
-| `2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md` | Active hardening plan | Builder must implement next; makes immediate execution heartbeat/latest-output and immediate review sync first-class before more product roadmap work |
+| `2026-05-01-hermes-workspace-autonomous-release-policy-activation-plan.md` | Completed / blocked then recovered by R5 | R4 enabled conservative single-lane policy for real ABACUS and correctly blocked on missing branch evidence; R5 added supported branch-evidence recovery and Merge-Healer merged the item. Reports: `dogfood-output/real-abacus-autonomous-release-latest.md`, `dogfood-output/real-abacus-branch-evidence-recovery-latest.md`. |
+| `2026-04-30-hermes-workspace-real-abacus-daily-brief-autonomous-gauntlet-plan.md` | Completed through R5 merge evidence | Real ABACUS Daily Brief Planner → Builder → Reviewer proof succeeded; R4 proved Merge-Healer blocks on missing branch evidence; R5 recovered with validated branch evidence and produced Merge-Healer merge evidence. |
+| `2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md` | Shipped hardening plan | Historical; committed/pushed at `da9681e`; made immediate execution heartbeat/latest-output and immediate review/mission sync first-class before real-product dogfood |
 | `2026-04-29-hermes-workspace-production-dogfood-queue-hygiene-real-idea-readiness-plan.md` | Shipped real-idea readiness plan | Historical; stale ABACUS dummy/test queue cleaned safely and real idea work item `697d0059-a3ca-438e-b92c-481f39e7566b` created |
 | `2026-04-29-hermes-workspace-eslint-baseline-stabilization-plan.md` | Shipped stabilization plan | Historical; full `pnpm exec eslint . --max-warnings=0` is green and package committed/pushed at `d0edae3`; final report `dogfood-output/eslint-baseline-stabilization-final-latest.md` |
 | `2026-04-29-hermes-workspace-typescript-baseline-stabilization-plan.md` | Shipped / Main-reviewed stabilization plan | Historical; full `tsc --noEmit` is green and package committed at `840a67e`; final report `dogfood-output/typescript-baseline-stabilization-final-latest.md` |
@@ -267,7 +287,25 @@ R1: Real Executions Runtime
   └─ shipped at `bf6706a`; owner correction implemented so `/executions` are real clickable run traces/results, not Scheduled Jobs or one-shot cron definitions
 
 R2: Immediate Execution Observability Hardening
-  └─ active; adds heartbeat/latest-output truth and immediate review sync from `ExecutionRunRecord` before more product feature work
+  └─ shipped at `da9681e`; active immediate runs now expose heartbeat/latest-output/final evidence and immediate mission/review sync reads `ExecutionRunRecord`
+
+R3: Real ABACUS Daily Brief Autonomous Gauntlet
+  └─ conditionally accepted through review; Planner/Builder/Reviewer succeeded and review approved; deploy/release now blocked by R4 missing branch evidence
+
+R4: Autonomous Release Policy Activation
+  └─ completed with BLOCKED BY MERGE-HEALER; conservative lane policy is enabled, but Merge-Healer refused to merge work item 697d0059-a3ca-438e-b92c-481f39e7566b because branchName/baseBranch feature-branch evidence is missing
+
+R5: Branch Evidence Recovery
+  └─ completed with ACCEPTED / MERGED; validated branch evidence was attached through the new API for mission/697d0059-daily-brief-recovery, then Merge-Healer produced merge commit b744cfa16be2a5d3c5d6f36cbc81af89765169ac without manual merge-success evidence
+
+R6: Release Supervisor Audit Gate
+  └─ complete; first-class release-audit gate/evidence added before Merge-Healer, with no Supervisor→Builder fallback and no new profile/gateway creation
+
+R7: Release Lane Packaging + Profile Readiness
+  └─ complete / package-ready; report dogfood-output/release-lane-packaging-profile-readiness-latest.md; no Deploy/Supervisor profiles created or mapped
+
+R8 → R12: Release profile enablement batch
+  └─ R8 clean package baseline first; R9 contracts/no-fallback; R10 Supervisor profile; R11 Merge-Healer profile; R12 profile-backed release-lane gauntlet. Do not jump to profile creation before R8/R9 pass.
 ```
 
 ---
@@ -289,7 +327,15 @@ A plan is not shipped until:
 
 ## 9. Immediate next action
 
-Builder should read `docs/handoff/current-slice-status.md`, then implement `docs/plans/2026-04-30-hermes-workspace-immediate-execution-observability-hardening-plan.md`, starting with Task 1 immediate review sync RED tests.
+Main/CEO created a five-plan Builder batch so D3n13r does not need to request every next handoff manually:
+
+1. R8 `2026-05-01-hermes-workspace-r8-release-lane-package-commit-plan.md` — package/commit/push the R7-classified release-lane bundle first.
+2. R9 `2026-05-01-hermes-workspace-r9-release-profile-contracts-plan.md` — define release role contracts/readiness and no-fallback behavior.
+3. R10 `2026-05-01-hermes-workspace-r10-supervisor-profile-creation-audit-launch-plan.md` — create/wire Supervisor for read-only release audit.
+4. R11 `2026-05-01-hermes-workspace-r11-merge-healer-profile-controlled-repair-plan.md` — create/wire Merge-Healer for controlled repair.
+5. R12 `2026-05-01-hermes-workspace-r12-profile-backed-release-lane-gauntlet-plan.md` — prove the profile-backed release lane end-to-end.
+
+Builder must execute them in order. Do not create profiles before R8 and R9 pass, do not map missing profiles to Builder, and do not create Discord gateways unless D3n13r explicitly authorizes them.
 
 ## 10. After R1 ships
 
@@ -300,4 +346,4 @@ R1 shipped and was committed/pushed at `bf6706a`. Evidence recorded in:
 - Execution run: `7b217f97-691c-4976-a6f8-35041a26591b`
 - Screenshot: `/home/d3ni3/.hermes/profiles/builder/cache/screenshots/browser_screenshot_8a169dfa537a4f6d881ebb770c84d576.png`
 
-Main/CEO selected R2 observability hardening as the next slice because the roadmap still calls for event/heartbeat truth and supervisor-grade execution evidence. After R2 ships, Main should reassess the roadmap before authorizing more product features.
+Main/CEO selected R2 observability hardening as the next slice because the roadmap still called for event/heartbeat truth and supervisor-grade execution evidence. R2 shipped at `da9681e`. After R2, Main selected R3 real-product dogfood: use the real Family Command Center ABACUS Daily Brief work item (`697d0059-a3ca-438e-b92c-481f39e7566b`) to prove Planner → Builder → Reviewer/Merge-Healer with first-class `/executions` evidence.

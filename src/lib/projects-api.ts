@@ -48,6 +48,12 @@ export type ProjectAutonomyAlwaysOnNotificationEvent =
   | 'pr_published'
   | 'cleanup_recommended'
 
+export type ProjectReleaseAuditPolicy = {
+  required: boolean
+  requiredRiskLevels: Array<'medium' | 'high'>
+  supervisorRequired: boolean
+}
+
 export type ProjectAutonomyAlwaysOnPolicy = {
   enabled: boolean
   retry: {
@@ -93,6 +99,7 @@ export type ProjectAutonomyLanePolicy = {
   mergeHealerEnabled: boolean
   allowParallelWorktrees: false
   alwaysOn: ProjectAutonomyAlwaysOnPolicy
+  releaseAudit?: ProjectReleaseAuditPolicy
 }
 
 export type ProjectRecord = {
@@ -132,6 +139,15 @@ export type WorkItemLaneState =
   | 'blocked'
   | 'done'
 export type WorkItemMergeState = 'not_started' | 'running' | 'merged' | 'conflict' | 'failed'
+export type WorkItemReleaseAuditState =
+  | 'not_required'
+  | 'pending'
+  | 'running'
+  | 'approved'
+  | 'vetoed'
+  | 'failed'
+  | 'manual_review'
+export type WorkItemReleaseAuditDecision = 'approved' | 'vetoed' | 'manual_review'
 export type WorkItemBlockedReason =
   | 'mission_failed'
   | 'review_feedback'
@@ -285,6 +301,15 @@ export type WorkItemRecord = {
   mergeTestCommand?: string
   mergeTestPassed?: boolean
   mergeArtifactPaths?: Array<string>
+  releaseAuditState?: WorkItemReleaseAuditState
+  releaseAuditExecutionId?: string
+  releaseAuditMissionId?: string
+  releaseAuditProfile?: string
+  releaseAuditDecision?: WorkItemReleaseAuditDecision
+  releaseAuditSummary?: string
+  releaseAuditReasons?: Array<string>
+  releaseAuditMissingEvidence?: Array<string>
+  releaseAuditObservedAt?: string
   prUrl?: string
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
@@ -376,6 +401,15 @@ export type CreateWorkItemInput = {
   mergeTestCommand?: string
   mergeTestPassed?: boolean
   mergeArtifactPaths?: Array<string>
+  releaseAuditState?: WorkItemReleaseAuditState
+  releaseAuditExecutionId?: string
+  releaseAuditMissionId?: string
+  releaseAuditProfile?: string
+  releaseAuditDecision?: WorkItemReleaseAuditDecision
+  releaseAuditSummary?: string
+  releaseAuditReasons?: Array<string>
+  releaseAuditMissingEvidence?: Array<string>
+  releaseAuditObservedAt?: string
   prUrl?: string
   artifactPaths?: Array<string>
   acceptanceCriteria?: Array<string>

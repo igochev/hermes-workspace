@@ -332,6 +332,50 @@ describe('work-item-launch', () => {
     )
   })
 
+  it('clears stale review decision fields when relaunching build after changes_requested', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+      phaseProfiles: { build: 'builder' },
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Retry build after reviewer changes',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      planFilePath: 'docs/plans/retry-build.md',
+      missionId: 'previous-builder-run',
+      missionState: 'succeeded',
+      reviewJobId: 'previous-review-run',
+      reviewState: 'failed',
+      reviewDecision: 'changes_requested',
+      reviewDecisionSummary: 'Needs copy cleanup.',
+      reviewDecisionConfidence: 'high',
+      reviewDecisionSource: 'json',
+      reviewParserError: 'old parser warning',
+      reviewQualityGateStatus: 'fail',
+      reviewQualityGateReasons: ['Reviewer requested changes.'],
+      reviewMissingEvidence: ['Desktop screenshot missing.'],
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, {
+      phase: 'build',
+      phaseProfiles: { build: 'builder' },
+    })
+
+    expect(result.workItem.missionId).toMatch(/^execution-build-/)
+    expect(result.workItem.reviewJobId).toBeUndefined()
+    expect(result.workItem.reviewState).toBeUndefined()
+    expect(result.workItem.reviewDecision).toBeUndefined()
+    expect(result.workItem.reviewQualityGateStatus).toBeUndefined()
+    expect(result.workItem.reviewQualityGateReasons).toEqual([])
+    expect(result.workItem.reviewMissingEvidence).toEqual([])
+    expect(getWorkItem(workItem.id)?.reviewDecision).toBeUndefined()
+  })
+
   it('still allows research launch for rough ideas', async () => {
     const project = createProject({
       name: 'Mission Control Demo',
@@ -835,6 +879,46 @@ describe('work-item-launch', () => {
         projectId: project.id,
         workItemId: workItem.id,
         href: `/projects/${project.id}/work-items/${workItem.id}`,
+      }),
+    )
+  })
+
+  it('launches review phase through review fields without overwriting Builder mission evidence', async () => {
+    const project = createProject({
+      name: 'Review Field Routing',
+      repoPath: '/repos/review-field-routing',
+      phaseProfiles: { review: 'reviewer' },
+      ...projectFixture(),
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Preserve Builder mission while reviewing',
+      status: 'active',
+      phase: 'review',
+      priority: 'medium',
+      riskLevel: 'medium',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'builder-exec-123',
+      missionLink: '/executions/builder-exec-123',
+      missionState: 'succeeded',
+      planFilePath: 'docs/plans/review.md',
+      acceptanceCriteria: ['Review uses review fields'],
+    })
+
+    const result = await launchWorkItemIntoConductor(workItem.id, { phase: 'review' })
+
+    expect(result.workItem.missionId).toBe('builder-exec-123')
+    expect(result.workItem.missionLink).toBe('/executions/builder-exec-123')
+    expect(result.workItem.missionState).toBe('succeeded')
+    expect(result.workItem.reviewJobId).toBe(`execution-review-${workItem.id.slice(0, 8)}`)
+    expect(result.workItem.reviewState).toBe('running')
+    expect(launchImmediateExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workItemId: workItem.id,
+        projectId: project.id,
+        phase: 'review',
+        role: 'reviewer',
+        profile: 'reviewer',
       }),
     )
   })

@@ -5,7 +5,13 @@ import { randomUUID } from 'node:crypto'
 
 import type { WorkItemPhase } from './work-items-store'
 
-export type ExecutionEngine = 'conductor' | 'hermes-cron' | 'hermes-session' | 'cron-legacy'
+export type ExecutionEngine =
+  | 'conductor'
+  | 'hermes-cron'
+  | 'hermes-session'
+  | 'portable-chat-completions'
+  | 'local-hermes-cli'
+  | 'cron-legacy'
 export type ExecutionRunRole = 'mission' | 'review' | 'supervisor' | 'planner' | 'builder' | 'reviewer' | 'deployer'
 export type ExecutionRunState =
   | 'queued'
@@ -87,7 +93,14 @@ export type ListExecutionRunsFilters = {
 }
 
 const VALID_ROLES: Array<ExecutionRunRole> = ['mission', 'review', 'supervisor', 'planner', 'builder', 'reviewer', 'deployer']
-const VALID_ENGINES: Array<ExecutionEngine> = ['conductor', 'hermes-cron', 'hermes-session', 'cron-legacy']
+const VALID_ENGINES: Array<ExecutionEngine> = [
+  'conductor',
+  'hermes-cron',
+  'hermes-session',
+  'portable-chat-completions',
+  'local-hermes-cli',
+  'cron-legacy',
+]
 const VALID_STATES: Array<ExecutionRunState> = [
   'queued',
   'scheduled',
@@ -232,7 +245,7 @@ function dedupeMatches(
   const inputRunId = asOptionalString(input.runId)
   const inputJobId = asOptionalString(input.jobId)
   const inputId = asOptionalString(input.id)
-  if (inputId && run.id === inputId) return true
+  if (inputId) return run.id === inputId
   if (run.workItemId !== input.workItemId.trim()) return false
   if (run.role !== input.role) return false
   if (inputJobId && run.jobId !== inputJobId) return false

@@ -95,7 +95,6 @@ describe('execution-runs-store', () => {
       jobId: 'review-job',
       state: 'scheduled',
     })
-
     const second = upsertExecutionRun({
       workItemId: 'work-1',
       projectId: 'project-1',
@@ -109,6 +108,41 @@ describe('execution-runs-store', () => {
     expect(second.id).toBe(first.id)
     expect(second.error).toBe('review failed')
     expect(listExecutionRuns()).toHaveLength(1)
+  })
+
+  it('does not deduplicate a new explicit execution id into an older same-role work item run', () => {
+    const failed = upsertExecutionRun({
+      id: 'failed-build-run',
+      workItemId: 'work-1',
+      projectId: 'project-1',
+      role: 'builder',
+      phase: 'build',
+      engine: 'portable-chat-completions',
+      state: 'failed',
+      error: 'fallback_fetch_failed: fetch failed',
+    })
+
+    const resumed = upsertExecutionRun({
+      id: 'resumed-build-run',
+      workItemId: 'work-1',
+      projectId: 'project-1',
+      role: 'builder',
+      phase: 'build',
+      engine: 'portable-chat-completions',
+      state: 'running',
+    })
+
+    expect(resumed.id).toBe('resumed-build-run')
+    expect(failed.id).toBe('failed-build-run')
+    expect(getExecutionRun('failed-build-run')).toMatchObject({
+      state: 'failed',
+      error: 'fallback_fetch_failed: fetch failed',
+    })
+    expect(getExecutionRun('resumed-build-run')).toMatchObject({ state: 'running' })
+    expect(listExecutionRuns({ workItemId: 'work-1', role: 'builder' }).map((run) => run.id)).toEqual([
+      'failed-build-run',
+      'resumed-build-run',
+    ])
   })
 
   it('filters execution runs by workItemId, projectId, and role', () => {

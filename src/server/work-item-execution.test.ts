@@ -193,6 +193,108 @@ describe('work-item-execution', () => {
     expect(persisted?.sessionKeys).toContain('session-immediate-123')
   })
 
+  it('syncs local Hermes CLI immediate mission state from ExecutionRunRecord without rewriting it as a Scheduled Job', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Local CLI mission observability',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'exec-local-cli-123',
+      missionLink: '/executions/exec-local-cli-123',
+      missionState: 'running',
+      sessionKeys: [],
+    })
+
+    upsertExecutionRun({
+      id: 'exec-local-cli-123',
+      workItemId: workItem.id,
+      projectId: project.id,
+      role: 'builder',
+      phase: 'build',
+      engine: 'local-hermes-cli',
+      state: 'succeeded',
+      profile: 'builder',
+      startedAt: '2026-04-30T12:00:00Z',
+      finishedAt: '2026-04-30T12:10:00Z',
+      lastObservedAt: '2026-04-30T12:10:00Z',
+      latestOutputText: 'Local Builder completed via CLI worker.',
+      finalResponse: 'Local Builder final response.',
+      summary: 'Builder execution completed in local Hermes CLI worker.',
+      artifactPaths: ['lib/daily-brief.ts'],
+    })
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(getHermesJobById).not.toHaveBeenCalled()
+    expect(listHermesJobs).not.toHaveBeenCalled()
+    expect(getHermesJobRuns).not.toHaveBeenCalled()
+    expect(result.execution.job).toBeNull()
+    expect(result.execution.state).toBe('succeeded')
+    expect(result.workItem.missionId).toBe('exec-local-cli-123')
+    expect(result.workItem.missionJobId).toBeUndefined()
+    expect(result.workItem.missionLink).toBe('/executions/exec-local-cli-123')
+    expect(result.workItem.missionState).toBe('succeeded')
+    expect(result.workItem.missionLastRunAt).toBe('2026-04-30T12:10:00Z')
+  })
+
+  it('does not re-advance changes_requested items to review from stale succeeded Builder evidence', async () => {
+    const project = createProject({
+      name: 'Mission Control Demo',
+      repoPath: '/repos/mission-control-demo',
+      defaultBranch: 'main',
+    })
+    const workItem = createWorkItem({
+      projectId: project.id,
+      title: 'Reviewer changes should stay in build',
+      status: 'active',
+      phase: 'build',
+      priority: 'high',
+      repoPathSnapshot: project.repoPath,
+      missionId: 'exec-local-cli-returned-build',
+      missionLink: '/executions/exec-local-cli-returned-build',
+      missionState: 'succeeded',
+      reviewJobId: 'review-requested-changes',
+      reviewState: 'failed',
+      reviewDecision: 'changes_requested',
+      reviewQualityGateStatus: 'fail',
+      sessionKeys: [],
+    })
+
+    upsertExecutionRun({
+      id: 'exec-local-cli-returned-build',
+      workItemId: workItem.id,
+      projectId: project.id,
+      role: 'builder',
+      phase: 'build',
+      engine: 'local-hermes-cli',
+      state: 'succeeded',
+      profile: 'builder',
+      startedAt: '2026-04-30T12:00:00Z',
+      finishedAt: '2026-04-30T12:10:00Z',
+      lastObservedAt: '2026-04-30T12:10:00Z',
+      latestOutputText: 'Local Builder completed via CLI worker.',
+      finalResponse: 'Local Builder final response.',
+      summary: 'Builder execution completed in local Hermes CLI worker.',
+      artifactPaths: ['lib/daily-brief.ts'],
+    })
+
+    const result = await syncWorkItemExecutionState(workItem.id)
+
+    expect(result.execution.state).toBe('succeeded')
+    expect(result.execution.transitionApplied).toBeNull()
+    expect(result.workItem.status).toBe('active')
+    expect(result.workItem.phase).toBe('build')
+    expect(result.workItem.reviewDecision).toBe('changes_requested')
+    expect(result.workItem.reviewJobId).toBe('review-requested-changes')
+  })
+
   it('blocks a work item and records error details when the mission fails', async () => {
     const project = createProject({
       name: 'Mission Control Demo',
@@ -1136,9 +1238,12 @@ DECISION: APPROVED`,
       expect(result1.workItem.history[1]?.note).toContain('Review requested changes')
       expect(result1.workItem.history[2]?.note).toContain('Planner review requested changes')
 
-      // Second sync — should not add duplicate history entry
+      // Second sync — should not add duplicate history entry and must keep the
+      // record itself in build, not only write a build-phase history entry.
       const result2 = await syncWorkItemExecutionState(workItem.id)
       expect(result2.workItem.history.length).toBe(result1.workItem.history.length)
+      expect(result2.workItem.status).toBe('active')
+      expect(result2.workItem.phase).toBe('build')
     })
 
     it('failed review job without parseable decision keeps approval pending', async () => {

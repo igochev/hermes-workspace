@@ -7,6 +7,12 @@
 > **Relationship to existing docs:** This document supersedes the older “what is missing?” slice queue as the new north-star roadmap. Keep existing detailed slice plans as implementation history and convert this roadmap into executable slice plans incrementally.
 >
 > **Roadmap correction, 2026-04-27:** Mission Control is not a parallel worktree swarm by default. The product north star is: **A single-user Mission Control console where each project/repo has a stable autonomous lane. The lane processes one work item at a time on a dedicated feature branch, with Planner/Builder/Reviewer/Merge-Healer phases, persistent evidence, UI visibility, and operator recovery controls. Parallel worktrees are an optional future optimization after single-lane autonomy and merge healing are proven.**
+>
+> **Release-lane design update, 2026-05-01:** The autonomous lane should mature into an evidence-gated release workflow: Researcher/Planner prepares plans and acceptance criteria, Builder implements, Planner/Reviewer independently reviews, Merge-Healer integrates only after policy/approval/test gates pass, and a future Supervisor profile audits/vetoes the whole chain before broader auto-merge confidence. Deploy/Merge and Supervisor should become dedicated first-class Hermes profiles when their code paths are ready; until then, Deploy must remain a manual/system Merge-Healer gate rather than being hidden behind `builder` fallback.
+>
+> **Post-R6 CEO decision, 2026-05-01:** R6 made the release-audit gate explicit, but the branch is still a mixed in-flight release-lane package. Do not create `deployer`/`supervisor` profiles ad hoc. First run R7 packaging/profile-readiness: classify and verify the R3/R4/R5/R6 package, then create dedicated profiles only through a separate owner-approved profile-creation/mapping task.
+>
+> **Post-R7 CEO decision, 2026-05-01:** R7 is package-ready. To reduce repeated owner round-trips, Main created a five-plan Builder batch: R8 package baseline, R9 release profile contracts/no-fallback, R10 Supervisor profile/audit launch, R11 Merge-Healer profile controlled repair, and R12 profile-backed release-lane gauntlet. Profile creation must still wait until the package baseline and contracts are clean.
 
 ---
 

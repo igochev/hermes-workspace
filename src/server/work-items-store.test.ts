@@ -195,6 +195,43 @@ describe('work-items-store', () => {
     expect(reset?.reviewQualityGateStatus).toBe('manual_review')
   })
 
+  it('normalizes release supervisor audit fields with defaults and round-trips evidence', () => {
+    const workItem = createWorkItem({
+      projectId: 'project-release-audit',
+      title: 'Release audit fields test',
+      repoPathSnapshot: '/repos/audit',
+    })
+
+    expect(workItem.releaseAuditState).toBeUndefined()
+    expect(workItem.releaseAuditDecision).toBeUndefined()
+    expect(workItem.releaseAuditReasons).toEqual([])
+    expect(workItem.releaseAuditMissingEvidence).toEqual([])
+
+    const updated = updateWorkItem(workItem.id, {
+      releaseAuditState: 'pending',
+      releaseAuditExecutionId: 'exec-audit-123',
+      releaseAuditProfile: 'supervisor',
+      releaseAuditSummary: 'Waiting for supervisor approval.',
+      releaseAuditReasons: ['Audit required by policy.'],
+      releaseAuditMissingEvidence: ['release audit approval'],
+      releaseAuditObservedAt: '2026-05-01T12:00:00.000Z',
+    })
+
+    expect(updated).toMatchObject({
+      releaseAuditState: 'pending',
+      releaseAuditExecutionId: 'exec-audit-123',
+      releaseAuditProfile: 'supervisor',
+      releaseAuditSummary: 'Waiting for supervisor approval.',
+      releaseAuditReasons: ['Audit required by policy.'],
+      releaseAuditMissingEvidence: ['release audit approval'],
+      releaseAuditObservedAt: '2026-05-01T12:00:00.000Z',
+    })
+    expect(getWorkItem(workItem.id)).toMatchObject({
+      releaseAuditState: 'pending',
+      releaseAuditMissingEvidence: ['release audit approval'],
+    })
+  })
+
   it('preserves source suggestion provenance across create, read, and partial update', () => {
     const workItem = createWorkItem({
       projectId: 'project-1',

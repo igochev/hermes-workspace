@@ -274,7 +274,14 @@ function resolveImmediateMissionExecutionRun(
   const candidates = Array.from(new Set([missionId, missionJobId].filter(Boolean)))
   for (const candidate of candidates) {
     const run = getExecutionRun(candidate)
-    if (run && run.engine === 'hermes-session') return run
+    if (
+      run &&
+      (run.engine === 'hermes-session' ||
+        run.engine === 'portable-chat-completions' ||
+        run.engine === 'local-hermes-cli')
+    ) {
+      return run
+    }
   }
   return null
 }
@@ -475,6 +482,14 @@ function transitionForSuccess(workItem: WorkItemRecord): {
     (workItem.status === 'active' || workItem.status === 'blocked') &&
     workItem.phase === 'build'
   ) {
+    if (
+      workItem.reviewDecision === 'changes_requested' &&
+      workItem.reviewState === 'failed' &&
+      readOptionalString(workItem.reviewJobId)
+    ) {
+      return null
+    }
+
     return {
       status: 'active',
       phase: 'review',
@@ -887,6 +902,8 @@ export async function syncWorkItemExecutionState(
               updated =
                 updateWorkItem(updated.id, {
                   ...workItemUpdates,
+                  status: 'active' as const,
+                  phase: 'build' as const,
                   reviewState: 'failed' as const,
                   reviewDecision: 'changes_requested' as const,
                 }) ?? updated

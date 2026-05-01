@@ -11,6 +11,7 @@ import {
   buildWorkItemBranchName,
   ensureWorkItemBranch,
 } from './project-branch-manager'
+import { evaluateReleaseAuditGate } from './work-item-release-audit-gate'
 import { runWorkItemMergeHealer } from './work-item-merge-healer'
 import { selectNextLaneWorkItem } from './project-autonomy-lane'
 import { launchWorkItemIntoConductor } from './work-item-launch'
@@ -605,8 +606,87 @@ export async function reconcileWorkItemAutonomy(
     workItem.mergeState !== 'merged'
 
   if (project && shouldRunMergeHealer) {
+    const auditGate = evaluateReleaseAuditGate(workItem, project)
+    if (auditGate.status === 'waiting') {
+      const nextAuditState =
+        workItem.releaseAuditState === 'pending' ? workItem.releaseAuditState : 'pending'
+      const nextObservedAt = workItem.releaseAuditObservedAt ?? new Date().toISOString()
+      const hasChanged =
+        workItem.releaseAuditState !== nextAuditState ||
+        workItem.releaseAuditSummary !== auditGate.reason ||
+        workItem.releaseAuditObservedAt !== nextObservedAt ||
+        (workItem.releaseAuditMissingEvidence ?? []).join('\n') !==
+          auditGate.missingEvidence.join('\n')
+      const updated = hasChanged
+        ? updateWorkItem(workItem.id, {
+            releaseAuditState: nextAuditState,
+            releaseAuditSummary: auditGate.reason,
+            releaseAuditMissingEvidence: auditGate.missingEvidence,
+            releaseAuditObservedAt: nextObservedAt,
+          })
+        : workItem
+      if (!updated) throw new Error('Failed to persist release audit gate state')
+      return {
+        workItemId,
+        changed: hasChanged,
+        blocked: true,
+        events: [
+          createEvent({
+            workItem,
+            action: 'run_merge_healer',
+            statusAfter: updated.status,
+            phaseAfter: updated.phase,
+            message: auditGate.reason,
+          }),
+        ],
+      }
+    }
+
+    if (auditGate.status === 'blocked') {
+      const updated = updateWorkItem(workItem.id, {
+        status: 'blocked',
+        phase: 'deploy',
+        blockedReason: 'other',
+        laneState: 'blocked',
+        laneParkedAt: workItem.laneParkedAt ?? new Date().toISOString(),
+        laneBlockedReason: auditGate.reason,
+        releaseAuditMissingEvidence: auditGate.missingEvidence,
+        releaseAuditObservedAt: workItem.releaseAuditObservedAt ?? new Date().toISOString(),
+      })
+      if (!updated) throw new Error('Failed to persist release audit blocker')
+      appendWorkItemHistoryEntry(updated.id, {
+        action: 'status-change',
+        status: 'blocked',
+        phase: 'deploy',
+        note: auditGate.reason,
+      })
+      return {
+        workItemId,
+        changed: true,
+        blocked: true,
+        events: [
+          createEvent({
+            workItem,
+            action: 'run_merge_healer',
+            statusAfter: 'blocked',
+            phaseAfter: 'deploy',
+            message: auditGate.reason,
+          }),
+        ],
+      }
+    }
+
+    const mergeReadyWorkItem =
+      auditGate.status === 'not_required' && workItem.releaseAuditState !== 'not_required'
+        ? updateWorkItem(workItem.id, {
+            releaseAuditState: 'not_required',
+            releaseAuditSummary: auditGate.reason,
+            releaseAuditObservedAt: workItem.releaseAuditObservedAt ?? new Date().toISOString(),
+          }) ?? workItem
+        : workItem
+
     const repoPath = (
-      workItem.repoPathSnapshot ||
+      mergeReadyWorkItem.repoPathSnapshot ||
       project.repoPath ||
       ''
     ).trim()
@@ -628,7 +708,7 @@ export async function reconcileWorkItemAutonomy(
 
     const merge = await runWorkItemMergeHealer({
       repoPath,
-      workItem,
+      workItem: mergeReadyWorkItem,
       testCommand: mergeHealerTestCommand(),
     })
     const mergeUpdates = {

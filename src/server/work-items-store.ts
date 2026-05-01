@@ -40,6 +40,15 @@ export type WorkItemLaneState =
   | 'blocked'
   | 'done'
 export type WorkItemMergeState = 'not_started' | 'running' | 'merged' | 'conflict' | 'failed'
+export type WorkItemReleaseAuditState =
+  | 'not_required'
+  | 'pending'
+  | 'running'
+  | 'approved'
+  | 'vetoed'
+  | 'failed'
+  | 'manual_review'
+export type WorkItemReleaseAuditDecision = 'approved' | 'vetoed' | 'manual_review'
 
 export type WorkItemStructuredReviewDecision = 'approved' | 'changes_requested' | 'manual_review'
 export type WorkItemReviewQualityGateStatus = 'pass' | 'fail' | 'manual_review'
@@ -105,6 +114,15 @@ export type WorkItemRecord = {
   mergeTestCommand?: string
   mergeTestPassed?: boolean
   mergeArtifactPaths?: Array<string>
+  releaseAuditState?: WorkItemReleaseAuditState
+  releaseAuditExecutionId?: string
+  releaseAuditMissionId?: string
+  releaseAuditProfile?: string
+  releaseAuditDecision?: WorkItemReleaseAuditDecision
+  releaseAuditSummary?: string
+  releaseAuditReasons?: Array<string>
+  releaseAuditMissingEvidence?: Array<string>
+  releaseAuditObservedAt?: string
   prUrl?: string
   artifactPaths: Array<string>
   acceptanceCriteria: Array<string>
@@ -175,6 +193,15 @@ type CreateWorkItemInput = {
   mergeTestCommand?: string
   mergeTestPassed?: boolean
   mergeArtifactPaths?: Array<string>
+  releaseAuditState?: WorkItemReleaseAuditState
+  releaseAuditExecutionId?: string
+  releaseAuditMissionId?: string
+  releaseAuditProfile?: string
+  releaseAuditDecision?: WorkItemReleaseAuditDecision
+  releaseAuditSummary?: string
+  releaseAuditReasons?: Array<string>
+  releaseAuditMissingEvidence?: Array<string>
+  releaseAuditObservedAt?: string
   prUrl?: string
   artifactPaths?: Array<string>
   acceptanceCriteria?: Array<string>
@@ -342,6 +369,25 @@ function normalizeMergeState(value: unknown): WorkItemMergeState | undefined {
     : undefined
 }
 
+
+function normalizeReleaseAuditState(value: unknown): WorkItemReleaseAuditState | undefined {
+  return value === 'not_required' ||
+    value === 'pending' ||
+    value === 'running' ||
+    value === 'approved' ||
+    value === 'vetoed' ||
+    value === 'failed' ||
+    value === 'manual_review'
+    ? value
+    : undefined
+}
+
+function normalizeReleaseAuditDecision(value: unknown): WorkItemReleaseAuditDecision | undefined {
+  return value === 'approved' || value === 'vetoed' || value === 'manual_review'
+    ? value
+    : undefined
+}
+
 function normalizeRetryCount(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
   return Math.max(0, Math.floor(value))
@@ -481,6 +527,15 @@ function normalizeWorkItem(
         ? (workItem as Partial<WorkItemRecord>).mergeTestPassed
         : undefined,
     mergeArtifactPaths: asStringArray((workItem as Partial<WorkItemRecord>).mergeArtifactPaths),
+    releaseAuditState: normalizeReleaseAuditState((workItem as Partial<WorkItemRecord>).releaseAuditState),
+    releaseAuditExecutionId: asOptionalString((workItem as Partial<WorkItemRecord>).releaseAuditExecutionId),
+    releaseAuditMissionId: asOptionalString((workItem as Partial<WorkItemRecord>).releaseAuditMissionId),
+    releaseAuditProfile: asOptionalString((workItem as Partial<WorkItemRecord>).releaseAuditProfile),
+    releaseAuditDecision: normalizeReleaseAuditDecision((workItem as Partial<WorkItemRecord>).releaseAuditDecision),
+    releaseAuditSummary: asOptionalString((workItem as Partial<WorkItemRecord>).releaseAuditSummary),
+    releaseAuditReasons: asStringArray((workItem as Partial<WorkItemRecord>).releaseAuditReasons),
+    releaseAuditMissingEvidence: asStringArray((workItem as Partial<WorkItemRecord>).releaseAuditMissingEvidence),
+    releaseAuditObservedAt: asOptionalString((workItem as Partial<WorkItemRecord>).releaseAuditObservedAt),
     prUrl: asOptionalString(workItem.prUrl),
     artifactPaths: asStringArray(workItem.artifactPaths),
     acceptanceCriteria,
@@ -569,6 +624,15 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItemRecord {
     mergeTestCommand: input.mergeTestCommand,
     mergeTestPassed: input.mergeTestPassed,
     mergeArtifactPaths: input.mergeArtifactPaths,
+    releaseAuditState: input.releaseAuditState,
+    releaseAuditExecutionId: input.releaseAuditExecutionId,
+    releaseAuditMissionId: input.releaseAuditMissionId,
+    releaseAuditProfile: input.releaseAuditProfile,
+    releaseAuditDecision: input.releaseAuditDecision,
+    releaseAuditSummary: input.releaseAuditSummary,
+    releaseAuditReasons: input.releaseAuditReasons,
+    releaseAuditMissingEvidence: input.releaseAuditMissingEvidence,
+    releaseAuditObservedAt: input.releaseAuditObservedAt,
     prUrl: input.prUrl,
     artifactPaths: input.artifactPaths,
     acceptanceCriteria: input.acceptanceCriteria,

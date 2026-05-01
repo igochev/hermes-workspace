@@ -480,6 +480,55 @@ export async function launchWorkItemIntoConductor(
     profile: resolvedProfile ?? undefined,
   })
 
+  if (phase === 'review') {
+    const reviewLaunch = await launchPlannerReview(workItem, project)
+    if (!reviewLaunch) {
+      throw new Error('Review launch requires a prepared plan and mapped review profile')
+    }
+    const sessionKeys = reviewLaunch.sessionKey
+      ? Array.from(new Set([...workItem.sessionKeys, reviewLaunch.sessionKey]))
+      : [...workItem.sessionKeys]
+    const nextWorkItem = updateWorkItem(workItem.id, {
+      status: 'active',
+      phase: 'review',
+      reviewJobId: reviewLaunch.reviewJobId,
+      reviewState: reviewLaunch.reviewState,
+      sessionKeys,
+      repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
+    })
+    if (!nextWorkItem) throw new Error('Failed to update work item after review launch')
+
+    const updatedWithHistory = appendWorkItemHistoryEntry(workItem.id, {
+      action: 'launch',
+      phase: 'review',
+      status: 'active',
+      note: resolvedProfile
+        ? `Started review immediate execution using profile ${resolvedProfile}.`
+        : 'Started review immediate execution.',
+      missionId: reviewLaunch.reviewJobId,
+      sessionKey: reviewLaunch.sessionKey,
+      sessionKeyPrefix: reviewLaunch.sessionKey,
+      profile: resolvedProfile ?? undefined,
+    })
+    if (!updatedWithHistory) throw new Error('Failed to record review launch history')
+
+    return {
+      workItem: updatedWithHistory,
+      project,
+      capacityDecision,
+      profileReadinessReport,
+      profileReadinessDecision,
+      launch: {
+        executionRunId: reviewLaunch.reviewJobId,
+        sessionKey: reviewLaunch.sessionKey,
+        state: 'running',
+        link: reviewLaunch.reviewLink,
+        phase,
+        profile: resolvedProfile,
+      },
+    }
+  }
+
   void launchPhaseProfiles
   const launch = await launchImmediateExecution({
     projectId: project.id,
@@ -509,6 +558,21 @@ export async function launchWorkItemIntoConductor(
     missionLastError: undefined,
     sessionKeys,
     repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
+  }
+
+  if (phase === 'build') {
+    Object.assign(workItemUpdates, {
+      reviewJobId: undefined,
+      reviewState: undefined,
+      reviewDecision: undefined,
+      reviewDecisionSummary: undefined,
+      reviewDecisionConfidence: undefined,
+      reviewDecisionSource: undefined,
+      reviewParserError: undefined,
+      reviewQualityGateStatus: undefined,
+      reviewQualityGateReasons: [],
+      reviewMissingEvidence: [],
+    })
   }
 
   // For two-phase pipeline, set the plan file path on the work item

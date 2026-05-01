@@ -128,6 +128,7 @@ import { Route as ApiWorkItemsWorkItemIdPlanningDraftsRouteImport } from './rout
 import { Route as ApiWorkItemsWorkItemIdLifecycleRouteImport } from './routes/api/work-items.$workItemId.lifecycle'
 import { Route as ApiWorkItemsWorkItemIdLaunchRouteImport } from './routes/api/work-items.$workItemId.launch'
 import { Route as ApiWorkItemsWorkItemIdExecutionRunsRouteImport } from './routes/api/work-items.$workItemId.execution-runs'
+import { Route as ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRouteImport } from './routes/api/work-items.$workItemId.branch-evidence-recovery'
 import { Route as ApiWorkItemsWorkItemIdApprovalsRouteImport } from './routes/api/work-items.$workItemId.approvals'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
@@ -749,6 +750,12 @@ const ApiWorkItemsWorkItemIdExecutionRunsRoute =
     path: '/execution-runs',
     getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
   } as any)
+const ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute =
+  ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRouteImport.update({
+    id: '/branch-evidence-recovery',
+    path: '/branch-evidence-recovery',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
 const ApiWorkItemsWorkItemIdApprovalsRoute =
   ApiWorkItemsWorkItemIdApprovalsRouteImport.update({
     id: '/approvals',
@@ -924,6 +931,7 @@ export interface FileRoutesByFullPath {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/branch-evidence-recovery': typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute
   '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
@@ -1051,6 +1059,7 @@ export interface FileRoutesByTo {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/branch-evidence-recovery': typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute
   '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
@@ -1182,6 +1191,7 @@ export interface FileRoutesById {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/branch-evidence-recovery': typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute
   '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
   '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
   '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
@@ -1314,6 +1324,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/branch-evidence-recovery'
     | '/api/work-items/$workItemId/execution-runs'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
@@ -1441,6 +1452,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/branch-evidence-recovery'
     | '/api/work-items/$workItemId/execution-runs'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
@@ -1571,6 +1583,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/branch-evidence-recovery'
     | '/api/work-items/$workItemId/execution-runs'
     | '/api/work-items/$workItemId/launch'
     | '/api/work-items/$workItemId/lifecycle'
@@ -2504,6 +2517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkItemsWorkItemIdExecutionRunsRouteImport
       parentRoute: typeof ApiWorkItemsWorkItemIdRoute
     }
+    '/api/work-items/$workItemId/branch-evidence-recovery': {
+      id: '/api/work-items/$workItemId/branch-evidence-recovery'
+      path: '/branch-evidence-recovery'
+      fullPath: '/api/work-items/$workItemId/branch-evidence-recovery'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
     '/api/work-items/$workItemId/approvals': {
       id: '/api/work-items/$workItemId/approvals'
       path: '/approvals'
@@ -2792,6 +2812,7 @@ const ApiWorkItemApprovalsRouteWithChildren =
 
 interface ApiWorkItemsWorkItemIdRouteChildren {
   ApiWorkItemsWorkItemIdApprovalsRoute: typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute: typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute
   ApiWorkItemsWorkItemIdExecutionRunsRoute: typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
   ApiWorkItemsWorkItemIdLaunchRoute: typeof ApiWorkItemsWorkItemIdLaunchRoute
   ApiWorkItemsWorkItemIdLifecycleRoute: typeof ApiWorkItemsWorkItemIdLifecycleRoute
@@ -2803,6 +2824,8 @@ interface ApiWorkItemsWorkItemIdRouteChildren {
 const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
   {
     ApiWorkItemsWorkItemIdApprovalsRoute: ApiWorkItemsWorkItemIdApprovalsRoute,
+    ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute:
+      ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute,
     ApiWorkItemsWorkItemIdExecutionRunsRoute:
       ApiWorkItemsWorkItemIdExecutionRunsRoute,
     ApiWorkItemsWorkItemIdLaunchRoute: ApiWorkItemsWorkItemIdLaunchRoute,
