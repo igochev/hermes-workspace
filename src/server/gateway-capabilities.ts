@@ -232,7 +232,12 @@ async function probeDashboard(): Promise<{ available: boolean; url: string }> {
     if (!res.ok) return { available: false, url: HERMES_DASHBOARD_URL }
     const body = (await res.json()) as { version?: string }
     if (!body.version) return { available: false, url: HERMES_DASHBOARD_URL }
-    await fetchDashboardToken().catch(() => '')
+
+    const token = await fetchDashboardToken().catch(() => '')
+    if (!token) {
+      return { available: false, url: HERMES_DASHBOARD_URL }
+    }
+
     return { available: true, url: HERMES_DASHBOARD_URL }
   } catch {
     return { available: false, url: HERMES_DASHBOARD_URL }

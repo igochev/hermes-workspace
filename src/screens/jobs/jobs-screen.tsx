@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -33,6 +33,59 @@ import {
 } from '@/lib/jobs-api'
 
 const QUERY_KEY = ['hermes', 'jobs'] as const
+
+export const JOBS_SCREEN_TITLE = 'Scheduled Jobs'
+export const JOBS_SCREEN_HELP_COPY =
+  'Scheduled/repeating job definitions. Work-item execution attempts live in Executions.'
+export const JOBS_SCREEN_NEW_JOB_LABEL = 'New Scheduled Job'
+export const JOBS_SCREEN_SEARCH_PLACEHOLDER = 'Search scheduled jobs...'
+
+export type ScheduledJobsViewModel = {
+  filteredJobs: Array<HermesJob>
+  matchedJobId: string | null
+  missingJobId: string | null
+  executionFallbackHref: string | null
+}
+
+export function getJobsScreenDeepLinkJobId(search: string): string | null {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  const jobId = params.get('jobId')?.trim()
+  return jobId && jobId.length > 0 ? jobId : null
+}
+
+export function buildScheduledJobsViewModel(
+  jobs: Array<HermesJob>,
+  options: { search: string; jobId: string | null },
+): ScheduledJobsViewModel {
+  const jobId = options.jobId?.trim() || null
+  if (jobId) {
+    const matchedJob = jobs.find((job) => job.id === jobId) ?? null
+    const executionFallbackParams = new URLSearchParams({ jobId })
+    return {
+      filteredJobs: matchedJob ? [matchedJob] : [],
+      matchedJobId: matchedJob?.id ?? null,
+      missingJobId: matchedJob ? null : jobId,
+      executionFallbackHref: matchedJob ? null : `/executions?${executionFallbackParams.toString()}`,
+    }
+  }
+
+  const q = options.search.trim().toLowerCase()
+  const filteredJobs = q
+    ? jobs.filter(
+        (job) =>
+          job.id.toLowerCase().includes(q) ||
+          job.name.toLowerCase().includes(q) ||
+          job.prompt.toLowerCase().includes(q),
+      )
+    : jobs
+
+  return {
+    filteredJobs,
+    matchedJobId: null,
+    missingJobId: null,
+    executionFallbackHref: null,
+  }
+}
 
 function formatNextRun(nextRun?: string | null): string {
   if (!nextRun) return '—'
@@ -100,6 +153,9 @@ function JobCard({
   onTrigger,
   onDelete,
   onEdit,
+  isHighlighted = false,
+  initialExpanded = false,
+  highlightReason,
 }: {
   job: HermesJob
   onPause: (id: string) => void
@@ -107,8 +163,14 @@ function JobCard({
   onTrigger: (id: string) => void
   onDelete: (id: string) => void
   onEdit: (job: HermesJob) => void
+  isHighlighted?: boolean
+  initialExpanded?: boolean
+  highlightReason?: string
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(initialExpanded)
+  useEffect(() => {
+    if (initialExpanded) setExpanded(true)
+  }, [initialExpanded])
   const isPaused = job.state === 'paused' || !job.enabled
   const isCompleted = job.state === 'completed'
   const lastRunStatus = getLastRunStatus(job)
@@ -128,9 +190,15 @@ function JobCard({
       className={cn(
         'rounded-xl border p-4 transition-colors',
         'bg-[var(--theme-card)] border-[var(--theme-border)]',
+        isHighlighted && 'border-[var(--theme-accent)] ring-1 ring-[var(--theme-accent)]',
         isPaused && 'opacity-60',
       )}
     >
+      {highlightReason ? (
+        <div className="mb-3 rounded-lg border border-[var(--theme-accent)] bg-[var(--theme-hover)] px-3 py-2 text-xs font-medium text-[var(--theme-text)]">
+          {highlightReason}
+        </div>
+      ) : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2">
@@ -293,8 +361,13 @@ function JobCard({
 export function JobsScreen() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const [deepLinkJobId, setDeepLinkJobId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [editingJob, setEditingJob] = useState<HermesJob | null>(null)
+
+  useEffect(() => {
+    setDeepLinkJobId(getJobsScreenDeepLinkJobId(window.location.search))
+  }, [])
 
   const jobsQuery = useQuery({
     queryKey: QUERY_KEY,
@@ -367,16 +440,15 @@ export function JobsScreen() {
     },
   })
 
-  const filteredJobs = useMemo(() => {
-    const jobs = jobsQuery.data ?? []
-    if (!search.trim()) return jobs
-    const q = search.toLowerCase()
-    return jobs.filter(
-      (j) =>
-        j.name?.toLowerCase().includes(q) ||
-        j.prompt?.toLowerCase().includes(q),
-    )
-  }, [jobsQuery.data, search])
+  const scheduledJobsViewModel = useMemo(
+    () =>
+      buildScheduledJobsViewModel(jobsQuery.data ?? [], {
+        search,
+        jobId: deepLinkJobId,
+      }),
+    [jobsQuery.data, search, deepLinkJobId],
+  )
+  const { filteredJobs, matchedJobId, missingJobId, executionFallbackHref } = scheduledJobsViewModel
 
   const handleCreate = useCallback(
     async (input: {
@@ -404,7 +476,7 @@ export function JobsScreen() {
             className="text-[var(--theme-accent)]"
           />
           <h1 className="text-base font-semibold text-[var(--theme-text)]">
-            Jobs
+            {JOBS_SCREEN_TITLE}
           </h1>
           {jobsQuery.data && (
             <span className="ml-1 text-xs text-[var(--theme-muted)]">
@@ -432,10 +504,13 @@ export function JobsScreen() {
             style={{ background: 'var(--theme-accent)' }}
           >
             <HugeiconsIcon icon={Add01Icon} size={14} />
-            New Job
+            {JOBS_SCREEN_NEW_JOB_LABEL}
           </button>
         </div>
       </div>
+      <p className="mt-3 text-xs leading-5 text-[var(--theme-muted)]">
+        {JOBS_SCREEN_HELP_COPY}
+      </p>
       </header>
 
       <div className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
@@ -447,7 +522,7 @@ export function JobsScreen() {
           />
           <input
             type="text"
-            placeholder="Search jobs..."
+            placeholder={JOBS_SCREEN_SEARCH_PLACEHOLDER}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] py-1.5 pl-8 pr-3 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
@@ -456,6 +531,20 @@ export function JobsScreen() {
       </div>
 
       <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
+        {deepLinkJobId ? (
+          <div className="rounded-xl border border-[var(--theme-accent)] bg-[var(--theme-card)] px-4 py-3 text-xs text-[var(--theme-text)]">
+            {matchedJobId
+              ? `Opened scheduled job definition ${matchedJobId}`
+              : jobsQuery.isLoading
+                ? `Looking up scheduled job definition ${deepLinkJobId}…`
+                : `No scheduled job definition found for ${deepLinkJobId}. Work-item execution attempts now live in Executions.`}
+            {executionFallbackHref ? (
+              <a className="ml-2 underline" href={executionFallbackHref}>
+                Open in Executions
+              </a>
+            ) : null}
+          </div>
+        ) : null}
         {jobsQuery.isLoading ? (
           <div className="flex items-center justify-center py-12 text-sm text-[var(--theme-muted)]">
             Loading jobs...
@@ -477,8 +566,19 @@ export function JobsScreen() {
               size={32}
               className="mb-3 opacity-40"
             />
-            <p className="text-sm font-medium">No scheduled jobs</p>
-            <p className="mt-1 text-xs">Create one to get started</p>
+            <p className="text-sm font-medium">
+              {missingJobId ? `No scheduled job definition found for ${missingJobId}` : 'No scheduled jobs'}
+            </p>
+            <p className="mt-1 text-xs">
+              {missingJobId
+                ? 'Work-item execution attempts now live in Executions.'
+                : 'Create one to get started'}
+            </p>
+            {executionFallbackHref ? (
+              <a className="mt-2 text-xs underline" href={executionFallbackHref}>
+                Open in Executions
+              </a>
+            ) : null}
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
@@ -489,12 +589,15 @@ export function JobsScreen() {
                 onPause={(id) => pauseMutation.mutate(id)}
                 onResume={(id) => resumeMutation.mutate(id)}
                 onTrigger={(id) => triggerMutation.mutate(id)}
-                onEdit={(job) => setEditingJob(job)}
+                onEdit={(jobToEdit) => setEditingJob(jobToEdit)}
                 onDelete={(id) => {
                   if (confirm(`Delete job "${job.name}"?`)) {
                     deleteMutation.mutate(id)
                   }
                 }}
+                isHighlighted={matchedJobId === job.id}
+                initialExpanded={matchedJobId === job.id}
+                highlightReason={matchedJobId === job.id ? `Opened execution trace for scheduled job ${job.id}` : undefined}
               />
             ))}
           </AnimatePresence>

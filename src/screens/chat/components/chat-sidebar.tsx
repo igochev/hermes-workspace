@@ -10,6 +10,7 @@ import {
   ComputerTerminal01Icon,
   DashboardSquare01Icon,
   File01Icon,
+  Folder01Icon,
   MessageMultiple01Icon,
   Moon02Icon,
   PencilEdit02Icon,
@@ -19,12 +20,11 @@ import {
   Search01Icon, Settings01Icon, Sun02Icon, UserGroupIcon, UserMultipleIcon
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { t } from '@/lib/i18n'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   CHAT_OPEN_SETTINGS_EVENT
-  
+
 } from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
@@ -35,6 +35,7 @@ import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
 import type {ChatOpenSettingsDetail} from '../chat-events';
 import type { SessionMeta } from '../types'
+import type { SessionEventsRefreshStatus } from '@/screens/chat/hooks/use-session-events-refresh'
 import { SettingsDialog } from '@/components/settings-dialog'
 import {
   TooltipContent,
@@ -52,6 +53,7 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { StatusDot } from '@/components/status-indicator'
+import { t } from '@/lib/i18n'
 import {
   MenuContent,
   MenuItem,
@@ -61,6 +63,24 @@ import {
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 
 type WorkspaceStats = Record<string, unknown>
+
+type ClickabilityAuditDescriptor = {
+  surface: string
+  label: string
+  kind: 'button' | 'link' | 'static'
+  target: string | null
+}
+
+export const CHAT_SIDEBAR_CLICKABILITY_AUDIT: Array<ClickabilityAuditDescriptor> = [
+  { surface: 'new-chat', label: 'New chat', kind: 'button', target: 'create session' },
+  { surface: 'collapse-sidebar', label: 'Collapse sidebar', kind: 'button', target: 'toggle sidebar collapsed state' },
+  { surface: 'session-search', label: 'Search conversations', kind: 'button', target: 'open search modal' },
+  { surface: 'session-row', label: 'Open session', kind: 'link', target: '/chat/:sessionKey' },
+  { surface: 'session-menu', label: 'Session actions', kind: 'button', target: 'rename/delete session menu' },
+  { surface: 'session-refresh-retry', label: 'Retry', kind: 'button', target: 'refetch sessions after sidebar error' },
+  { surface: 'session-freshness-badge', label: 'Session refresh status', kind: 'static', target: null },
+  { surface: 'session-stale-indicator', label: 'Stale session indicator', kind: 'static', target: null },
+]
 
 function ThemeToggleMini() {
   const _theme = useSettingsStore((state) => state.settings.theme)
@@ -121,9 +141,39 @@ type ChatSidebarProps = {
   sessionsFetching: boolean
   sessionsError: string | null
   onRetrySessions: () => void
+  sessionRefreshStatus?: SessionEventsRefreshStatus
 }
 
+export function SessionFreshnessBadge({
+  status,
+}: {
+  status: SessionEventsRefreshStatus
+}) {
+  const labelByStatus: Record<SessionEventsRefreshStatus, string> = {
+    live: 'Live',
+    reconnecting: 'Reconnecting',
+    polling: 'Polling',
+  }
+  const dotClassByStatus: Record<SessionEventsRefreshStatus, string> = {
+    live: 'bg-emerald-400',
+    reconnecting: 'bg-amber-400',
+    polling: 'bg-sky-400',
+  }
 
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-primary-200/60 bg-primary-100/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-600 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-300"
+      aria-label={`Session refresh: ${labelByStatus[status]}`}
+      title={`Session refresh: ${labelByStatus[status]}`}
+    >
+      <span
+        aria-hidden="true"
+        className={cn('size-1.5 rounded-full', dotClassByStatus[status])}
+      />
+      <span>{labelByStatus[status]}</span>
+    </span>
+  )
+}
 
 // ── Reusable nav item ───────────────────────────────────────────────────
 
@@ -151,8 +201,8 @@ export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   }
 }
 
-export async function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
-  return []
+export function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
+  return Promise.resolve([])
 }
 
 function NavItem({
@@ -228,8 +278,8 @@ function NavItem({
             <TooltipTrigger
               render={
                 <Link
-                  to={item.to!}
-                  search={item.search}
+                  to={item.to}
+                  search={item.search as never}
                   hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
@@ -246,8 +296,8 @@ function NavItem({
     }
     return (
       <Link
-        to={item.to!}
-        search={item.search}
+        to={item.to}
+        search={item.search as never}
         hash={item.hash}
         onClick={handleSelect}
         className={cls}
@@ -502,6 +552,7 @@ function ChatSidebarComponent({
   sessionsFetching,
   sessionsError,
   onRetrySessions,
+  sessionRefreshStatus,
 }: ChatSidebarProps) {
   const {
     settingsOpen,
@@ -526,7 +577,7 @@ function ChatSidebarComponent({
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
       const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
-      handleOpenSettings(detail?.section === 'appearance' ? 'appearance' : 'hermes')
+      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'hermes')
     }
 
     window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
@@ -558,8 +609,11 @@ function ChatSidebarComponent({
   const isFilesActive = pathname === '/files'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
+  const isExecutionsActive = pathname.startsWith('/executions')
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
+  const isProjectsActive =
+    pathname === '/projects' || pathname.startsWith('/projects/')
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
@@ -792,10 +846,24 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/executions',
+      icon: Clock01Icon,
+      label: t('nav.executions'),
+      active: isExecutionsActive,
+    },
+    {
+      kind: 'link',
       to: '/tasks',
       icon: CheckListIcon,
       label: t('nav.tasks'),
       active: isTasksActive,
+    },
+    {
+      kind: 'link',
+      to: '/projects',
+      icon: Folder01Icon,
+      label: t('nav.projects'),
+      active: isProjectsActive,
     },
     {
       kind: 'link',
@@ -876,16 +944,21 @@ function ChatSidebarComponent({
               exit={{ opacity: 0 }}
               transition={transition}
             >
-              <Link
-                to="/chat"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'sm' }),
-                  'w-full pl-1.5 justify-start gap-2',
-                )}
-              >
-                <img src="/hermes-avatar.webp" alt="Hermes" className="size-6 rounded-lg" />
-                <span className="text-sm font-semibold tracking-tight" style={{ color: 'var(--theme-text)' }}>Hermes Workspace</span>
-              </Link>
+              <div className="flex items-center gap-1 pr-10">
+                <Link
+                  to="/chat"
+                  className={cn(
+                    buttonVariants({ variant: 'ghost', size: 'sm' }),
+                    'min-w-0 flex-1 pl-1.5 justify-start gap-2',
+                  )}
+                >
+                  <img src="/hermes-avatar.webp" alt="Hermes" className="size-6 rounded-lg" />
+                  <span className="truncate text-sm font-semibold tracking-tight" style={{ color: 'var(--theme-text)' }}>Hermes Workspace</span>
+                </Link>
+                {sessionRefreshStatus ? (
+                  <SessionFreshnessBadge status={sessionRefreshStatus} />
+                ) : null}
+              </div>
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -1189,7 +1262,7 @@ function areSessionsEqual(
   return true
 }
 
-function areSidebarPropsEqual(
+export function areSidebarPropsEqual(
   prevProps: ChatSidebarProps,
   nextProps: ChatSidebarProps,
 ): boolean {
@@ -1200,6 +1273,8 @@ function areSidebarPropsEqual(
   if (prevProps.sessionsFetching !== nextProps.sessionsFetching) return false
   if (prevProps.sessionsError !== nextProps.sessionsError) return false
   if (prevProps.onRetrySessions !== nextProps.onRetrySessions) return false
+  if (prevProps.sessionRefreshStatus !== nextProps.sessionRefreshStatus)
+    return false
   if (!areSessionsEqual(prevProps.sessions, nextProps.sessions)) return false
   return true
 }

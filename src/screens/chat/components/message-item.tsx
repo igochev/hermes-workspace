@@ -1452,11 +1452,9 @@ function InlineToolSectionItem({
           {isRunning && (
             <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />
           )}
-          {hasExpandableContent && (
-            <span className="text-[8px] opacity-30 ml-0.5">
-              {open ? '▾' : '▸'}
-            </span>
-          )}
+          <span className="text-[8px] opacity-30 ml-0.5">
+            {open ? '▾' : '▸'}
+          </span>
         </div>
         {isRunning && (
           <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
@@ -1705,7 +1703,7 @@ function MessageItemComponent({
   )
 
   useEffect(() => {
-    const totalWords = countWords(displayText)
+    const nextTotalWords = countWords(displayText)
     const previousText = previousTextRef.current
     const previousLength = previousTextLengthRef.current
     const textGrew =
@@ -1713,7 +1711,7 @@ function MessageItemComponent({
       displayText.startsWith(previousText)
     const textChanged = displayText !== previousText
 
-    targetWordCountRef.current = totalWords
+    targetWordCountRef.current = nextTotalWords
     previousTextRef.current = displayText
     previousTextLengthRef.current = displayText.length
 
@@ -1722,12 +1720,12 @@ function MessageItemComponent({
         window.clearInterval(revealTimerRef.current)
         revealTimerRef.current = null
       }
-      setRevealedWordCount(totalWords)
+      setRevealedWordCount(nextTotalWords)
       return
     }
 
     if (textChanged && !textGrew) {
-      setRevealedWordCount(totalWords)
+      setRevealedWordCount(nextTotalWords)
       return
     }
 
@@ -1737,24 +1735,24 @@ function MessageItemComponent({
 
     // Don't start animation if already fully revealed
     setRevealedWordCount((currentWordCount) => {
-      if (currentWordCount >= totalWords) {
+      if (currentWordCount >= nextTotalWords) {
         return currentWordCount
       }
 
       function tick() {
-        setRevealedWordCount((currentWordCount) => {
+        setRevealedWordCount((revealedCount) => {
           const targetWordCount = targetWordCountRef.current
-          if (currentWordCount >= targetWordCount) {
+          if (revealedCount >= targetWordCount) {
             if (revealTimerRef.current !== null) {
               window.clearInterval(revealTimerRef.current)
               revealTimerRef.current = null
             }
-            return currentWordCount
+            return revealedCount
           }
 
           const nextWordCount = Math.min(
             targetWordCount,
-            currentWordCount + WORDS_PER_TICK,
+            revealedCount + WORDS_PER_TICK,
           )
 
           if (
@@ -2341,11 +2339,7 @@ function MessageItemComponent({
                             'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                             effectiveIsStreaming && 'chat-streaming-content',
                           )}
-                          style={
-                            isUser
-                              ? { color: 'var(--chat-user-foreground)' }
-                              : undefined
-                          }
+                          style={undefined}
                         >
                           {item.text}
                         </MessageContent>
@@ -2370,11 +2364,7 @@ function MessageItemComponent({
                         'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                         effectiveIsStreaming && 'chat-streaming-content',
                       )}
-                      style={
-                        isUser
-                          ? { color: 'var(--chat-user-foreground)' }
-                          : undefined
-                      }
+                      style={undefined}
                     >
                       {assistantDisplayText}
                     </MessageContent>

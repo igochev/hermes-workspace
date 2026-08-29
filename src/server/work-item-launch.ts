@@ -1,0 +1,644 @@
+import {
+
+
+  getMappedPhaseProfile,
+  normalizePhaseProfiles
+} from '../lib/conductor-phase-profiles'
+import {  getProject } from './projects-store'
+import {
+
+
+
+  appendWorkItemHistoryEntry,
+  getWorkItem,
+  updateWorkItem
+} from './work-items-store'
+import { launchImmediateExecution } from './immediate-execution-launch'
+import {  evaluateLaunchCapacity } from './role-capacity-policy'
+import { refreshAttentionQueue } from './attention-queue'
+import {
+
+
+  evaluateProfileReadiness
+} from './profile-readiness'
+import { listProfiles } from './profiles-browser'
+import type {ProfileReadinessReport, ProfileReadinessRoleReport} from './profile-readiness';
+import type {LaunchCapacityDecision} from './role-capacity-policy';
+import type {ImmediateExecutionLaunchResult, ImmediateExecutionRole} from './immediate-execution-launch';
+import type {WorkItemPhase, WorkItemRecord, WorkItemReviewDecision} from './work-items-store';
+import type {ProjectRecord} from './projects-store';
+import type {ConductorPhaseKey, ConductorPhaseProfiles} from '../lib/conductor-phase-profiles';
+
+export type WorkItemLaunchRequest = {
+  phase?: unknown
+  orchestratorModel?: unknown
+  workerModel?: unknown
+  projectsDir?: unknown
+  maxParallel?: unknown
+  supervised?: unknown
+  phaseProfiles?: unknown
+}
+
+export type WorkItemLaunchResponse = {
+  workItem: WorkItemRecord
+  project: ProjectRecord
+  capacityDecision: LaunchCapacityDecision
+  profileReadinessReport: ProfileReadinessReport
+  profileReadinessDecision: ProfileReadinessRoleReport
+  launch: ImmediateExecutionLaunchResult & {
+    phase: WorkItemPhase
+    profile: string | null
+  }
+}
+
+function readOptionalString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeLaunchPhase(value: unknown, fallback?: WorkItemPhase): WorkItemPhase {
+  return value === 'research' || value === 'build' || value === 'review' || value === 'deploy'
+    ? value
+    : fallback ?? 'build'
+}
+
+function resolveLaunchProfile(
+  workItem: WorkItemRecord,
+  project: ProjectRecord,
+  phase: WorkItemPhase,
+  requestPhaseProfiles: ConductorPhaseProfiles,
+): string | null {
+  const explicit = readOptionalString(workItem.assignedProfile)
+  if (explicit) return explicit
+
+  const projectProfile = getMappedPhaseProfile(project.phaseProfiles, phase as ConductorPhaseKey)
+  if (projectProfile) return projectProfile
+
+  return getMappedPhaseProfile(requestPhaseProfiles, phase as ConductorPhaseKey)
+}
+
+function buildLaunchPhaseProfiles(params: {
+  project: ProjectRecord
+  requestPhaseProfiles: ConductorPhaseProfiles
+  phase: WorkItemPhase
+  profile: string | null
+}): ConductorPhaseProfiles {
+  const projectPhaseProfiles = normalizePhaseProfiles(params.project.phaseProfiles)
+  const merged: ConductorPhaseProfiles = {
+    ...params.requestPhaseProfiles,
+    ...projectPhaseProfiles,
+  }
+
+  if (params.profile) {
+    merged[params.phase as ConductorPhaseKey] = params.profile
+  }
+
+  return merged
+}
+
+function discoverAvailableProfilesForReadiness(): Array<string> | null {
+  try {
+    return listProfiles().map((profile) => profile.name)
+  } catch {
+    return null
+  }
+}
+
+function evaluateLaunchProfileReadiness(params: {
+  project: ProjectRecord
+  workItem: WorkItemRecord
+  phase: WorkItemPhase
+  resolvedProfile: string | null
+}): {
+  profileReadinessReport: ProfileReadinessReport
+  profileReadinessDecision: ProfileReadinessRoleReport
+} {
+  const readinessWorkItem = {
+    ...params.workItem,
+    phase: params.phase,
+    assignedProfile: params.resolvedProfile ?? undefined,
+  }
+  const profileReadinessReport = evaluateProfileReadiness({
+    project: params.project,
+    workItem: readinessWorkItem,
+    availableProfiles: discoverAvailableProfilesForReadiness(),
+  })
+  const profileReadinessDecision = profileReadinessReport.roles.find((role) => role.role === params.phase)
+
+  if (!profileReadinessDecision) {
+    throw new Error(`Profile readiness decision missing for launch phase ${params.phase}`)
+  }
+
+  return { profileReadinessReport, profileReadinessDecision }
+}
+
+function buildProfileReadinessAdvisory(role: ProfileReadinessRoleReport): string | null {
+  if (role.status !== 'missing' && role.status !== 'unknown') return null
+  const profile = role.mappedProfile ? `profile ${role.mappedProfile}` : 'no mapped profile'
+  return `Profile readiness advisory: ${role.role} uses ${profile} (${role.status}). ${role.fixHint}`
+}
+
+function joinLaunchAdvisories(baseNote: string, advisories: Array<string | null>): string {
+  return advisories.filter((advisory): advisory is string => Boolean(advisory)).reduce(
+    (note, advisory) => `${note} ${advisory}`,
+    baseNote,
+  )
+}
+
+function buildAcceptanceCriteriaBlock(workItem: WorkItemRecord): Array<string> {
+  if (workItem.acceptanceCriteria.length === 0) return ['Acceptance criteria: none recorded.']
+  return ['Acceptance criteria:', ...workItem.acceptanceCriteria.map((item) => `- ${item}`)]
+}
+
+function buildNotesBlock(workItem: WorkItemRecord): Array<string> {
+  if (workItem.notes.length === 0) return []
+  return ['Operator notes:', ...workItem.notes.map((item) => `- ${item}`)]
+}
+
+function isTwoPhaseLaunchCandidate(workItem: WorkItemRecord, phase: WorkItemPhase): boolean {
+  // When a ready work item is launched for build, trigger the two-phase pipeline:
+  // Phase 1 = Plan (Planner writes plan), Phase 2 = Build (Builder implements)
+  return workItem.status === 'ready' && phase === 'build'
+}
+
+function buildTwoPhaseLaunchGoal(params: {
+  workItem: WorkItemRecord
+  project: ProjectRecord
+  plannerProfile: string | null
+  builderProfile: string | null
+  planFilePath: string
+}): string {
+  const { workItem, project, plannerProfile, builderProfile, planFilePath } = params
+  const repoPath = readOptionalString(workItem.repoPathSnapshot) || project.repoPath
+  const fullPlanPath = `${repoPath}/${planFilePath}`
+
+  return [
+    `Execute a TWO-PHASE Launch Build pipeline for work item "${workItem.title}" of project "${project.name}".`,
+    `Work item ID: ${workItem.id}`,
+    `Repository path: ${repoPath}`,
+    ...(project.defaultBranch ? [`Default branch: ${project.defaultBranch}`] : []),
+    ...(project.repoUrl ? [`Repository URL: ${project.repoUrl}`] : []),
+    '',
+    '======================================================================',
+    'PHASE 1 — Plan (Research / Planning)',
+    '======================================================================',
+    `Profile: ${plannerProfile || 'planner'}`,
+    '',
+    'Your FIRST task is to write a plan document at:',
+    `  ${fullPlanPath}`,
+    '',
+    'Phase 1 outcomes:',
+    '- Fully understand the work item description and acceptance criteria',
+    '- Explore the codebase at the repository path',
+    '- Write a comprehensive plan as a markdown file at the path above',
+    '- The plan MUST include: implementation approach, files to change, test strategy, and how to verify each acceptance criterion',
+    '- If acceptance criteria are incomplete, propose and draft them explicitly in the plan',
+    '- Identify any open questions, constraints, or recommended build slice breakdown',
+    '',
+    'Description:',
+    workItem.description || 'No additional description provided.',
+    '',
+    ...buildAcceptanceCriteriaBlock(workItem),
+    ...(workItem.notes.length > 0 ? ['', ...buildNotesBlock(workItem)] : []),
+    '',
+    '======================================================================',
+    'PHASE 2 — Build (Implementation)',
+    '======================================================================',
+    `Profile: ${builderProfile || 'builder'}`,
+    '',
+    'After Phase 1 is COMPLETE and the plan file is written, execute Phase 2:',
+    '',
+    'Phase 2 tasks:',
+    '- Read and follow the plan from Phase 1 at:',
+    `  ${fullPlanPath}`,
+    '- Implement per the plan using TDD approach (tests first, then implementation)',
+    '- Verify all acceptance criteria are met',
+    '- Commit changes and create a PR if the repo has a default branch configured',
+    '',
+    '======================================================================',
+    '',
+    'CRITICAL RULES:',
+    '- Execute Phase 1 FIRST, then Phase 2. Do NOT reorder or skip either phase.',
+    '- The plan file produced in Phase 1 is the authoritative contract for Phase 2.',
+    '- Keep both phases grounded in the real repository at the given path.',
+    '',
+    'Treat this as a tracked Mission Control two-phase launch. Reference the work item ID in all summaries.',
+  ].join('\n')
+}
+
+function buildPhaseOutcomeBlock(phase: WorkItemPhase): Array<string> {
+  if (phase === 'research') {
+    return [
+      'Primary outcome for this research/planning launch:',
+      '- turn the idea/request into a grounded plan',
+      '- draft acceptance criteria',
+      '- identify open questions, constraints, and recommended next build slice',
+      '- If acceptance criteria are incomplete, propose them explicitly in the output',
+    ]
+  }
+
+  return [
+    'Primary outcome for this launch:',
+    '- execute the requested phase with concrete repo-grounded outputs',
+  ]
+}
+
+function phaseToImmediateRole(phase: WorkItemPhase): ImmediateExecutionRole {
+  if (phase === 'research') return 'planner'
+  if (phase === 'review') return 'reviewer'
+  if (phase === 'deploy') return 'deployer'
+  return 'builder'
+}
+
+export function buildPlannerReviewGoal(workItem: WorkItemRecord, project: ProjectRecord): string {
+  const repoPath = readOptionalString(workItem.repoPathSnapshot) || project.repoPath
+  const fullPlanPath = workItem.planFilePath ? `${repoPath}/${workItem.planFilePath}` : 'no plan file recorded'
+  const criteriaLines = buildAcceptanceCriteriaBlock(workItem)
+  const criteriaProgress = workItem.criteriaStatus.length > 0
+    ? `Criteria completion: ${workItem.criteriaStatus.filter((c) => c.met).length}/${workItem.criteriaStatus.length} criteria met.`
+    : 'No criteria status tracked.'
+
+  return [
+    `You are acting as a **Reviewer** for Hermes Mission Control. Review the build output for work item "${workItem.title}" of project "${project.name}".`,
+    `Work item ID: ${workItem.id}`,
+    `Repository path: ${repoPath}`,
+    ...(project.defaultBranch ? [`Default branch: ${project.defaultBranch}`] : []),
+    ...(project.repoUrl ? [`Repository URL: ${project.repoUrl}`] : []),
+    '',
+    '======================================================================',
+    'REVIEW CONTEXT',
+    '======================================================================',
+    '',
+    'Description:',
+    workItem.description || 'No additional description provided.',
+    '',
+    ...criteriaLines,
+    criteriaProgress,
+    '',
+    `Plan file path: ${fullPlanPath}`,
+    '',
+    '======================================================================',
+    'YOUR TASK',
+    '======================================================================',
+    '',
+    '1. Review the Builder output against the plan authored at the path above.',
+    '2. Check each acceptance criterion against what was actually implemented.',
+    '3. Verify that the implementation follows the plan approach and all criteria are demonstrably met.',
+    '',
+    '======================================================================',
+    'DECISION',
+    '======================================================================',
+    '',
+    'You MUST end your output with a clear DECISION line on its own line:',
+    '',
+    '  DECISION: APPROVED',
+    '  (advance the work item to deploy — criteria are met and implementation is sound)',
+    '',
+    '  OR',
+    '',
+    '  DECISION: CHANGES_REQUESTED',
+    '  (return the work item to build — criteria are not fully met or implementation has issues)',
+    '',
+    'Include a brief rationale for your decision in a SUMMARY section before the DECISION line.',
+    '',
+    'STRUCTURED OUTPUT REQUIREMENT',
+    '',
+    'You MUST include REVIEW_DECISION_JSON matching this schema:',
+    '{',
+    '  "decision": "approved | changes_requested",',
+    '  "confidence": "low | medium | high",',
+    '  "summary": "...",',
+    '  "criteria": [{ "text": "...", "met": true, "evidence": "...", "notes": "..." }],',
+    '  "evidence": {',
+    '    "branchName": "...",',
+    '    "prUrl": "...",',
+    '    "artifactPaths": ["..."],',
+    '    "testCommands": ["..."],',
+    '    "testResults": [{ "command": "...", "status": "passed|failed|not_run|unknown", "summary": "..." }],',
+    '    "filesReviewed": ["..."],',
+    '    "planReviewed": true',
+    '  },',
+    '  "blockers": [],',
+    '  "risks": []',
+    '}',
+    '',
+    'You MUST end with exactly one final line:',
+    'DECISION: APPROVED',
+    'or',
+    'DECISION: CHANGES_REQUESTED',
+    '',
+    'If you cannot verify every acceptance criterion with evidence, use CHANGES_REQUESTED.',
+    'Missing structured output will require manual CEO review and will not auto-approve.',
+    '',
+    ...(workItem.notes.length > 0 ? ['', ...buildNotesBlock(workItem)] : []),
+    '',
+    'Treat this as a tracked Mission Control Planner review. Reference the work item ID in all summaries.',
+  ].join('\n')
+}
+
+export async function launchPlannerReview(workItem: WorkItemRecord, project: ProjectRecord): Promise<{
+  reviewJobId: string
+  reviewState: 'running' | 'succeeded' | 'failed'
+  reviewLink: string
+  sessionKey?: string
+} | null> {
+  if (!workItem.planFilePath) return null
+
+  const goal = buildPlannerReviewGoal(workItem, project)
+  const phase = 'review'
+  const profile = resolveLaunchProfile(workItem, project, phase, normalizePhaseProfiles({}))
+  if (!profile) return null
+
+  try {
+    const launch = await launchImmediateExecution({
+      projectId: project.id,
+      workItemId: workItem.id,
+      phase,
+      role: 'reviewer',
+      profile,
+      goal,
+      repoPath: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
+    })
+    return {
+      reviewJobId: launch.executionRunId,
+      reviewState: launch.state === 'queued' ? 'running' : launch.state,
+      reviewLink: launch.link,
+      sessionKey: launch.sessionKey,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function buildWorkItemLaunchGoal(params: {
+  workItem: WorkItemRecord
+  project: ProjectRecord
+  phase: WorkItemPhase
+  profile: string | null
+}): string {
+  const { workItem, project, phase, profile } = params
+  const repoPath = readOptionalString(workItem.repoPathSnapshot) || project.repoPath
+  return [
+    `Execute Mission Control work item "${workItem.title}" for project "${project.name}".`,
+    `Work item ID: ${workItem.id}`,
+    `Launch phase: ${phase}`,
+    `Repository path: ${repoPath}`,
+    ...(project.defaultBranch ? [`Default branch: ${project.defaultBranch}`] : []),
+    ...(project.repoUrl ? [`Repository URL: ${project.repoUrl}`] : []),
+    ...(profile ? [`Preferred Hermes profile for this phase: ${profile}`] : []),
+    '',
+    'Description:',
+    workItem.description || 'No additional description provided.',
+    '',
+    ...buildPhaseOutcomeBlock(phase),
+    '',
+    ...buildAcceptanceCriteriaBlock(workItem),
+    ...(workItem.notes.length > 0 ? ['', ...buildNotesBlock(workItem)] : []),
+    '',
+    'Treat this as a tracked Mission Control launch. Keep the repo path grounded, produce concrete outputs, and reference the work item ID in summaries.',
+  ].join('\n')
+}
+
+export async function launchWorkItemIntoConductor(
+  workItemId: string,
+  request: WorkItemLaunchRequest,
+): Promise<WorkItemLaunchResponse> {
+  const workItem = getWorkItem(workItemId)
+  if (!workItem) throw new Error('Work item not found')
+
+  const project = getProject(workItem.projectId)
+  if (!project) throw new Error('Project not found')
+  if (!readOptionalString(workItem.repoPathSnapshot) && !readOptionalString(project.repoPath)) {
+    throw new Error('Project repoPath is required before launching work')
+  }
+
+  const requestPhaseProfiles = normalizePhaseProfiles(request.phaseProfiles)
+  const phase = normalizeLaunchPhase(request.phase, workItem.phase)
+
+  const launchingBuildWithoutPlannerPreparation =
+    phase === 'build' &&
+    !readOptionalString(workItem.planFilePath) &&
+    (workItem.status === 'inbox' || workItem.phase === 'research')
+  if (launchingBuildWithoutPlannerPreparation) {
+    throw new Error('Work item must be prepared by Planner before Builder launch')
+  }
+
+  const isTwoPhase = isTwoPhaseLaunchCandidate(workItem, phase)
+
+  // For two-phase pipeline, resolve both profiles and build combined goal
+  let resolvedProfile: string | null
+  let goal: string
+  let launchPhaseProfiles: ConductorPhaseProfiles
+  let planFilePath: string | undefined
+
+  if (isTwoPhase) {
+    const plannerProfile = resolveLaunchProfile(workItem, project, 'research', requestPhaseProfiles)
+    const builderProfile = resolveLaunchProfile(workItem, project, 'build', requestPhaseProfiles)
+    planFilePath = `docs/plans/${project.slug}-${workItem.id.slice(0, 8)}-plan.md`
+
+    goal = buildTwoPhaseLaunchGoal({
+      workItem,
+      project,
+      plannerProfile,
+      builderProfile,
+      planFilePath,
+    })
+
+    // Build phase profiles ensuring both research and build are covered
+    launchPhaseProfiles = buildLaunchPhaseProfiles({
+      project,
+      requestPhaseProfiles,
+      phase,
+      profile: builderProfile,
+    })
+    // Also ensure the planner profile is in research slot
+    if (plannerProfile && launchPhaseProfiles.research !== plannerProfile) {
+      launchPhaseProfiles.research = plannerProfile
+    }
+
+    // Use builder profile as the primary display profile
+    resolvedProfile = builderProfile
+  } else {
+    resolvedProfile = resolveLaunchProfile(workItem, project, phase, requestPhaseProfiles)
+    goal = buildWorkItemLaunchGoal({ workItem, project, phase, profile: resolvedProfile })
+    launchPhaseProfiles = buildLaunchPhaseProfiles({
+      project,
+      requestPhaseProfiles,
+      phase,
+      profile: resolvedProfile,
+    })
+  }
+
+  const { profileReadinessReport, profileReadinessDecision } = evaluateLaunchProfileReadiness({
+    project,
+    workItem,
+    phase,
+    resolvedProfile,
+  })
+
+  const capacityDecision = evaluateLaunchCapacity({
+    role: phase,
+    profile: resolvedProfile ?? undefined,
+  })
+
+  if (phase === 'review') {
+    const reviewLaunch = await launchPlannerReview(workItem, project)
+    if (!reviewLaunch) {
+      throw new Error('Review launch requires a prepared plan and mapped review profile')
+    }
+    const sessionKeys = reviewLaunch.sessionKey
+      ? Array.from(new Set([...workItem.sessionKeys, reviewLaunch.sessionKey]))
+      : [...workItem.sessionKeys]
+    const nextWorkItem = updateWorkItem(workItem.id, {
+      status: 'active',
+      phase: 'review',
+      reviewJobId: reviewLaunch.reviewJobId,
+      reviewState: reviewLaunch.reviewState,
+      sessionKeys,
+      repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
+    })
+    if (!nextWorkItem) throw new Error('Failed to update work item after review launch')
+
+    const updatedWithHistory = appendWorkItemHistoryEntry(workItem.id, {
+      action: 'launch',
+      phase: 'review',
+      status: 'active',
+      note: resolvedProfile
+        ? `Started review immediate execution using profile ${resolvedProfile}.`
+        : 'Started review immediate execution.',
+      missionId: reviewLaunch.reviewJobId,
+      sessionKey: reviewLaunch.sessionKey,
+      sessionKeyPrefix: reviewLaunch.sessionKey,
+      profile: resolvedProfile ?? undefined,
+    })
+    if (!updatedWithHistory) throw new Error('Failed to record review launch history')
+
+    return {
+      workItem: updatedWithHistory,
+      project,
+      capacityDecision,
+      profileReadinessReport,
+      profileReadinessDecision,
+      launch: {
+        executionRunId: reviewLaunch.reviewJobId,
+        sessionKey: reviewLaunch.sessionKey,
+        state: 'running',
+        link: reviewLaunch.reviewLink,
+        phase,
+        profile: resolvedProfile,
+      },
+    }
+  }
+
+  void launchPhaseProfiles
+  const launch = await launchImmediateExecution({
+    projectId: project.id,
+    workItemId: workItem.id,
+    phase,
+    role: phaseToImmediateRole(phase),
+    profile: resolvedProfile ?? undefined,
+    goal,
+    repoPath: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
+  })
+
+  const sessionKeys = launch.sessionKey
+    ? Array.from(new Set([...workItem.sessionKeys, launch.sessionKey]))
+    : [...workItem.sessionKeys]
+  const missionLink = launch.link
+  const wasRecoveryLaunch = workItem.status === 'blocked' || workItem.missionState === 'failed'
+
+  const workItemUpdates: Record<string, unknown> = {
+    status: 'active',
+    phase,
+    missionId: launch.executionRunId,
+    missionJobId: undefined,
+    missionJobName: undefined,
+    missionSessionKeyPrefix: launch.sessionKey,
+    missionLink,
+    missionState: launch.state,
+    missionLastError: undefined,
+    sessionKeys,
+    repoPathSnapshot: readOptionalString(workItem.repoPathSnapshot) || project.repoPath,
+  }
+
+  if (phase === 'build') {
+    Object.assign(workItemUpdates, {
+      reviewJobId: undefined,
+      reviewState: undefined,
+      reviewDecision: undefined,
+      reviewDecisionSummary: undefined,
+      reviewDecisionConfidence: undefined,
+      reviewDecisionSource: undefined,
+      reviewParserError: undefined,
+      reviewQualityGateStatus: undefined,
+      reviewQualityGateReasons: [],
+      reviewMissingEvidence: [],
+    })
+  }
+
+  // For two-phase pipeline, set the plan file path on the work item
+  if (isTwoPhase && planFilePath) {
+    workItemUpdates.planFilePath = planFilePath
+  }
+
+  const nextWorkItem = updateWorkItem(workItem.id, workItemUpdates)
+
+  if (!nextWorkItem) throw new Error('Failed to update work item after launch')
+
+  const baseNote = isTwoPhase
+    ? `Started two-phase pipeline (Phase 1: ${resolvedProfile} plan → Phase 2: build) as immediate execution. Plan path: ${planFilePath}`
+    : wasRecoveryLaunch
+      ? resolvedProfile
+        ? `Relaunched ${phase} as immediate execution using profile ${resolvedProfile} after failure recovery.`
+        : `Relaunched ${phase} as immediate execution after failure recovery.`
+      : resolvedProfile
+        ? `Started ${phase} immediate execution using profile ${resolvedProfile}.`
+        : `Started ${phase} immediate execution.`
+  const note = joinLaunchAdvisories(baseNote, [
+    !capacityDecision.allowed && capacityDecision.message
+      ? `Capacity advisory: ${capacityDecision.message}`
+      : null,
+    buildProfileReadinessAdvisory(profileReadinessDecision),
+  ])
+
+  const updatedWithHistory = appendWorkItemHistoryEntry(workItem.id, {
+    action: 'launch',
+    phase,
+    status: 'active',
+    note,
+    missionId: launch.executionRunId,
+    sessionKey: launch.sessionKey,
+    sessionKeyPrefix: launch.sessionKey,
+    profile: resolvedProfile ?? undefined,
+  })
+
+  if (!updatedWithHistory) throw new Error('Failed to record work item launch history')
+
+  if (!capacityDecision.allowed && capacityDecision.message) {
+    refreshAttentionQueue({
+      capacityItems: [
+        {
+          dedupeKey: `launch:${workItem.id}:${phase}`,
+          projectId: project.id,
+          workItemId: workItem.id,
+          title: 'Launch capacity advisory',
+          detail: capacityDecision.message,
+          href: `/projects/${project.id}/work-items/${workItem.id}`,
+          severity: 'warning',
+        },
+      ],
+    })
+  }
+
+  return {
+    workItem: updatedWithHistory,
+    project,
+    capacityDecision,
+    profileReadinessReport,
+    profileReadinessDecision,
+    launch: {
+      ...launch,
+      phase,
+      profile: resolvedProfile,
+    },
+  }
+}

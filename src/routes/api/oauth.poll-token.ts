@@ -21,7 +21,7 @@ function saveNousTokens(accessToken: string, refreshToken?: string) {
     // File doesn't exist or is invalid — start fresh
   }
 
-  const providers = (existing.providers as Record<string, unknown>) || {}
+  const providers = (existing.providers as Record<string, unknown>)
   providers['nous'] = {
     access_token: accessToken,
     refresh_token: refreshToken || null,

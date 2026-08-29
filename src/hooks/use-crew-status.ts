@@ -28,7 +28,7 @@ export type CrewMember = {
 }
 
 export type CrewStatus = {
-  crew: CrewMember[]
+  crew: Array<CrewMember>
   fetchedAt: number
 }
 

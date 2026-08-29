@@ -13,21 +13,31 @@ import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as ProfilesRouteImport } from './routes/profiles'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
+import { Route as ExecutionsRouteImport } from './routes/executions'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as SettingsMcpRouteImport } from './routes/settings/mcp'
+import { Route as ProjectsAutopilotRouteImport } from './routes/projects/autopilot'
+import { Route as ProjectsApprovalsRouteImport } from './routes/projects/approvals'
+import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
+import { Route as ExecutionsExecutionIdRouteImport } from './routes/executions/$executionId'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
+import { Route as ApiWorkItemsRouteImport } from './routes/api/work-items'
+import { Route as ApiWorkItemNotificationDigestRouteImport } from './routes/api/work-item-notification-digest'
+import { Route as ApiWorkItemApprovalsRouteImport } from './routes/api/work-item-approvals'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
@@ -36,14 +46,18 @@ import { Route as ApiStartHermesRouteImport } from './routes/api/start-hermes'
 import { Route as ApiStartAgentRouteImport } from './routes/api/start-agent'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
+import { Route as ApiSessionTelemetryRouteImport } from './routes/api/session-telemetry'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
 import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiRoleCapacityPolicyRouteImport } from './routes/api/role-capacity-policy'
+import { Route as ApiProjectsRouteImport } from './routes/api/projects'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiMorningReviewRouteImport } from './routes/api/morning-review'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-providers'
@@ -54,6 +68,7 @@ import { Route as ApiHermesJobsRouteImport } from './routes/api/hermes-jobs'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiExecutionRunsRouteImport } from './routes/api/execution-runs'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
@@ -61,13 +76,20 @@ import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection
 import { Route as ApiConductorStopRouteImport } from './routes/api/conductor-stop'
 import { Route as ApiConductorSpawnRouteImport } from './routes/api/conductor-spawn'
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
+import { Route as ApiAutopilotSuggestionsRouteImport } from './routes/api/autopilot-suggestions'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
+import { Route as ApiAttentionQueueRouteImport } from './routes/api/attention-queue'
+import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdAutopilotRouteImport } from './routes/projects/$projectId/autopilot'
+import { Route as ApiWorkItemsWorkItemIdRouteImport } from './routes/api/work-items.$workItemId'
+import { Route as ApiWorkItemApprovalsApprovalIdRouteImport } from './routes/api/work-item-approvals.$approvalId'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
 import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
 import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
 import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-search'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiProjectsProjectIdRouteImport } from './routes/api/projects.$projectId'
 import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
 import { Route as ApiProfilesRenameRouteImport } from './routes/api/profiles/rename'
 import { Route as ApiProfilesReadRouteImport } from './routes/api/profiles/read'
@@ -75,6 +97,7 @@ import { Route as ApiProfilesListRouteImport } from './routes/api/profiles/list'
 import { Route as ApiProfilesDeleteRouteImport } from './routes/api/profiles/delete'
 import { Route as ApiProfilesCreateRouteImport } from './routes/api/profiles/create'
 import { Route as ApiProfilesActivateRouteImport } from './routes/api/profiles/activate'
+import { Route as ApiPlanningDraftsDraftIdRouteImport } from './routes/api/planning-drafts.$draftId'
 import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
 import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
 import { Route as ApiModelInfoRouteImport } from './routes/api/model/info'
@@ -93,8 +116,28 @@ import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/c
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
 import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
+import { Route as ApiExecutionsExecutionIdRouteImport } from './routes/api/executions.$executionId'
+import { Route as ApiExecutionRunsExecutionRunIdRouteImport } from './routes/api/execution-runs.$executionRunId'
+import { Route as ApiAutopilotSuggestionsSuggestionIdRouteImport } from './routes/api/autopilot-suggestions.$suggestionId'
+import { Route as ProjectsProjectIdWorkItemsWorkItemIdRouteImport } from './routes/projects/$projectId/work-items/$workItemId'
+import { Route as ApiWorkItemsSupervisorReconcileRouteImport } from './routes/api/work-items.supervisor.reconcile'
+import { Route as ApiWorkItemsOrchestratorReconcileRouteImport } from './routes/api/work-items.orchestrator.reconcile'
+import { Route as ApiWorkItemsWorkItemIdRecoveryActionsRouteImport } from './routes/api/work-items.$workItemId.recovery-actions'
+import { Route as ApiWorkItemsWorkItemIdPrepareRouteImport } from './routes/api/work-items.$workItemId.prepare'
+import { Route as ApiWorkItemsWorkItemIdPlanningDraftsRouteImport } from './routes/api/work-items.$workItemId.planning-drafts'
+import { Route as ApiWorkItemsWorkItemIdLifecycleRouteImport } from './routes/api/work-items.$workItemId.lifecycle'
+import { Route as ApiWorkItemsWorkItemIdLaunchRouteImport } from './routes/api/work-items.$workItemId.launch'
+import { Route as ApiWorkItemsWorkItemIdExecutionRunsRouteImport } from './routes/api/work-items.$workItemId.execution-runs'
+import { Route as ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRouteImport } from './routes/api/work-items.$workItemId.branch-evidence-recovery'
+import { Route as ApiWorkItemsWorkItemIdApprovalsRouteImport } from './routes/api/work-items.$workItemId.approvals'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
+import { Route as ApiProjectsProjectIdProfileReadinessRouteImport } from './routes/api/projects.$projectId.profile-readiness'
+import { Route as ApiProjectsProjectIdLabelAnalyticsRouteImport } from './routes/api/projects.$projectId.label-analytics'
+import { Route as ApiProjectsProjectIdAutopilotScheduleRouteImport } from './routes/api/projects.$projectId.autopilot-schedule'
+import { Route as ApiPlanningDraftsDraftIdOutputRouteImport } from './routes/api/planning-drafts.$draftId.output'
+import { Route as ApiPlanningDraftsDraftIdAcceptRouteImport } from './routes/api/planning-drafts.$draftId.accept'
+import { Route as ApiAutopilotSuggestionsSuggestionIdConvertRouteImport } from './routes/api/autopilot-suggestions.$suggestionId.convert'
 
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
@@ -114,6 +157,11 @@ const SkillsRoute = SkillsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfilesRoute = ProfilesRouteImport.update({
@@ -141,6 +189,11 @@ const FilesRoute = FilesRouteImport.update({
   path: '/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExecutionsRoute = ExecutionsRouteImport.update({
+  id: '/executions',
+  path: '/executions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -166,6 +219,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SettingsRoute,
 } as any)
+const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectsRoute,
+} as any)
 const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/chat/',
   path: '/chat/',
@@ -181,6 +239,26 @@ const SettingsMcpRoute = SettingsMcpRouteImport.update({
   path: '/mcp',
   getParentRoute: () => SettingsRoute,
 } as any)
+const ProjectsAutopilotRoute = ProjectsAutopilotRouteImport.update({
+  id: '/autopilot',
+  path: '/autopilot',
+  getParentRoute: () => ProjectsRoute,
+} as any)
+const ProjectsApprovalsRoute = ProjectsApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => ProjectsRoute,
+} as any)
+const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
+  id: '/$projectId',
+  path: '/$projectId',
+  getParentRoute: () => ProjectsRoute,
+} as any)
+const ExecutionsExecutionIdRoute = ExecutionsExecutionIdRouteImport.update({
+  id: '/$executionId',
+  path: '/$executionId',
+  getParentRoute: () => ExecutionsRoute,
+} as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
   path: '/chat/$sessionKey',
@@ -189,6 +267,22 @@ const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
   id: '/api/workspace',
   path: '/api/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkItemsRoute = ApiWorkItemsRouteImport.update({
+  id: '/api/work-items',
+  path: '/api/work-items',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkItemNotificationDigestRoute =
+  ApiWorkItemNotificationDigestRouteImport.update({
+    id: '/api/work-item-notification-digest',
+    path: '/api/work-item-notification-digest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWorkItemApprovalsRoute = ApiWorkItemApprovalsRouteImport.update({
+  id: '/api/work-item-approvals',
+  path: '/api/work-item-approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
@@ -231,6 +325,11 @@ const ApiSessionsRoute = ApiSessionsRouteImport.update({
   path: '/api/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionTelemetryRoute = ApiSessionTelemetryRouteImport.update({
+  id: '/api/session-telemetry',
+  path: '/api/session-telemetry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSessionStatusRoute = ApiSessionStatusRouteImport.update({
   id: '/api/session-status',
   path: '/api/session-status',
@@ -256,6 +355,16 @@ const ApiSendRoute = ApiSendRouteImport.update({
   path: '/api/send',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRoleCapacityPolicyRoute = ApiRoleCapacityPolicyRouteImport.update({
+  id: '/api/role-capacity-policy',
+  path: '/api/role-capacity-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsRoute = ApiProjectsRouteImport.update({
+  id: '/api/projects',
+  path: '/api/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
   id: '/api/preview-file',
   path: '/api/preview-file',
@@ -269,6 +378,11 @@ const ApiPingRoute = ApiPingRouteImport.update({
 const ApiPathsRoute = ApiPathsRouteImport.update({
   id: '/api/paths',
   path: '/api/paths',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMorningReviewRoute = ApiMorningReviewRouteImport.update({
+  id: '/api/morning-review',
+  path: '/api/morning-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
@@ -321,6 +435,11 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiExecutionRunsRoute = ApiExecutionRunsRouteImport.update({
+  id: '/api/execution-runs',
+  path: '/api/execution-runs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
@@ -356,6 +475,11 @@ const ApiChatEventsRoute = ApiChatEventsRouteImport.update({
   path: '/api/chat-events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAutopilotSuggestionsRoute = ApiAutopilotSuggestionsRouteImport.update({
+  id: '/api/autopilot-suggestions',
+  path: '/api/autopilot-suggestions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthCheckRoute = ApiAuthCheckRouteImport.update({
   id: '/api/auth-check',
   path: '/api/auth-check',
@@ -366,6 +490,33 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
   path: '/api/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAttentionQueueRoute = ApiAttentionQueueRouteImport.update({
+  id: '/api/attention-queue',
+  path: '/api/attention-queue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectsProjectIdRoute,
+} as any)
+const ProjectsProjectIdAutopilotRoute =
+  ProjectsProjectIdAutopilotRouteImport.update({
+    id: '/autopilot',
+    path: '/autopilot',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdRoute = ApiWorkItemsWorkItemIdRouteImport.update({
+  id: '/$workItemId',
+  path: '/$workItemId',
+  getParentRoute: () => ApiWorkItemsRoute,
+} as any)
+const ApiWorkItemApprovalsApprovalIdRoute =
+  ApiWorkItemApprovalsApprovalIdRouteImport.update({
+    id: '/$approvalId',
+    path: '/$approvalId',
+    getParentRoute: () => ApiWorkItemApprovalsRoute,
+  } as any)
 const ApiSkillsUninstallRoute = ApiSkillsUninstallRouteImport.update({
   id: '/uninstall',
   path: '/uninstall',
@@ -390,6 +541,11 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   id: '/send',
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
+} as any)
+const ApiProjectsProjectIdRoute = ApiProjectsProjectIdRouteImport.update({
+  id: '/$projectId',
+  path: '/$projectId',
+  getParentRoute: () => ApiProjectsRoute,
 } as any)
 const ApiProfilesUpdateRoute = ApiProfilesUpdateRouteImport.update({
   id: '/api/profiles/update',
@@ -426,6 +582,12 @@ const ApiProfilesActivateRoute = ApiProfilesActivateRouteImport.update({
   path: '/api/profiles/activate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPlanningDraftsDraftIdRoute =
+  ApiPlanningDraftsDraftIdRouteImport.update({
+    id: '/api/planning-drafts/$draftId',
+    path: '/api/planning-drafts/$draftId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOauthPollTokenRoute = ApiOauthPollTokenRouteImport.update({
   id: '/api/oauth/poll-token',
   path: '/api/oauth/poll-token',
@@ -516,6 +678,90 @@ const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiHermesJobsRoute,
 } as any)
+const ApiExecutionsExecutionIdRoute =
+  ApiExecutionsExecutionIdRouteImport.update({
+    id: '/api/executions/$executionId',
+    path: '/api/executions/$executionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiExecutionRunsExecutionRunIdRoute =
+  ApiExecutionRunsExecutionRunIdRouteImport.update({
+    id: '/$executionRunId',
+    path: '/$executionRunId',
+    getParentRoute: () => ApiExecutionRunsRoute,
+  } as any)
+const ApiAutopilotSuggestionsSuggestionIdRoute =
+  ApiAutopilotSuggestionsSuggestionIdRouteImport.update({
+    id: '/$suggestionId',
+    path: '/$suggestionId',
+    getParentRoute: () => ApiAutopilotSuggestionsRoute,
+  } as any)
+const ProjectsProjectIdWorkItemsWorkItemIdRoute =
+  ProjectsProjectIdWorkItemsWorkItemIdRouteImport.update({
+    id: '/work-items/$workItemId',
+    path: '/work-items/$workItemId',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ApiWorkItemsSupervisorReconcileRoute =
+  ApiWorkItemsSupervisorReconcileRouteImport.update({
+    id: '/supervisor/reconcile',
+    path: '/supervisor/reconcile',
+    getParentRoute: () => ApiWorkItemsRoute,
+  } as any)
+const ApiWorkItemsOrchestratorReconcileRoute =
+  ApiWorkItemsOrchestratorReconcileRouteImport.update({
+    id: '/orchestrator/reconcile',
+    path: '/orchestrator/reconcile',
+    getParentRoute: () => ApiWorkItemsRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdRecoveryActionsRoute =
+  ApiWorkItemsWorkItemIdRecoveryActionsRouteImport.update({
+    id: '/recovery-actions',
+    path: '/recovery-actions',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdPrepareRoute =
+  ApiWorkItemsWorkItemIdPrepareRouteImport.update({
+    id: '/prepare',
+    path: '/prepare',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdPlanningDraftsRoute =
+  ApiWorkItemsWorkItemIdPlanningDraftsRouteImport.update({
+    id: '/planning-drafts',
+    path: '/planning-drafts',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdLifecycleRoute =
+  ApiWorkItemsWorkItemIdLifecycleRouteImport.update({
+    id: '/lifecycle',
+    path: '/lifecycle',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdLaunchRoute =
+  ApiWorkItemsWorkItemIdLaunchRouteImport.update({
+    id: '/launch',
+    path: '/launch',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdExecutionRunsRoute =
+  ApiWorkItemsWorkItemIdExecutionRunsRouteImport.update({
+    id: '/execution-runs',
+    path: '/execution-runs',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute =
+  ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRouteImport.update({
+    id: '/branch-evidence-recovery',
+    path: '/branch-evidence-recovery',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
+const ApiWorkItemsWorkItemIdApprovalsRoute =
+  ApiWorkItemsWorkItemIdApprovalsRouteImport.update({
+    id: '/approvals',
+    path: '/approvals',
+    getParentRoute: () => ApiWorkItemsWorkItemIdRoute,
+  } as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -528,23 +774,63 @@ const ApiSessionsSessionKeyActiveRunRoute =
     path: '/$sessionKey/active-run',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
+const ApiProjectsProjectIdProfileReadinessRoute =
+  ApiProjectsProjectIdProfileReadinessRouteImport.update({
+    id: '/profile-readiness',
+    path: '/profile-readiness',
+    getParentRoute: () => ApiProjectsProjectIdRoute,
+  } as any)
+const ApiProjectsProjectIdLabelAnalyticsRoute =
+  ApiProjectsProjectIdLabelAnalyticsRouteImport.update({
+    id: '/label-analytics',
+    path: '/label-analytics',
+    getParentRoute: () => ApiProjectsProjectIdRoute,
+  } as any)
+const ApiProjectsProjectIdAutopilotScheduleRoute =
+  ApiProjectsProjectIdAutopilotScheduleRouteImport.update({
+    id: '/autopilot-schedule',
+    path: '/autopilot-schedule',
+    getParentRoute: () => ApiProjectsProjectIdRoute,
+  } as any)
+const ApiPlanningDraftsDraftIdOutputRoute =
+  ApiPlanningDraftsDraftIdOutputRouteImport.update({
+    id: '/output',
+    path: '/output',
+    getParentRoute: () => ApiPlanningDraftsDraftIdRoute,
+  } as any)
+const ApiPlanningDraftsDraftIdAcceptRoute =
+  ApiPlanningDraftsDraftIdAcceptRouteImport.update({
+    id: '/accept',
+    path: '/accept',
+    getParentRoute: () => ApiPlanningDraftsDraftIdRoute,
+  } as any)
+const ApiAutopilotSuggestionsSuggestionIdConvertRoute =
+  ApiAutopilotSuggestionsSuggestionIdConvertRouteImport.update({
+    id: '/convert',
+    path: '/convert',
+    getParentRoute: () => ApiAutopilotSuggestionsSuggestionIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/executions': typeof ExecutionsRouteWithChildren
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/profiles': typeof ProfilesRoute
+  '/projects': typeof ProjectsRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/attention-queue': typeof ApiAttentionQueueRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
@@ -552,6 +838,7 @@ export interface FileRoutesByFullPath {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/execution-runs': typeof ApiExecutionRunsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -562,14 +849,18 @@ export interface FileRoutesByFullPath {
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/morning-review': typeof ApiMorningReviewRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/projects': typeof ApiProjectsRouteWithChildren
+  '/api/role-capacity-policy': typeof ApiRoleCapacityPolicyRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
+  '/api/session-telemetry': typeof ApiSessionTelemetryRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
@@ -578,12 +869,23 @@ export interface FileRoutesByFullPath {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
+  '/api/work-item-notification-digest': typeof ApiWorkItemNotificationDigestRoute
+  '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/executions/$executionId': typeof ExecutionsExecutionIdRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/projects/approvals': typeof ProjectsApprovalsRoute
+  '/projects/autopilot': typeof ProjectsAutopilotRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
+  '/projects/': typeof ProjectsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
+  '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
+  '/api/executions/$executionId': typeof ApiExecutionsExecutionIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -602,6 +904,7 @@ export interface FileRoutesByFullPath {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/planning-drafts/$draftId': typeof ApiPlanningDraftsDraftIdRouteWithChildren
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -609,19 +912,42 @@ export interface FileRoutesByFullPath {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
+  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId/autopilot': typeof ProjectsProjectIdAutopilotRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/api/autopilot-suggestions/$suggestionId/convert': typeof ApiAutopilotSuggestionsSuggestionIdConvertRoute
+  '/api/planning-drafts/$draftId/accept': typeof ApiPlanningDraftsDraftIdAcceptRoute
+  '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
+  '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
+  '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
+  '/api/projects/$projectId/profile-readiness': typeof ApiProjectsProjectIdProfileReadinessRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/branch-evidence-recovery': typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute
+  '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
+  '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
+  '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
+  '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
+  '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
+  '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
+  '/api/work-items/orchestrator/reconcile': typeof ApiWorkItemsOrchestratorReconcileRoute
+  '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
+  '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/executions': typeof ExecutionsRouteWithChildren
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
@@ -630,8 +956,10 @@ export interface FileRoutesByTo {
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/attention-queue': typeof ApiAttentionQueueRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
@@ -639,6 +967,7 @@ export interface FileRoutesByTo {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/execution-runs': typeof ApiExecutionRunsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -649,14 +978,18 @@ export interface FileRoutesByTo {
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/morning-review': typeof ApiMorningReviewRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/projects': typeof ApiProjectsRouteWithChildren
+  '/api/role-capacity-policy': typeof ApiRoleCapacityPolicyRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
+  '/api/session-telemetry': typeof ApiSessionTelemetryRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
@@ -665,12 +998,22 @@ export interface FileRoutesByTo {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
+  '/api/work-item-notification-digest': typeof ApiWorkItemNotificationDigestRoute
+  '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/executions/$executionId': typeof ExecutionsExecutionIdRoute
+  '/projects/approvals': typeof ProjectsApprovalsRoute
+  '/projects/autopilot': typeof ProjectsAutopilotRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
+  '/projects': typeof ProjectsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
+  '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
+  '/api/executions/$executionId': typeof ApiExecutionsExecutionIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -689,6 +1032,7 @@ export interface FileRoutesByTo {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/planning-drafts/$draftId': typeof ApiPlanningDraftsDraftIdRouteWithChildren
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -696,13 +1040,35 @@ export interface FileRoutesByTo {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
+  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId/autopilot': typeof ProjectsProjectIdAutopilotRoute
+  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/api/autopilot-suggestions/$suggestionId/convert': typeof ApiAutopilotSuggestionsSuggestionIdConvertRoute
+  '/api/planning-drafts/$draftId/accept': typeof ApiPlanningDraftsDraftIdAcceptRoute
+  '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
+  '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
+  '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
+  '/api/projects/$projectId/profile-readiness': typeof ApiProjectsProjectIdProfileReadinessRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/branch-evidence-recovery': typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute
+  '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
+  '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
+  '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
+  '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
+  '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
+  '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
+  '/api/work-items/orchestrator/reconcile': typeof ApiWorkItemsOrchestratorReconcileRoute
+  '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
+  '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -710,17 +1076,21 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/executions': typeof ExecutionsRouteWithChildren
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/profiles': typeof ProfilesRoute
+  '/projects': typeof ProjectsRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/api/attention-queue': typeof ApiAttentionQueueRoute
   '/api/auth': typeof ApiAuthRoute
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/autopilot-suggestions': typeof ApiAutopilotSuggestionsRouteWithChildren
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
@@ -728,6 +1098,7 @@ export interface FileRoutesById {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/execution-runs': typeof ApiExecutionRunsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -738,14 +1109,18 @@ export interface FileRoutesById {
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
+  '/api/morning-review': typeof ApiMorningReviewRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/projects': typeof ApiProjectsRouteWithChildren
+  '/api/role-capacity-policy': typeof ApiRoleCapacityPolicyRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
+  '/api/session-telemetry': typeof ApiSessionTelemetryRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
@@ -754,12 +1129,23 @@ export interface FileRoutesById {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/work-item-approvals': typeof ApiWorkItemApprovalsRouteWithChildren
+  '/api/work-item-notification-digest': typeof ApiWorkItemNotificationDigestRoute
+  '/api/work-items': typeof ApiWorkItemsRouteWithChildren
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/executions/$executionId': typeof ExecutionsExecutionIdRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/projects/approvals': typeof ProjectsApprovalsRoute
+  '/projects/autopilot': typeof ProjectsAutopilotRoute
   '/settings/mcp': typeof SettingsMcpRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
+  '/projects/': typeof ProjectsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/autopilot-suggestions/$suggestionId': typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
+  '/api/execution-runs/$executionRunId': typeof ApiExecutionRunsExecutionRunIdRoute
+  '/api/executions/$executionId': typeof ApiExecutionsExecutionIdRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -778,6 +1164,7 @@ export interface FileRoutesById {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/planning-drafts/$draftId': typeof ApiPlanningDraftsDraftIdRouteWithChildren
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -785,13 +1172,35 @@ export interface FileRoutesById {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/projects/$projectId': typeof ApiProjectsProjectIdRouteWithChildren
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/work-item-approvals/$approvalId': typeof ApiWorkItemApprovalsApprovalIdRoute
+  '/api/work-items/$workItemId': typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  '/projects/$projectId/autopilot': typeof ProjectsProjectIdAutopilotRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/api/autopilot-suggestions/$suggestionId/convert': typeof ApiAutopilotSuggestionsSuggestionIdConvertRoute
+  '/api/planning-drafts/$draftId/accept': typeof ApiPlanningDraftsDraftIdAcceptRoute
+  '/api/planning-drafts/$draftId/output': typeof ApiPlanningDraftsDraftIdOutputRoute
+  '/api/projects/$projectId/autopilot-schedule': typeof ApiProjectsProjectIdAutopilotScheduleRoute
+  '/api/projects/$projectId/label-analytics': typeof ApiProjectsProjectIdLabelAnalyticsRoute
+  '/api/projects/$projectId/profile-readiness': typeof ApiProjectsProjectIdProfileReadinessRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/work-items/$workItemId/approvals': typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  '/api/work-items/$workItemId/branch-evidence-recovery': typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute
+  '/api/work-items/$workItemId/execution-runs': typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
+  '/api/work-items/$workItemId/launch': typeof ApiWorkItemsWorkItemIdLaunchRoute
+  '/api/work-items/$workItemId/lifecycle': typeof ApiWorkItemsWorkItemIdLifecycleRoute
+  '/api/work-items/$workItemId/planning-drafts': typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
+  '/api/work-items/$workItemId/prepare': typeof ApiWorkItemsWorkItemIdPrepareRoute
+  '/api/work-items/$workItemId/recovery-actions': typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
+  '/api/work-items/orchestrator/reconcile': typeof ApiWorkItemsOrchestratorReconcileRoute
+  '/api/work-items/supervisor/reconcile': typeof ApiWorkItemsSupervisorReconcileRoute
+  '/projects/$projectId/work-items/$workItemId': typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -800,17 +1209,21 @@ export interface FileRouteTypes {
     | '/$'
     | '/conductor'
     | '/dashboard'
+    | '/executions'
     | '/files'
     | '/jobs'
     | '/memory'
     | '/operations'
     | '/profiles'
+    | '/projects'
     | '/settings'
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/api/attention-queue'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/autopilot-suggestions'
     | '/api/chat-events'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
@@ -818,6 +1231,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/execution-runs'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -828,14 +1242,18 @@ export interface FileRouteTypes {
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
+    | '/api/morning-review'
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
+    | '/api/projects'
+    | '/api/role-capacity-policy'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
+    | '/api/session-telemetry'
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
@@ -844,12 +1262,23 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/work-item-approvals'
+    | '/api/work-item-notification-digest'
+    | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
+    | '/executions/$executionId'
+    | '/projects/$projectId'
+    | '/projects/approvals'
+    | '/projects/autopilot'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat/'
+    | '/projects/'
     | '/settings/'
+    | '/api/autopilot-suggestions/$suggestionId'
+    | '/api/execution-runs/$executionRunId'
+    | '/api/executions/$executionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -868,6 +1297,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/planning-drafts/$draftId'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -875,19 +1305,42 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/projects/$projectId'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/work-item-approvals/$approvalId'
+    | '/api/work-items/$workItemId'
+    | '/projects/$projectId/autopilot'
+    | '/projects/$projectId/'
+    | '/api/autopilot-suggestions/$suggestionId/convert'
+    | '/api/planning-drafts/$draftId/accept'
+    | '/api/planning-drafts/$draftId/output'
+    | '/api/projects/$projectId/autopilot-schedule'
+    | '/api/projects/$projectId/label-analytics'
+    | '/api/projects/$projectId/profile-readiness'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/branch-evidence-recovery'
+    | '/api/work-items/$workItemId/execution-runs'
+    | '/api/work-items/$workItemId/launch'
+    | '/api/work-items/$workItemId/lifecycle'
+    | '/api/work-items/$workItemId/planning-drafts'
+    | '/api/work-items/$workItemId/prepare'
+    | '/api/work-items/$workItemId/recovery-actions'
+    | '/api/work-items/orchestrator/reconcile'
+    | '/api/work-items/supervisor/reconcile'
+    | '/projects/$projectId/work-items/$workItemId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$'
     | '/conductor'
     | '/dashboard'
+    | '/executions'
     | '/files'
     | '/jobs'
     | '/memory'
@@ -896,8 +1349,10 @@ export interface FileRouteTypes {
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/api/attention-queue'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/autopilot-suggestions'
     | '/api/chat-events'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
@@ -905,6 +1360,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/execution-runs'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -915,14 +1371,18 @@ export interface FileRouteTypes {
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
+    | '/api/morning-review'
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
+    | '/api/projects'
+    | '/api/role-capacity-policy'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
+    | '/api/session-telemetry'
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
@@ -931,12 +1391,22 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/work-item-approvals'
+    | '/api/work-item-notification-digest'
+    | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
+    | '/executions/$executionId'
+    | '/projects/approvals'
+    | '/projects/autopilot'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat'
+    | '/projects'
     | '/settings'
+    | '/api/autopilot-suggestions/$suggestionId'
+    | '/api/execution-runs/$executionRunId'
+    | '/api/executions/$executionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -955,6 +1425,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/planning-drafts/$draftId'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -962,30 +1433,56 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/projects/$projectId'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/work-item-approvals/$approvalId'
+    | '/api/work-items/$workItemId'
+    | '/projects/$projectId/autopilot'
+    | '/projects/$projectId'
+    | '/api/autopilot-suggestions/$suggestionId/convert'
+    | '/api/planning-drafts/$draftId/accept'
+    | '/api/planning-drafts/$draftId/output'
+    | '/api/projects/$projectId/autopilot-schedule'
+    | '/api/projects/$projectId/label-analytics'
+    | '/api/projects/$projectId/profile-readiness'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/branch-evidence-recovery'
+    | '/api/work-items/$workItemId/execution-runs'
+    | '/api/work-items/$workItemId/launch'
+    | '/api/work-items/$workItemId/lifecycle'
+    | '/api/work-items/$workItemId/planning-drafts'
+    | '/api/work-items/$workItemId/prepare'
+    | '/api/work-items/$workItemId/recovery-actions'
+    | '/api/work-items/orchestrator/reconcile'
+    | '/api/work-items/supervisor/reconcile'
+    | '/projects/$projectId/work-items/$workItemId'
   id:
     | '__root__'
     | '/'
     | '/$'
     | '/conductor'
     | '/dashboard'
+    | '/executions'
     | '/files'
     | '/jobs'
     | '/memory'
     | '/operations'
     | '/profiles'
+    | '/projects'
     | '/settings'
     | '/skills'
     | '/tasks'
     | '/terminal'
+    | '/api/attention-queue'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/autopilot-suggestions'
     | '/api/chat-events'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
@@ -993,6 +1490,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/execution-runs'
     | '/api/files'
     | '/api/gateway-status'
     | '/api/hermes-config'
@@ -1003,14 +1501,18 @@ export interface FileRouteTypes {
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
+    | '/api/morning-review'
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
+    | '/api/projects'
+    | '/api/role-capacity-policy'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
     | '/api/session-send'
     | '/api/session-status'
+    | '/api/session-telemetry'
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
@@ -1019,12 +1521,23 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/work-item-approvals'
+    | '/api/work-item-notification-digest'
+    | '/api/work-items'
     | '/api/workspace'
     | '/chat/$sessionKey'
+    | '/executions/$executionId'
+    | '/projects/$projectId'
+    | '/projects/approvals'
+    | '/projects/autopilot'
     | '/settings/mcp'
     | '/settings/providers'
     | '/chat/'
+    | '/projects/'
     | '/settings/'
+    | '/api/autopilot-suggestions/$suggestionId'
+    | '/api/execution-runs/$executionRunId'
+    | '/api/executions/$executionId'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1043,6 +1556,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/planning-drafts/$draftId'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1050,13 +1564,35 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/projects/$projectId'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/work-item-approvals/$approvalId'
+    | '/api/work-items/$workItemId'
+    | '/projects/$projectId/autopilot'
+    | '/projects/$projectId/'
+    | '/api/autopilot-suggestions/$suggestionId/convert'
+    | '/api/planning-drafts/$draftId/accept'
+    | '/api/planning-drafts/$draftId/output'
+    | '/api/projects/$projectId/autopilot-schedule'
+    | '/api/projects/$projectId/label-analytics'
+    | '/api/projects/$projectId/profile-readiness'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/work-items/$workItemId/approvals'
+    | '/api/work-items/$workItemId/branch-evidence-recovery'
+    | '/api/work-items/$workItemId/execution-runs'
+    | '/api/work-items/$workItemId/launch'
+    | '/api/work-items/$workItemId/lifecycle'
+    | '/api/work-items/$workItemId/planning-drafts'
+    | '/api/work-items/$workItemId/prepare'
+    | '/api/work-items/$workItemId/recovery-actions'
+    | '/api/work-items/orchestrator/reconcile'
+    | '/api/work-items/supervisor/reconcile'
+    | '/projects/$projectId/work-items/$workItemId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1064,17 +1600,21 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
+  ExecutionsRoute: typeof ExecutionsRouteWithChildren
   FilesRoute: typeof FilesRoute
   JobsRoute: typeof JobsRoute
   MemoryRoute: typeof MemoryRoute
   OperationsRoute: typeof OperationsRoute
   ProfilesRoute: typeof ProfilesRoute
+  ProjectsRoute: typeof ProjectsRouteWithChildren
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
   TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
+  ApiAttentionQueueRoute: typeof ApiAttentionQueueRoute
   ApiAuthRoute: typeof ApiAuthRoute
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
+  ApiAutopilotSuggestionsRoute: typeof ApiAutopilotSuggestionsRouteWithChildren
   ApiChatEventsRoute: typeof ApiChatEventsRoute
   ApiConductorSpawnRoute: typeof ApiConductorSpawnRoute
   ApiConductorStopRoute: typeof ApiConductorStopRoute
@@ -1082,6 +1622,7 @@ export interface RootRouteChildren {
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiExecutionRunsRoute: typeof ApiExecutionRunsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
@@ -1092,14 +1633,18 @@ export interface RootRouteChildren {
   ApiLocalProvidersRoute: typeof ApiLocalProvidersRoute
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiMorningReviewRoute: typeof ApiMorningReviewRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
+  ApiProjectsRoute: typeof ApiProjectsRouteWithChildren
+  ApiRoleCapacityPolicyRoute: typeof ApiRoleCapacityPolicyRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
   ApiSessionSendRoute: typeof ApiSessionSendRoute
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
+  ApiSessionTelemetryRoute: typeof ApiSessionTelemetryRoute
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRouteWithChildren
   ApiStartAgentRoute: typeof ApiStartAgentRoute
@@ -1108,9 +1653,13 @@ export interface RootRouteChildren {
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
+  ApiWorkItemApprovalsRoute: typeof ApiWorkItemApprovalsRouteWithChildren
+  ApiWorkItemNotificationDigestRoute: typeof ApiWorkItemNotificationDigestRoute
+  ApiWorkItemsRoute: typeof ApiWorkItemsRouteWithChildren
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
+  ApiExecutionsExecutionIdRoute: typeof ApiExecutionsExecutionIdRoute
   ApiHermesProxySplatRoute: typeof ApiHermesProxySplatRoute
   ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
@@ -1123,6 +1672,7 @@ export interface RootRouteChildren {
   ApiModelInfoRoute: typeof ApiModelInfoRoute
   ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
   ApiOauthPollTokenRoute: typeof ApiOauthPollTokenRoute
+  ApiPlanningDraftsDraftIdRoute: typeof ApiPlanningDraftsDraftIdRouteWithChildren
   ApiProfilesActivateRoute: typeof ApiProfilesActivateRoute
   ApiProfilesCreateRoute: typeof ApiProfilesCreateRoute
   ApiProfilesDeleteRoute: typeof ApiProfilesDeleteRoute
@@ -1162,6 +1712,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profiles': {
       id: '/profiles'
       path: '/profiles'
@@ -1195,6 +1752,13 @@ declare module '@tanstack/react-router' {
       path: '/files'
       fullPath: '/files'
       preLoaderRoute: typeof FilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/executions': {
+      id: '/executions'
+      path: '/executions'
+      fullPath: '/executions'
+      preLoaderRoute: typeof ExecutionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -1232,6 +1796,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/projects/': {
+      id: '/projects/'
+      path: '/'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof ProjectsIndexRouteImport
+      parentRoute: typeof ProjectsRoute
+    }
     '/chat/': {
       id: '/chat/'
       path: '/chat'
@@ -1253,6 +1824,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsMcpRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/projects/autopilot': {
+      id: '/projects/autopilot'
+      path: '/autopilot'
+      fullPath: '/projects/autopilot'
+      preLoaderRoute: typeof ProjectsAutopilotRouteImport
+      parentRoute: typeof ProjectsRoute
+    }
+    '/projects/approvals': {
+      id: '/projects/approvals'
+      path: '/approvals'
+      fullPath: '/projects/approvals'
+      preLoaderRoute: typeof ProjectsApprovalsRouteImport
+      parentRoute: typeof ProjectsRoute
+    }
+    '/projects/$projectId': {
+      id: '/projects/$projectId'
+      path: '/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      parentRoute: typeof ProjectsRoute
+    }
+    '/executions/$executionId': {
+      id: '/executions/$executionId'
+      path: '/$executionId'
+      fullPath: '/executions/$executionId'
+      preLoaderRoute: typeof ExecutionsExecutionIdRouteImport
+      parentRoute: typeof ExecutionsRoute
+    }
     '/chat/$sessionKey': {
       id: '/chat/$sessionKey'
       path: '/chat/$sessionKey'
@@ -1265,6 +1864,27 @@ declare module '@tanstack/react-router' {
       path: '/api/workspace'
       fullPath: '/api/workspace'
       preLoaderRoute: typeof ApiWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-items': {
+      id: '/api/work-items'
+      path: '/api/work-items'
+      fullPath: '/api/work-items'
+      preLoaderRoute: typeof ApiWorkItemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-item-notification-digest': {
+      id: '/api/work-item-notification-digest'
+      path: '/api/work-item-notification-digest'
+      fullPath: '/api/work-item-notification-digest'
+      preLoaderRoute: typeof ApiWorkItemNotificationDigestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-item-approvals': {
+      id: '/api/work-item-approvals'
+      path: '/api/work-item-approvals'
+      fullPath: '/api/work-item-approvals'
+      preLoaderRoute: typeof ApiWorkItemApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/terminal-stream': {
@@ -1323,6 +1943,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session-telemetry': {
+      id: '/api/session-telemetry'
+      path: '/api/session-telemetry'
+      fullPath: '/api/session-telemetry'
+      preLoaderRoute: typeof ApiSessionTelemetryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/session-status': {
       id: '/api/session-status'
       path: '/api/session-status'
@@ -1358,6 +1985,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/role-capacity-policy': {
+      id: '/api/role-capacity-policy'
+      path: '/api/role-capacity-policy'
+      fullPath: '/api/role-capacity-policy'
+      preLoaderRoute: typeof ApiRoleCapacityPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects': {
+      id: '/api/projects'
+      path: '/api/projects'
+      fullPath: '/api/projects'
+      preLoaderRoute: typeof ApiProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/preview-file': {
       id: '/api/preview-file'
       path: '/api/preview-file'
@@ -1377,6 +2018,13 @@ declare module '@tanstack/react-router' {
       path: '/api/paths'
       fullPath: '/api/paths'
       preLoaderRoute: typeof ApiPathsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/morning-review': {
+      id: '/api/morning-review'
+      path: '/api/morning-review'
+      fullPath: '/api/morning-review'
+      preLoaderRoute: typeof ApiMorningReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/models': {
@@ -1449,6 +2097,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/execution-runs': {
+      id: '/api/execution-runs'
+      path: '/api/execution-runs'
+      fullPath: '/api/execution-runs'
+      preLoaderRoute: typeof ApiExecutionRunsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/events': {
       id: '/api/events'
       path: '/api/events'
@@ -1498,6 +2153,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/autopilot-suggestions': {
+      id: '/api/autopilot-suggestions'
+      path: '/api/autopilot-suggestions'
+      fullPath: '/api/autopilot-suggestions'
+      preLoaderRoute: typeof ApiAutopilotSuggestionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth-check': {
       id: '/api/auth-check'
       path: '/api/auth-check'
@@ -1511,6 +2173,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth'
       preLoaderRoute: typeof ApiAuthRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/attention-queue': {
+      id: '/api/attention-queue'
+      path: '/api/attention-queue'
+      fullPath: '/api/attention-queue'
+      preLoaderRoute: typeof ApiAttentionQueueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId/': {
+      id: '/projects/$projectId/'
+      path: '/'
+      fullPath: '/projects/$projectId/'
+      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/autopilot': {
+      id: '/projects/$projectId/autopilot'
+      path: '/autopilot'
+      fullPath: '/projects/$projectId/autopilot'
+      preLoaderRoute: typeof ProjectsProjectIdAutopilotRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/api/work-items/$workItemId': {
+      id: '/api/work-items/$workItemId'
+      path: '/$workItemId'
+      fullPath: '/api/work-items/$workItemId'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdRouteImport
+      parentRoute: typeof ApiWorkItemsRoute
+    }
+    '/api/work-item-approvals/$approvalId': {
+      id: '/api/work-item-approvals/$approvalId'
+      path: '/$approvalId'
+      fullPath: '/api/work-item-approvals/$approvalId'
+      preLoaderRoute: typeof ApiWorkItemApprovalsApprovalIdRouteImport
+      parentRoute: typeof ApiWorkItemApprovalsRoute
     }
     '/api/skills/uninstall': {
       id: '/api/skills/uninstall'
@@ -1546,6 +2243,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sessions/send'
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/projects/$projectId': {
+      id: '/api/projects/$projectId'
+      path: '/$projectId'
+      fullPath: '/api/projects/$projectId'
+      preLoaderRoute: typeof ApiProjectsProjectIdRouteImport
+      parentRoute: typeof ApiProjectsRoute
     }
     '/api/profiles/update': {
       id: '/api/profiles/update'
@@ -1594,6 +2298,13 @@ declare module '@tanstack/react-router' {
       path: '/api/profiles/activate'
       fullPath: '/api/profiles/activate'
       preLoaderRoute: typeof ApiProfilesActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/planning-drafts/$draftId': {
+      id: '/api/planning-drafts/$draftId'
+      path: '/api/planning-drafts/$draftId'
+      fullPath: '/api/planning-drafts/$draftId'
+      preLoaderRoute: typeof ApiPlanningDraftsDraftIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/oauth/poll-token': {
@@ -1722,6 +2433,104 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesJobsJobIdRouteImport
       parentRoute: typeof ApiHermesJobsRoute
     }
+    '/api/executions/$executionId': {
+      id: '/api/executions/$executionId'
+      path: '/api/executions/$executionId'
+      fullPath: '/api/executions/$executionId'
+      preLoaderRoute: typeof ApiExecutionsExecutionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/execution-runs/$executionRunId': {
+      id: '/api/execution-runs/$executionRunId'
+      path: '/$executionRunId'
+      fullPath: '/api/execution-runs/$executionRunId'
+      preLoaderRoute: typeof ApiExecutionRunsExecutionRunIdRouteImport
+      parentRoute: typeof ApiExecutionRunsRoute
+    }
+    '/api/autopilot-suggestions/$suggestionId': {
+      id: '/api/autopilot-suggestions/$suggestionId'
+      path: '/$suggestionId'
+      fullPath: '/api/autopilot-suggestions/$suggestionId'
+      preLoaderRoute: typeof ApiAutopilotSuggestionsSuggestionIdRouteImport
+      parentRoute: typeof ApiAutopilotSuggestionsRoute
+    }
+    '/projects/$projectId/work-items/$workItemId': {
+      id: '/projects/$projectId/work-items/$workItemId'
+      path: '/work-items/$workItemId'
+      fullPath: '/projects/$projectId/work-items/$workItemId'
+      preLoaderRoute: typeof ProjectsProjectIdWorkItemsWorkItemIdRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/api/work-items/supervisor/reconcile': {
+      id: '/api/work-items/supervisor/reconcile'
+      path: '/supervisor/reconcile'
+      fullPath: '/api/work-items/supervisor/reconcile'
+      preLoaderRoute: typeof ApiWorkItemsSupervisorReconcileRouteImport
+      parentRoute: typeof ApiWorkItemsRoute
+    }
+    '/api/work-items/orchestrator/reconcile': {
+      id: '/api/work-items/orchestrator/reconcile'
+      path: '/orchestrator/reconcile'
+      fullPath: '/api/work-items/orchestrator/reconcile'
+      preLoaderRoute: typeof ApiWorkItemsOrchestratorReconcileRouteImport
+      parentRoute: typeof ApiWorkItemsRoute
+    }
+    '/api/work-items/$workItemId/recovery-actions': {
+      id: '/api/work-items/$workItemId/recovery-actions'
+      path: '/recovery-actions'
+      fullPath: '/api/work-items/$workItemId/recovery-actions'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdRecoveryActionsRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
+    '/api/work-items/$workItemId/prepare': {
+      id: '/api/work-items/$workItemId/prepare'
+      path: '/prepare'
+      fullPath: '/api/work-items/$workItemId/prepare'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdPrepareRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
+    '/api/work-items/$workItemId/planning-drafts': {
+      id: '/api/work-items/$workItemId/planning-drafts'
+      path: '/planning-drafts'
+      fullPath: '/api/work-items/$workItemId/planning-drafts'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdPlanningDraftsRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
+    '/api/work-items/$workItemId/lifecycle': {
+      id: '/api/work-items/$workItemId/lifecycle'
+      path: '/lifecycle'
+      fullPath: '/api/work-items/$workItemId/lifecycle'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdLifecycleRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
+    '/api/work-items/$workItemId/launch': {
+      id: '/api/work-items/$workItemId/launch'
+      path: '/launch'
+      fullPath: '/api/work-items/$workItemId/launch'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdLaunchRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
+    '/api/work-items/$workItemId/execution-runs': {
+      id: '/api/work-items/$workItemId/execution-runs'
+      path: '/execution-runs'
+      fullPath: '/api/work-items/$workItemId/execution-runs'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdExecutionRunsRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
+    '/api/work-items/$workItemId/branch-evidence-recovery': {
+      id: '/api/work-items/$workItemId/branch-evidence-recovery'
+      path: '/branch-evidence-recovery'
+      fullPath: '/api/work-items/$workItemId/branch-evidence-recovery'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
+    '/api/work-items/$workItemId/approvals': {
+      id: '/api/work-items/$workItemId/approvals'
+      path: '/approvals'
+      fullPath: '/api/work-items/$workItemId/approvals'
+      preLoaderRoute: typeof ApiWorkItemsWorkItemIdApprovalsRouteImport
+      parentRoute: typeof ApiWorkItemsWorkItemIdRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -1736,8 +2545,96 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/projects/$projectId/profile-readiness': {
+      id: '/api/projects/$projectId/profile-readiness'
+      path: '/profile-readiness'
+      fullPath: '/api/projects/$projectId/profile-readiness'
+      preLoaderRoute: typeof ApiProjectsProjectIdProfileReadinessRouteImport
+      parentRoute: typeof ApiProjectsProjectIdRoute
+    }
+    '/api/projects/$projectId/label-analytics': {
+      id: '/api/projects/$projectId/label-analytics'
+      path: '/label-analytics'
+      fullPath: '/api/projects/$projectId/label-analytics'
+      preLoaderRoute: typeof ApiProjectsProjectIdLabelAnalyticsRouteImport
+      parentRoute: typeof ApiProjectsProjectIdRoute
+    }
+    '/api/projects/$projectId/autopilot-schedule': {
+      id: '/api/projects/$projectId/autopilot-schedule'
+      path: '/autopilot-schedule'
+      fullPath: '/api/projects/$projectId/autopilot-schedule'
+      preLoaderRoute: typeof ApiProjectsProjectIdAutopilotScheduleRouteImport
+      parentRoute: typeof ApiProjectsProjectIdRoute
+    }
+    '/api/planning-drafts/$draftId/output': {
+      id: '/api/planning-drafts/$draftId/output'
+      path: '/output'
+      fullPath: '/api/planning-drafts/$draftId/output'
+      preLoaderRoute: typeof ApiPlanningDraftsDraftIdOutputRouteImport
+      parentRoute: typeof ApiPlanningDraftsDraftIdRoute
+    }
+    '/api/planning-drafts/$draftId/accept': {
+      id: '/api/planning-drafts/$draftId/accept'
+      path: '/accept'
+      fullPath: '/api/planning-drafts/$draftId/accept'
+      preLoaderRoute: typeof ApiPlanningDraftsDraftIdAcceptRouteImport
+      parentRoute: typeof ApiPlanningDraftsDraftIdRoute
+    }
+    '/api/autopilot-suggestions/$suggestionId/convert': {
+      id: '/api/autopilot-suggestions/$suggestionId/convert'
+      path: '/convert'
+      fullPath: '/api/autopilot-suggestions/$suggestionId/convert'
+      preLoaderRoute: typeof ApiAutopilotSuggestionsSuggestionIdConvertRouteImport
+      parentRoute: typeof ApiAutopilotSuggestionsSuggestionIdRoute
+    }
   }
 }
+
+interface ExecutionsRouteChildren {
+  ExecutionsExecutionIdRoute: typeof ExecutionsExecutionIdRoute
+}
+
+const ExecutionsRouteChildren: ExecutionsRouteChildren = {
+  ExecutionsExecutionIdRoute: ExecutionsExecutionIdRoute,
+}
+
+const ExecutionsRouteWithChildren = ExecutionsRoute._addFileChildren(
+  ExecutionsRouteChildren,
+)
+
+interface ProjectsProjectIdRouteChildren {
+  ProjectsProjectIdAutopilotRoute: typeof ProjectsProjectIdAutopilotRoute
+  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+  ProjectsProjectIdWorkItemsWorkItemIdRoute: typeof ProjectsProjectIdWorkItemsWorkItemIdRoute
+}
+
+const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
+  ProjectsProjectIdAutopilotRoute: ProjectsProjectIdAutopilotRoute,
+  ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+  ProjectsProjectIdWorkItemsWorkItemIdRoute:
+    ProjectsProjectIdWorkItemsWorkItemIdRoute,
+}
+
+const ProjectsProjectIdRouteWithChildren =
+  ProjectsProjectIdRoute._addFileChildren(ProjectsProjectIdRouteChildren)
+
+interface ProjectsRouteChildren {
+  ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
+  ProjectsApprovalsRoute: typeof ProjectsApprovalsRoute
+  ProjectsAutopilotRoute: typeof ProjectsAutopilotRoute
+  ProjectsIndexRoute: typeof ProjectsIndexRoute
+}
+
+const ProjectsRouteChildren: ProjectsRouteChildren = {
+  ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
+  ProjectsApprovalsRoute: ProjectsApprovalsRoute,
+  ProjectsAutopilotRoute: ProjectsAutopilotRoute,
+  ProjectsIndexRoute: ProjectsIndexRoute,
+}
+
+const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
+  ProjectsRouteChildren,
+)
 
 interface SettingsRouteChildren {
   SettingsMcpRoute: typeof SettingsMcpRoute
@@ -1754,6 +2651,47 @@ const SettingsRouteChildren: SettingsRouteChildren = {
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
+
+interface ApiAutopilotSuggestionsSuggestionIdRouteChildren {
+  ApiAutopilotSuggestionsSuggestionIdConvertRoute: typeof ApiAutopilotSuggestionsSuggestionIdConvertRoute
+}
+
+const ApiAutopilotSuggestionsSuggestionIdRouteChildren: ApiAutopilotSuggestionsSuggestionIdRouteChildren =
+  {
+    ApiAutopilotSuggestionsSuggestionIdConvertRoute:
+      ApiAutopilotSuggestionsSuggestionIdConvertRoute,
+  }
+
+const ApiAutopilotSuggestionsSuggestionIdRouteWithChildren =
+  ApiAutopilotSuggestionsSuggestionIdRoute._addFileChildren(
+    ApiAutopilotSuggestionsSuggestionIdRouteChildren,
+  )
+
+interface ApiAutopilotSuggestionsRouteChildren {
+  ApiAutopilotSuggestionsSuggestionIdRoute: typeof ApiAutopilotSuggestionsSuggestionIdRouteWithChildren
+}
+
+const ApiAutopilotSuggestionsRouteChildren: ApiAutopilotSuggestionsRouteChildren =
+  {
+    ApiAutopilotSuggestionsSuggestionIdRoute:
+      ApiAutopilotSuggestionsSuggestionIdRouteWithChildren,
+  }
+
+const ApiAutopilotSuggestionsRouteWithChildren =
+  ApiAutopilotSuggestionsRoute._addFileChildren(
+    ApiAutopilotSuggestionsRouteChildren,
+  )
+
+interface ApiExecutionRunsRouteChildren {
+  ApiExecutionRunsExecutionRunIdRoute: typeof ApiExecutionRunsExecutionRunIdRoute
+}
+
+const ApiExecutionRunsRouteChildren: ApiExecutionRunsRouteChildren = {
+  ApiExecutionRunsExecutionRunIdRoute: ApiExecutionRunsExecutionRunIdRoute,
+}
+
+const ApiExecutionRunsRouteWithChildren =
+  ApiExecutionRunsRoute._addFileChildren(ApiExecutionRunsRouteChildren)
 
 interface ApiHermesJobsRouteChildren {
   ApiHermesJobsJobIdRoute: typeof ApiHermesJobsJobIdRoute
@@ -1797,6 +2735,36 @@ const ApiMemoryRouteWithChildren = ApiMemoryRoute._addFileChildren(
   ApiMemoryRouteChildren,
 )
 
+interface ApiProjectsProjectIdRouteChildren {
+  ApiProjectsProjectIdAutopilotScheduleRoute: typeof ApiProjectsProjectIdAutopilotScheduleRoute
+  ApiProjectsProjectIdLabelAnalyticsRoute: typeof ApiProjectsProjectIdLabelAnalyticsRoute
+  ApiProjectsProjectIdProfileReadinessRoute: typeof ApiProjectsProjectIdProfileReadinessRoute
+}
+
+const ApiProjectsProjectIdRouteChildren: ApiProjectsProjectIdRouteChildren = {
+  ApiProjectsProjectIdAutopilotScheduleRoute:
+    ApiProjectsProjectIdAutopilotScheduleRoute,
+  ApiProjectsProjectIdLabelAnalyticsRoute:
+    ApiProjectsProjectIdLabelAnalyticsRoute,
+  ApiProjectsProjectIdProfileReadinessRoute:
+    ApiProjectsProjectIdProfileReadinessRoute,
+}
+
+const ApiProjectsProjectIdRouteWithChildren =
+  ApiProjectsProjectIdRoute._addFileChildren(ApiProjectsProjectIdRouteChildren)
+
+interface ApiProjectsRouteChildren {
+  ApiProjectsProjectIdRoute: typeof ApiProjectsProjectIdRouteWithChildren
+}
+
+const ApiProjectsRouteChildren: ApiProjectsRouteChildren = {
+  ApiProjectsProjectIdRoute: ApiProjectsProjectIdRouteWithChildren,
+}
+
+const ApiProjectsRouteWithChildren = ApiProjectsRoute._addFileChildren(
+  ApiProjectsRouteChildren,
+)
+
 interface ApiSessionsRouteChildren {
   ApiSessionsSendRoute: typeof ApiSessionsSendRoute
   ApiSessionsSessionKeyActiveRunRoute: typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1831,22 +2799,102 @@ const ApiSkillsRouteWithChildren = ApiSkillsRoute._addFileChildren(
   ApiSkillsRouteChildren,
 )
 
+interface ApiWorkItemApprovalsRouteChildren {
+  ApiWorkItemApprovalsApprovalIdRoute: typeof ApiWorkItemApprovalsApprovalIdRoute
+}
+
+const ApiWorkItemApprovalsRouteChildren: ApiWorkItemApprovalsRouteChildren = {
+  ApiWorkItemApprovalsApprovalIdRoute: ApiWorkItemApprovalsApprovalIdRoute,
+}
+
+const ApiWorkItemApprovalsRouteWithChildren =
+  ApiWorkItemApprovalsRoute._addFileChildren(ApiWorkItemApprovalsRouteChildren)
+
+interface ApiWorkItemsWorkItemIdRouteChildren {
+  ApiWorkItemsWorkItemIdApprovalsRoute: typeof ApiWorkItemsWorkItemIdApprovalsRoute
+  ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute: typeof ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute
+  ApiWorkItemsWorkItemIdExecutionRunsRoute: typeof ApiWorkItemsWorkItemIdExecutionRunsRoute
+  ApiWorkItemsWorkItemIdLaunchRoute: typeof ApiWorkItemsWorkItemIdLaunchRoute
+  ApiWorkItemsWorkItemIdLifecycleRoute: typeof ApiWorkItemsWorkItemIdLifecycleRoute
+  ApiWorkItemsWorkItemIdPlanningDraftsRoute: typeof ApiWorkItemsWorkItemIdPlanningDraftsRoute
+  ApiWorkItemsWorkItemIdPrepareRoute: typeof ApiWorkItemsWorkItemIdPrepareRoute
+  ApiWorkItemsWorkItemIdRecoveryActionsRoute: typeof ApiWorkItemsWorkItemIdRecoveryActionsRoute
+}
+
+const ApiWorkItemsWorkItemIdRouteChildren: ApiWorkItemsWorkItemIdRouteChildren =
+  {
+    ApiWorkItemsWorkItemIdApprovalsRoute: ApiWorkItemsWorkItemIdApprovalsRoute,
+    ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute:
+      ApiWorkItemsWorkItemIdBranchEvidenceRecoveryRoute,
+    ApiWorkItemsWorkItemIdExecutionRunsRoute:
+      ApiWorkItemsWorkItemIdExecutionRunsRoute,
+    ApiWorkItemsWorkItemIdLaunchRoute: ApiWorkItemsWorkItemIdLaunchRoute,
+    ApiWorkItemsWorkItemIdLifecycleRoute: ApiWorkItemsWorkItemIdLifecycleRoute,
+    ApiWorkItemsWorkItemIdPlanningDraftsRoute:
+      ApiWorkItemsWorkItemIdPlanningDraftsRoute,
+    ApiWorkItemsWorkItemIdPrepareRoute: ApiWorkItemsWorkItemIdPrepareRoute,
+    ApiWorkItemsWorkItemIdRecoveryActionsRoute:
+      ApiWorkItemsWorkItemIdRecoveryActionsRoute,
+  }
+
+const ApiWorkItemsWorkItemIdRouteWithChildren =
+  ApiWorkItemsWorkItemIdRoute._addFileChildren(
+    ApiWorkItemsWorkItemIdRouteChildren,
+  )
+
+interface ApiWorkItemsRouteChildren {
+  ApiWorkItemsWorkItemIdRoute: typeof ApiWorkItemsWorkItemIdRouteWithChildren
+  ApiWorkItemsOrchestratorReconcileRoute: typeof ApiWorkItemsOrchestratorReconcileRoute
+  ApiWorkItemsSupervisorReconcileRoute: typeof ApiWorkItemsSupervisorReconcileRoute
+}
+
+const ApiWorkItemsRouteChildren: ApiWorkItemsRouteChildren = {
+  ApiWorkItemsWorkItemIdRoute: ApiWorkItemsWorkItemIdRouteWithChildren,
+  ApiWorkItemsOrchestratorReconcileRoute:
+    ApiWorkItemsOrchestratorReconcileRoute,
+  ApiWorkItemsSupervisorReconcileRoute: ApiWorkItemsSupervisorReconcileRoute,
+}
+
+const ApiWorkItemsRouteWithChildren = ApiWorkItemsRoute._addFileChildren(
+  ApiWorkItemsRouteChildren,
+)
+
+interface ApiPlanningDraftsDraftIdRouteChildren {
+  ApiPlanningDraftsDraftIdAcceptRoute: typeof ApiPlanningDraftsDraftIdAcceptRoute
+  ApiPlanningDraftsDraftIdOutputRoute: typeof ApiPlanningDraftsDraftIdOutputRoute
+}
+
+const ApiPlanningDraftsDraftIdRouteChildren: ApiPlanningDraftsDraftIdRouteChildren =
+  {
+    ApiPlanningDraftsDraftIdAcceptRoute: ApiPlanningDraftsDraftIdAcceptRoute,
+    ApiPlanningDraftsDraftIdOutputRoute: ApiPlanningDraftsDraftIdOutputRoute,
+  }
+
+const ApiPlanningDraftsDraftIdRouteWithChildren =
+  ApiPlanningDraftsDraftIdRoute._addFileChildren(
+    ApiPlanningDraftsDraftIdRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
+  ExecutionsRoute: ExecutionsRouteWithChildren,
   FilesRoute: FilesRoute,
   JobsRoute: JobsRoute,
   MemoryRoute: MemoryRoute,
   OperationsRoute: OperationsRoute,
   ProfilesRoute: ProfilesRoute,
+  ProjectsRoute: ProjectsRouteWithChildren,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
   TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
+  ApiAttentionQueueRoute: ApiAttentionQueueRoute,
   ApiAuthRoute: ApiAuthRoute,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
+  ApiAutopilotSuggestionsRoute: ApiAutopilotSuggestionsRouteWithChildren,
   ApiChatEventsRoute: ApiChatEventsRoute,
   ApiConductorSpawnRoute: ApiConductorSpawnRoute,
   ApiConductorStopRoute: ApiConductorStopRoute,
@@ -1854,6 +2902,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiExecutionRunsRoute: ApiExecutionRunsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
@@ -1864,14 +2913,18 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLocalProvidersRoute: ApiLocalProvidersRoute,
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
   ApiModelsRoute: ApiModelsRoute,
+  ApiMorningReviewRoute: ApiMorningReviewRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
+  ApiProjectsRoute: ApiProjectsRouteWithChildren,
+  ApiRoleCapacityPolicyRoute: ApiRoleCapacityPolicyRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,
   ApiSessionSendRoute: ApiSessionSendRoute,
   ApiSessionStatusRoute: ApiSessionStatusRoute,
+  ApiSessionTelemetryRoute: ApiSessionTelemetryRoute,
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRouteWithChildren,
   ApiStartAgentRoute: ApiStartAgentRoute,
@@ -1880,9 +2933,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
+  ApiWorkItemApprovalsRoute: ApiWorkItemApprovalsRouteWithChildren,
+  ApiWorkItemNotificationDigestRoute: ApiWorkItemNotificationDigestRoute,
+  ApiWorkItemsRoute: ApiWorkItemsRouteWithChildren,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
+  ApiExecutionsExecutionIdRoute: ApiExecutionsExecutionIdRoute,
   ApiHermesProxySplatRoute: ApiHermesProxySplatRoute,
   ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
@@ -1895,6 +2952,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelInfoRoute: ApiModelInfoRoute,
   ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,
   ApiOauthPollTokenRoute: ApiOauthPollTokenRoute,
+  ApiPlanningDraftsDraftIdRoute: ApiPlanningDraftsDraftIdRouteWithChildren,
   ApiProfilesActivateRoute: ApiProfilesActivateRoute,
   ApiProfilesCreateRoute: ApiProfilesCreateRoute,
   ApiProfilesDeleteRoute: ApiProfilesDeleteRoute,

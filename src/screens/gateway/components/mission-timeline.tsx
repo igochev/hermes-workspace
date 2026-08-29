@@ -1,17 +1,17 @@
 import { useMemo, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { AgentOutputPanel } from './agent-output-panel'
 import type { TeamMember } from './team-panel'
 import type { HubTask } from './task-board'
-import { AgentOutputPanel } from './agent-output-panel'
+import { cn } from '@/lib/utils'
 
 type MissionTimelineProps = {
-  tasks: HubTask[]
-  agentOutputs: Map<string, string[]>
+  tasks: Array<HubTask>
+  agentOutputs: Map<string, Array<string>>
   agentSessionMap?: Record<string, string>
   agentStatuses: Map<string, { status: string; lastSeen: number }>
   missionState: string
   missionGoal: string
-  teamMembers: TeamMember[]
+  teamMembers: Array<TeamMember>
   elapsedTime?: number
 }
 
@@ -110,7 +110,7 @@ export function MissionTimeline({
                   <div className="mt-2 rounded-r-lg border-l-4 border-emerald-500 bg-emerald-50 px-3 py-2">
                     <p className="text-sm font-semibold text-emerald-800">Agent working</p>
                     <p className="mt-0.5 text-xs text-emerald-600">
-                      Live stream is active{status?.lastSeen ? ` · last seen ${new Date(status.lastSeen).toLocaleTimeString()}` : ''}
+                      Live stream is active{status.lastSeen ? ` · last seen ${new Date(status.lastSeen).toLocaleTimeString()}` : ''}
                     </p>
                   </div>
                 ) : null}

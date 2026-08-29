@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {  useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -10,16 +10,23 @@ import {
   Settings01Icon,
   TaskDone01Icon,
 } from '@hugeicons/core-free-icons'
+import { OfficeView } from './components/office-view'
+import {   useConductorGateway } from './hooks/use-conductor-gateway'
+import type {CSSProperties} from 'react';
+import type { AgentWorkingRow } from './components/agents-working-panel'
+import type {GatewaySession} from '@/lib/gateway-api';
+import type {ConductorPhaseKey} from '@/lib/conductor-phase-profiles';
+import type {MissionHistoryEntry, MissionHistoryWorkerDetail} from './hooks/use-conductor-gateway';
 import { Button } from '@/components/ui/button'
 import { Markdown } from '@/components/prompt-kit/markdown'
-import { OfficeView } from './components/office-view'
-import type { AgentWorkingRow } from './components/agents-working-panel'
-import { type GatewaySession } from '@/lib/gateway-api'
+import {
+  CONDUCTOR_PHASE_KEYS
+
+} from '@/lib/conductor-phase-profiles'
 import { cn } from '@/lib/utils'
-import { type MissionHistoryEntry, type MissionHistoryWorkerDetail, useConductorGateway } from './hooks/use-conductor-gateway'
 
 type ConductorPhase = 'home' | 'preview' | 'active' | 'complete'
-type QuickActionId = 'research' | 'build' | 'review' | 'deploy'
+type QuickActionId = ConductorPhaseKey
 
 type HistoryMessage = {
   role?: string
@@ -38,6 +45,10 @@ type AvailableModel = {
   id?: string
   provider?: string
   name?: string
+}
+
+type AvailableProfile = {
+  name: string
 }
 
 type FileBrowserEntry = {
@@ -129,7 +140,7 @@ function MissionCostSection({
   onToggle,
 }: {
   totalTokens: number
-  workers: MissionCostWorker[]
+  workers: Array<MissionCostWorker>
   expanded: boolean
   onToggle: () => void
 }) {
@@ -215,7 +226,7 @@ function CyclingStatus({
   intervalMs = 3000,
   isPaused = false,
 }: {
-  steps: string[]
+  steps: Array<string>
   intervalMs?: number
   isPaused?: boolean
 }) {
@@ -263,12 +274,12 @@ function formatMissionTimestamp(value: string | null | undefined): string | null
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
 }
 
-function buildProjectPathCandidates(workers: Array<{ label: string }>, missionStartedAt: string | null | undefined): string[] {
+function buildProjectPathCandidates(workers: Array<{ label: string }>, missionStartedAt: string | null | undefined): Array<string> {
   const timestamp = formatMissionTimestamp(missionStartedAt)
   const candidates = new Set<string>()
 
   for (const worker of workers) {
-    const label = worker.label ?? ''
+    const label = worker.label
     const slug = label.replace(/^worker-/, '').trim()
     if (!slug) continue
 
@@ -353,7 +364,7 @@ function WorkerCard({
 }) {
   const dot = getWorkerDot(worker.status)
   const persona = getAgentPersona(index)
-  const workerOutput = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+  const workerOutput = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)
   const workerStartedAt =
     typeof worker.raw.createdAt === 'string'
       ? worker.raw.createdAt
@@ -493,8 +504,8 @@ function getProviderLabel(provider: string | null | undefined): string {
     .join(' ')
 }
 
-function groupModelsByProvider(models: AvailableModel[]) {
-  const groups = new Map<string, AvailableModel[]>()
+function groupModelsByProvider(models: Array<AvailableModel>) {
+  const groups = new Map<string, Array<AvailableModel>>()
 
   for (const model of models) {
     const provider = getProviderLabel(model.provider)
@@ -516,7 +527,7 @@ function groupModelsByProvider(models: AvailableModel[]) {
     }))
 }
 
-function getDirectoryPathSegments(pathValue: string): string[] {
+function getDirectoryPathSegments(pathValue: string): Array<string> {
   const normalized = pathValue.trim()
   if (!normalized) return ['~']
   if (normalized === '~') return ['~']
@@ -530,7 +541,7 @@ function getDirectoryPathSegments(pathValue: string): string[] {
   return normalized.split('/').filter(Boolean)
 }
 
-function buildDirectoryPathFromSegments(segments: string[]): string {
+function buildDirectoryPathFromSegments(segments: Array<string>): string {
   if (segments.length === 0) return '~'
   if (segments[0] === '~') {
     return segments.length === 1 ? '~' : `~/${segments.slice(1).join('/')}`
@@ -551,6 +562,62 @@ function getDirectorySuggestions() {
   return ['~/conductor-projects', '~/Projects', '/tmp', '~/Desktop']
 }
 
+const PHASE_LABELS: Record<ConductorPhaseKey, string> = {
+  research: 'Research',
+  build: 'Build',
+  review: 'Review',
+  deploy: 'Deploy',
+}
+
+function getProfileSelectValue(value: string): string {
+  const trimmed = value.trim()
+  return trimmed ? trimmed : '__default__'
+}
+
+function getProfileSelectLabel(profileName: string): string {
+  const trimmed = profileName.trim()
+  return trimmed ? trimmed : 'Default worker routing'
+}
+
+function PhaseProfileSelector({
+  phase,
+  value,
+  options,
+  onChange,
+}: {
+  phase: ConductorPhaseKey
+  value: string
+  options: Array<string>
+  onChange: (nextValue: string) => void
+}) {
+  return (
+    <label className="block space-y-2">
+      <span className="text-sm font-medium text-[var(--theme-text)]">
+        {PHASE_LABELS[phase]} Profile
+      </span>
+      <select
+        value={getProfileSelectValue(value)}
+        onChange={(event) =>
+          onChange(event.target.value === '__default__' ? '' : event.target.value)
+        }
+        className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-[var(--theme-accent)]"
+      >
+        <option value="__default__">Default worker routing</option>
+        {options.map((profileName) => (
+          <option key={profileName} value={profileName}>
+            {profileName}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-[var(--theme-muted-2)]">
+        {value.trim()
+          ? `${PHASE_LABELS[phase]} tasks will prefer Hermes profile “${value.trim()}”.`
+          : `${PHASE_LABELS[phase]} tasks will use the normal Conductor worker path.`}
+      </p>
+    </label>
+  )
+}
+
 function ModelSelectorDropdown({
   label,
   value,
@@ -561,7 +628,7 @@ function ModelSelectorDropdown({
   label: string
   value: string
   onChange: (nextValue: string) => void
-  models: AvailableModel[]
+  models: Array<AvailableModel>
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -707,18 +774,18 @@ function extractMessageText(message: HistoryMessage | undefined): string {
   if (typeof message.content === 'string') return message.content
   if (Array.isArray(message.content)) {
     return message.content
-      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+      .map((part) => (typeof part.text === 'string' ? part.text : ''))
       .filter(Boolean)
       .join('\n')
   }
   return ''
 }
 
-function getLastAssistantMessage(messages: HistoryMessage[] | undefined): string {
+function getLastAssistantMessage(messages: Array<HistoryMessage> | undefined): string {
   if (!Array.isArray(messages)) return ''
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
-    if (message?.role !== 'assistant') continue
+    if (message.role !== 'assistant') continue
     const text = extractMessageText(message)
     if (text.trim()) return text.trim()
   }
@@ -787,7 +854,7 @@ export function Conductor() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [directoryBrowserOpen, setDirectoryBrowserOpen] = useState(false)
   const [directoryBrowserPath, setDirectoryBrowserPath] = useState('~')
-  const [directoryBrowserEntries, setDirectoryBrowserEntries] = useState<FileBrowserEntry[]>([])
+  const [directoryBrowserEntries, setDirectoryBrowserEntries] = useState<Array<FileBrowserEntry>>([])
   const [directoryBrowserLoading, setDirectoryBrowserLoading] = useState(false)
   const [directoryBrowserError, setDirectoryBrowserError] = useState<string | null>(null)
   const modelsQuery = useQuery({
@@ -800,7 +867,23 @@ export function Conductor() {
     enabled: settingsOpen,
     staleTime: 60_000,
   })
+  const profilesQuery = useQuery({
+    queryKey: ['conductor', 'profiles'],
+    queryFn: async () => {
+      const res = await fetch('/api/profiles/list')
+      const data = (await res.json()) as {
+        profiles?: Array<AvailableProfile>
+      }
+      return (data.profiles ?? [])
+        .map((profile) => profile.name)
+        .filter((name): name is string => typeof name === 'string' && name !== 'default')
+        .sort((left, right) => left.localeCompare(right))
+    },
+    enabled: settingsOpen,
+    staleTime: 60_000,
+  })
   const availableModels = modelsQuery.data ?? []
+  const availableProfiles = profilesQuery.data ?? []
 
   useEffect(() => {
     if (!directoryBrowserOpen) return
@@ -826,7 +909,7 @@ export function Conductor() {
         if (cancelled) return
         setDirectoryBrowserPath(typeof data.root === 'string' && data.root.trim() ? data.root : directoryBrowserPath)
         setDirectoryBrowserEntries(
-          Array.isArray(data.entries) ? data.entries.filter((entry) => entry?.type === 'folder') : [],
+          Array.isArray(data.entries) ? data.entries.filter((entry) => entry.type === 'folder') : [],
         )
       } catch (error) {
         if (cancelled) return
@@ -907,14 +990,14 @@ export function Conductor() {
       completeSummary ??
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
       conductor.workers
-        .map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined))
+        .map((worker) => getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined))
         .find((output) => output.trim()) ??
       conductor.streamText
 
     const combinedPrompt = [
       'CONTINUATION OF PREVIOUS MISSION',
       `Original goal: ${conductor.goal}`,
-      `Previous output summary: ${truncateContinuationText(continuationSummarySource ?? '')}`,
+      `Previous output summary: ${truncateContinuationText(continuationSummarySource)}`,
       `New instructions: ${trimmedInstructions}`,
       '',
       'Please continue building on the previous work.',
@@ -927,6 +1010,15 @@ export function Conductor() {
 
   const updateSettings = (patch: Partial<typeof conductor.conductorSettings>) => {
     conductor.setConductorSettings({ ...conductor.conductorSettings, ...patch })
+  }
+
+  const updatePhaseProfile = (phaseKey: ConductorPhaseKey, profileName: string) => {
+    updateSettings({
+      phaseProfiles: {
+        ...conductor.conductorSettings.phaseProfiles,
+        [phaseKey]: profileName,
+      },
+    })
   }
 
   const openDirectoryBrowser = () => {
@@ -956,7 +1048,7 @@ export function Conductor() {
   const missionProgress = totalWorkers > 0 ? Math.round((completedWorkers / totalWorkers) * 100) : 0
   const totalTokens = conductor.workers.reduce((sum, worker) => sum + worker.totalTokens, 0)
   const selectedHistoryEntry = conductor.selectedHistoryEntry
-  const completeMissionCostWorkers = useMemo<MissionCostWorker[]>(
+  const completeMissionCostWorkers = useMemo<Array<MissionCostWorker>>(
     () =>
       conductor.workers.map((worker, index) => {
         const persona = getAgentPersona(index)
@@ -970,7 +1062,7 @@ export function Conductor() {
       }),
     [conductor.workers],
   )
-  const historyMissionCostWorkers = useMemo<MissionCostWorker[]>(
+  const historyMissionCostWorkers = useMemo<Array<MissionCostWorker>>(
     () =>
       (selectedHistoryEntry?.workerDetails ?? []).map((worker, index) => ({
         id: `${selectedHistoryEntry?.id ?? 'history'}-${index}`,
@@ -982,7 +1074,7 @@ export function Conductor() {
     [selectedHistoryEntry],
   )
   const OFFICE_NAMES = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift']
-  const homeOfficeRows = useMemo<AgentWorkingRow[]>(() => {
+  const homeOfficeRows = useMemo<Array<AgentWorkingRow>>(() => {
     const sessions = conductor.recentSessions
     if (sessions.length === 0) {
       return OFFICE_NAMES.slice(0, 3).map((name, i) => ({
@@ -996,7 +1088,7 @@ export function Conductor() {
       }))
     }
     return sessions.slice(0, 6).map((session, i) => {
-      const s = session as GatewaySession
+      const s = session
       const updatedAt = typeof s.updatedAt === 'string' ? new Date(s.updatedAt).getTime() : typeof s.updatedAt === 'number' ? s.updatedAt : 0
       const statusText = `${s.status ?? ''} ${s.kind ?? ''}`.toLowerCase()
       const status = /error|failed/.test(statusText) ? 'error' as const
@@ -1016,12 +1108,12 @@ export function Conductor() {
     })
   }, [conductor.recentSessions])
 
-  const officeAgentRows = useMemo<AgentWorkingRow[]>(() => {
+  const officeAgentRows = useMemo<Array<AgentWorkingRow>>(() => {
     if (conductor.workers.length > 0) {
       return conductor.workers.map((worker, index) => {
         const persona = getAgentPersona(index)
         const currentTask = conductor.tasks.find((task) => task.workerKey === worker.key && task.status === 'running')?.title
-        const lastLine = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)
+        const lastLine = conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)
         const isWorkerPaused = conductor.isPaused && (worker.status === 'running' || worker.status === 'idle')
 
         return {
@@ -1057,7 +1149,7 @@ export function Conductor() {
   const completePhaseProjectPath = useMemo(() => {
     const workerOutputTexts = [
       ...Object.values(conductor.workerOutputs),
-      ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)),
+      ...conductor.workers.map((worker) => getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)),
     ].filter(Boolean)
 
     for (const text of workerOutputTexts) {
@@ -1149,10 +1241,10 @@ export function Conductor() {
       completeSummary ??
       Object.values(conductor.workerOutputs).find((output) => output.trim()) ??
       conductor.workers
-        .map((worker) => getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined))
+        .map((worker) => getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined))
         .find((output) => output.trim()) ??
       conductor.streamText
-    return truncateContinuationText(summarySource ?? '')
+    return truncateContinuationText(summarySource)
   }, [completeSummary, conductor.streamText, conductor.workerOutputs, conductor.workers])
   const continuationModalPreview = useMemo(() => truncateContinuationText(continuationPreview, 200), [continuationPreview])
   const hasMissionHistory = conductor.missionHistory.length > 0
@@ -1166,8 +1258,8 @@ export function Conductor() {
     const sessions = conductor.recentSessions
     if (activityFilter === 'all') return sessions
     return sessions
-      .filter((session) => ((session.label as string) ?? '').startsWith('worker-'))
-      .filter((session) => deriveSessionStatus(session as GatewaySession) === activityFilter)
+      .filter((session) => (session.label as string).startsWith('worker-'))
+      .filter((session) => deriveSessionStatus(session) === activityFilter)
   })()
   const activityItems: Array<MissionHistoryEntry | GatewaySession> = hasMissionHistory ? filteredHistory : filteredSessions
   const ACTIVITY_PAGE_SIZE = 3
@@ -1660,6 +1752,24 @@ export function Conductor() {
                   />
 
                   <div className="space-y-2">
+                    <span className="text-sm font-medium text-[var(--theme-text)]">Phase → Profile Routing</span>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {CONDUCTOR_PHASE_KEYS.map((phaseKey) => (
+                        <PhaseProfileSelector
+                          key={phaseKey}
+                          phase={phaseKey}
+                          value={conductor.conductorSettings.phaseProfiles[phaseKey]}
+                          options={availableProfiles}
+                          onChange={(nextValue) => updatePhaseProfile(phaseKey, nextValue)}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-[var(--theme-muted-2)]">
+                      Optional. Use this when Research/Build/Review/Deploy should run under different Hermes profiles.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
                     <span className="text-sm font-medium text-[var(--theme-text)]">Project Directory</span>
                     <div className="flex gap-2">
                       <input
@@ -2089,7 +2199,7 @@ export function Conductor() {
             {(!completePhaseProjectPath || previewState.unavailable) && (() => {
               const outputSections = conductor.workers
                 .map((worker, index) => {
-                  const output = (conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as HistoryMessage[] | undefined)).trim()
+                  const output = (conductor.workerOutputs[worker.key] ?? getLastAssistantMessage(worker.raw.messages as Array<HistoryMessage> | undefined)).trim()
                   if (!output) return null
                   const persona = getAgentPersona(index)
                   return { key: worker.key, persona, label: worker.label, output }

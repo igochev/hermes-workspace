@@ -244,17 +244,17 @@ export function SkillsScreen() {
         const author =
           skill.author ||
           (skill.repo ? skill.repo.split('/')[0] : null) ||
-          (skill.extra as Record<string, unknown>)?.author ||
+          (skill.extra as Record<string, unknown>).author ||
           skill.source ||
           'Community'
         const homepage =
           skill.homepage ||
           skill.repo ||
-          (skill.extra as Record<string, unknown>)?.homepage ||
+          (skill.extra as Record<string, unknown>).homepage ||
           null
-        const category =
+        const marketplaceCategory =
           skill.category ||
-          (skill.extra as Record<string, unknown>)?.category ||
+          (skill.extra as Record<string, unknown>).category ||
           'Productivity'
 
         return {
@@ -266,7 +266,7 @@ export function SkillsScreen() {
           triggers: skill.tags,
           tags: skill.tags,
           homepage: typeof homepage === 'string' ? homepage : null,
-          category: String(category),
+          category: String(marketplaceCategory),
           icon:
             skill.source === 'github'
               ? '🐙'
@@ -820,7 +820,6 @@ function SecurityBadge({
 }) {
   if (!security) return null
   const config = SECURITY_BADGE[security.level]
-  if (!config) return null
 
   const [expanded, setExpanded] = useState(false)
 
@@ -859,7 +858,6 @@ function SecurityBadge({
 function SecurityScanCard({ security }: { security: SecurityRisk }) {
   const [showDetails, setShowDetails] = useState(false)
   const config = SECURITY_BADGE[security.level]
-  if (!config) return null
 
   const summaryText =
     security.flags.length === 0

@@ -127,7 +127,9 @@ export function getConnectionErrorInfo(
   const details =
     typeof error === 'string'
       ? error.trim()
-      : error?.message?.trim() ?? ''
+      : error instanceof Error
+        ? error.message.trim()
+        : ''
 
   const showDetails =
     details.length > 0 &&

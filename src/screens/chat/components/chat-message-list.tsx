@@ -576,7 +576,7 @@ export function buildDisplayEntries(
     }
 
     if (message.role === 'tool' || message.role === 'toolResult') {
-      const previousEntry = entries[entries.length - 1]
+      const previousEntry = entries.at(-1)
       if (previousEntry?.message.role === 'assistant') {
         previousEntry.attachedToolMessages.push(message)
       } else if (pendingAssistantToolMessages.length > 0) {
@@ -600,7 +600,7 @@ export function buildDisplayEntries(
   })
 
   if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
+    const previousEntry = entries.at(-1)
     if (previousEntry?.message.role === 'assistant') {
       previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
     }
@@ -748,7 +748,7 @@ function ChatMessageListComponent({
   }, [contentStyle, isMobileViewport])
 
   // Simple scroll handler — only tracks if user is near bottom via refs (no state updates)
-  const handleUserScroll = useCallback(function handleUserScroll(metrics: {
+  const handleUserScroll = useCallback(function handleUserScrollCallback(metrics: {
     scrollTop: number
     scrollHeight: number
     clientHeight: number
@@ -769,7 +769,7 @@ function ChatMessageListComponent({
   }, [])
 
   // Simple scroll to bottom — find viewport and scroll
-  const scrollToBottom = useCallback(function scrollToBottom(
+  const scrollToBottom = useCallback(function scrollToBottomCallback(
     behavior: ScrollBehavior = 'auto',
   ) {
     const anchor = anchorRef.current
@@ -928,7 +928,7 @@ function ChatMessageListComponent({
         clearTimeout(thinkingGraceTimerRef.current)
       }
     }
-  }, [displayEntries, waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayEntries, waitingForResponse])
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -970,23 +970,23 @@ function ChatMessageListComponent({
     [messageSearchMatches],
   )
 
-  const activeSearchMatch = messageSearchMatches[activeSearchMatchIndex] ?? null
+  const activeSearchMatch = messageSearchMatches.at(activeSearchMatchIndex) ?? null
 
-  const focusSearchInput = useCallback(function focusSearchInput() {
+  const focusSearchInput = useCallback(function focusSearchInputCallback() {
     window.requestAnimationFrame(function focusSearchInputField() {
       searchInputRef.current?.focus()
       searchInputRef.current?.select()
     })
   }, [])
 
-  const closeMessageSearch = useCallback(function closeMessageSearch() {
+  const closeMessageSearch = useCallback(function closeMessageSearchCallback() {
     setIsMessageSearchOpen(false)
     setMessageSearchValue('')
     setActiveSearchMatchIndex(0)
   }, [])
 
   const openMessageSearch = useCallback(
-    function openMessageSearch() {
+    function openMessageSearchCallback() {
       setIsMessageSearchOpen(true)
       setActiveSearchMatchIndex(0)
       focusSearchInput()
@@ -995,7 +995,7 @@ function ChatMessageListComponent({
   )
 
   const jumpToPreviousMatch = useCallback(
-    function jumpToPreviousMatch() {
+    function jumpToPreviousMatchCallback() {
       if (messageSearchMatches.length === 0) return
       setActiveSearchMatchIndex(function setPreviousMatchIndex(currentIndex) {
         return (
@@ -1008,7 +1008,7 @@ function ChatMessageListComponent({
   )
 
   const jumpToNextMatch = useCallback(
-    function jumpToNextMatch() {
+    function jumpToNextMatchCallback() {
       if (messageSearchMatches.length === 0) return
       setActiveSearchMatchIndex(function setNextMatchIndex(currentIndex) {
         return (currentIndex + 1) % messageSearchMatches.length
@@ -1017,7 +1017,7 @@ function ChatMessageListComponent({
     [messageSearchMatches.length],
   )
 
-  const scrollToMessageById = useCallback(function scrollToMessageById(
+  const scrollToMessageById = useCallback(function scrollToMessageByIdCallback(
     messageId: string,
     behavior: ScrollBehavior = 'smooth',
   ) {
@@ -1136,7 +1136,6 @@ function ChatMessageListComponent({
       streamingTargets: new Set<string>(),
       signatureById: nextSignatures,
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEntries, streamingCleared])
 
   const lastAssistantIndex = visibleEntries
@@ -1177,9 +1176,9 @@ function ChatMessageListComponent({
     if (!effectivelyWaiting) return false
     // If streaming has visible text, hide indicator — response is rendering
     if (isStreaming && streamingText && streamingText.length > 0) return false
-    const lastEntry = visibleEntries[visibleEntries.length - 1]
+    const lastEntry = visibleEntries.at(-1)
     const lastMessage = lastEntry?.message
-    if (lastMessage && lastMessage.role === 'assistant') {
+    if (lastEntry && lastMessage?.role === 'assistant') {
       const lastId = getStableMessageId(lastMessage, lastEntry.sourceIndex)
       const isBeingTypewritten = streamingState.streamingTargets.has(lastId)
       if (isBeingTypewritten) return false
@@ -1236,7 +1235,7 @@ function ChatMessageListComponent({
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
   const hasGroup = pinToTop && groupStartIndex >= 0
-  const shouldVirtualize = false // Disabled — causes scroll glitches
+  const shouldVirtualize = Boolean(false) // Disabled — causes scroll glitches
 
   const virtualRange = useMemo(() => {
     if (!shouldVirtualize || scrollMetrics.clientHeight <= 0) {
@@ -1351,15 +1350,11 @@ function ChatMessageListComponent({
                   ? 'bg-amber-50/30'
                   : undefined
             }
-            toolCalls={
-              messageIsStreaming ? normalizedStreamingToolCalls : undefined
-            }
+            toolCalls={normalizedStreamingToolCalls}
             isStreaming={messageIsStreaming}
             streamingText={streamingText}
-            streamingThinking={
-              messageIsStreaming ? streamingThinking : undefined
-            }
-            lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
+            streamingThinking={streamingThinking}
+            lifecycleEvents={lifecycleEvents}
             simulateStreaming={simulateStreaming}
             streamingKey={signature}
             expandAllToolSections={expandAllToolSections}
@@ -1385,13 +1380,11 @@ function ChatMessageListComponent({
               ? 'bg-amber-50/30'
               : undefined
         }
-        toolCalls={
-          messageIsStreaming ? normalizedStreamingToolCalls : undefined
-        }
+        toolCalls={undefined}
         isStreaming={messageIsStreaming}
-        streamingText={messageIsStreaming ? streamingText : undefined}
-        streamingThinking={messageIsStreaming ? streamingThinking : undefined}
-        lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
+        streamingText={undefined}
+        streamingThinking={undefined}
+        lifecycleEvents={undefined}
         simulateStreaming={simulateStreaming}
         streamingKey={signature}
         expandAllToolSections={expandAllToolSections}
@@ -1430,8 +1423,7 @@ function ChatMessageListComponent({
     if (isNearBottomRef.current) {
       // Use smooth scroll only when user is near bottom (<200px) and new messages arrive;
       // use instant scroll during streaming to avoid choppiness.
-      const behavior: ScrollBehavior =
-        isNearBottomRef.current && !isStreaming ? 'smooth' : 'auto'
+      const behavior: ScrollBehavior = !isStreaming ? 'smooth' : 'auto'
       frameId = window.requestAnimationFrame(() => scrollToBottom(behavior))
     }
 
@@ -1561,7 +1553,7 @@ function ChatMessageListComponent({
   }, [isMessageSearchActive, messageSearchMatches.length])
 
   useEffect(() => {
-    if (!activeSearchMatch) return
+    if (activeSearchMatch === null) return
 
     const frameId = window.requestAnimationFrame(
       function scrollToActiveMatch() {
@@ -1575,7 +1567,7 @@ function ChatMessageListComponent({
   }, [activeSearchMatch, scrollToMessageById])
 
   const handleScrollToBottom = useCallback(
-    function handleScrollToBottom() {
+    function handleScrollToBottomCallback() {
       stickToBottomRef.current = true
       isNearBottomRef.current = true
       setIsNearBottom(true)
@@ -1848,7 +1840,7 @@ function ChatMessageListComponent({
               </>
             ) : (
               <>
-                {shouldVirtualize && virtualRange.topSpacerHeight > 0 ? (
+                {virtualRange.topSpacerHeight > 0 ? (
                   <div
                     aria-hidden="true"
                     style={{ height: `${virtualRange.topSpacerHeight}px` }}
@@ -1859,7 +1851,7 @@ function ChatMessageListComponent({
                   .map((entry, index) =>
                     renderMessage(entry, virtualRange.startIndex + index),
                   )}
-                {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
+                {virtualRange.bottomSpacerHeight > 0 ? (
                   <div
                     aria-hidden="true"
                     style={{ height: `${virtualRange.bottomSpacerHeight}px` }}
@@ -1916,7 +1908,7 @@ function getToolGroupClass(
   index: number,
 ): string {
   const message = messages[index]
-  if (!message || message.role !== 'assistant') return ''
+  if (message.role !== 'assistant') return ''
   const hasToolCalls = getToolCallsFromMessage(message).length > 0
   if (!hasToolCalls) return ''
 

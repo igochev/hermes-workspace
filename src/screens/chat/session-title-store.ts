@@ -33,7 +33,7 @@ const listeners = new Set<() => void>()
 let loaded = false
 
 // Cached snapshot to prevent infinite re-renders
-let cachedSnapshot: Record<string, SessionTitleInfo> | null = null
+let cachedSnapshot: Partial<Record<string, SessionTitleInfo>> | null = null
 
 function ensureLoaded() {
   if (loaded || typeof window === 'undefined') return
@@ -42,24 +42,28 @@ function ensureLoaded() {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as unknown
-      if (parsed && typeof parsed === 'object') {
+      if (parsed !== null && typeof parsed === 'object') {
         persistedTitles = Object.fromEntries(
-          Object.entries(parsed as Record<string, PersistedTitle>).map(
+          Object.entries(parsed as Record<string, unknown>).map(
             ([key, value]) => {
               const normalized: PersistedTitle = {}
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+
               if (value && typeof value === 'object') {
+                const persistedValue = value as PersistedTitle
                 if (
-                  typeof value.title === 'string' &&
-                  value.title.trim().length > 0
+                  typeof persistedValue.title === 'string' &&
+                  persistedValue.title.trim().length > 0
                 ) {
-                  normalized.title = value.title.trim()
+                  normalized.title = persistedValue.title.trim()
                 }
-                if (value.source === 'auto' || value.source === 'manual') {
-                  normalized.source = value.source
+                if (
+                  persistedValue.source === 'auto' ||
+                  persistedValue.source === 'manual'
+                ) {
+                  normalized.source = persistedValue.source
                 }
-                if (typeof value.updatedAt === 'number') {
-                  normalized.updatedAt = value.updatedAt
+                if (typeof persistedValue.updatedAt === 'number') {
+                  normalized.updatedAt = persistedValue.updatedAt
                 }
               }
               return [key, normalized]
@@ -116,7 +120,7 @@ function buildInfo(friendlyId: string): SessionTitleInfo {
   }
 }
 
-function getSnapshot(): Record<string, SessionTitleInfo> {
+function getSnapshot(): Partial<Record<string, SessionTitleInfo>> {
   ensureLoaded()
   // Return cached snapshot if available (prevents infinite re-renders)
   if (cachedSnapshot !== null) {
@@ -126,7 +130,7 @@ function getSnapshot(): Record<string, SessionTitleInfo> {
     ...Object.keys(persistedTitles),
     ...Array.from(runtimeStates.keys()),
   ])
-  const result: Record<string, SessionTitleInfo> = {}
+  const result: Partial<Record<string, SessionTitleInfo>> = {}
   for (const key of keys) {
     result[key] = buildInfo(key)
   }
@@ -147,10 +151,9 @@ export function useSessionTitles() {
 
 export function useSessionTitleInfo(friendlyId: string): SessionTitleInfo {
   const map = useSessionTitles()
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-  return friendlyId && map[friendlyId]
-    ? map[friendlyId]
-    : { status: 'idle', error: null }
+  const info = map[friendlyId]
+
+  return info ?? { status: 'idle', error: null }
 }
 
 type SessionTitleUpdate = Partial<SessionTitleInfo>

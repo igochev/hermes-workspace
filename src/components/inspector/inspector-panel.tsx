@@ -221,8 +221,8 @@ function MemoryTab() {
           const list = Array.isArray(json?.files) ? json.files : []
           setFiles(
             list.map((entry: Record<string, unknown>) => ({
-              path: String(entry?.path || ''),
-              name: String(entry?.name || entry?.path || ''),
+              path: String(entry.path || ''),
+              name: String(entry.name || entry.path || ''),
             })),
           )
           setLoading(false)
@@ -241,15 +241,16 @@ function MemoryTab() {
 
   if (loading) return <LoadingState text="Loading memory…" />
   if (error) return <ErrorState text={`Memory: ${error}`} />
-  if (!files || files.length === 0)
+  const loadedFiles = files ?? []
+  if (loadedFiles.length === 0)
     return <EmptyState text="No memory files available" />
 
   return (
     <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
       <p className="mb-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
-        {files.length} memory files available
+        {loadedFiles.length} memory files available
       </p>
-      {files.map((file, index) => (
+      {loadedFiles.map((file, index) => (
         <div
           key={`${file.path}-${index}`}
           className="rounded-lg px-3 py-2 text-xs leading-relaxed"
@@ -314,10 +315,10 @@ function SkillsTab() {
   if (skills.length === 0) return <EmptyState text="No skills found" />
 
   // Group by category
-  const grouped: Record<string, Array<SkillItem>> = {}
+  const grouped: Partial<Record<string, Array<SkillItem>>> = {}
   for (const skill of skills) {
     const cat = skill.category || 'Uncategorized'
-    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat] ??= []
     grouped[cat].push(skill)
   }
 
@@ -334,7 +335,7 @@ function SkillsTab() {
           >
             {category}
           </p>
-          {items.map((skill) => (
+          {(items ?? []).map((skill) => (
             <button
               key={skill.name}
               type="button"

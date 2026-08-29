@@ -945,7 +945,6 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
           {header}
           <ScrollAreaRoot className="flex-1 min-h-0">
             <ScrollAreaViewport>
-              {/* eslint-disable-next-line react/no-danger */}
               <div
                 className="markdown-preview px-6 py-5 text-sm text-primary-900 dark:text-neutral-200"
                 dangerouslySetInnerHTML={{ __html: mdHtml }}
@@ -975,7 +974,6 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
             <ScrollAreaViewport>
               <pre
                 className="code-viewer px-4 py-4 text-xs font-mono leading-relaxed text-primary-800 dark:text-neutral-300"
-                // eslint-disable-next-line react/no-danger
                 dangerouslySetInnerHTML={{ __html: displayHtml }}
               />
             </ScrollAreaViewport>

@@ -368,7 +368,7 @@ export async function streamChat(
   let buffer = ''
   let currentEvent = ''
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read()
     if (done) break
 
@@ -406,6 +406,33 @@ export async function sendChat(
     message: msg,
     model: mdl,
   })
+}
+
+export type ImmediateChatCompletionResult = {
+  response?: string
+  finalResponse?: string
+  raw?: unknown
+}
+
+export async function sendImmediateChatCompletion(opts: {
+  message: string
+  model?: string
+}): Promise<ImmediateChatCompletionResult> {
+  const response = await hermesPost<Record<string, unknown>>('/v1/chat/completions', {
+    model: opts.model || 'hermes-agent',
+    messages: [{ role: 'user', content: opts.message }],
+    stream: false,
+  })
+  const choices = Array.isArray(response.choices) ? response.choices : []
+  const first = choices[0] as Record<string, unknown> | undefined
+  const message = first?.message as Record<string, unknown> | undefined
+  const content =
+    typeof message?.content === 'string'
+      ? message.content
+      : typeof first?.text === 'string'
+        ? first.text
+        : undefined
+  return { response: content, finalResponse: content, raw: response }
 }
 
 // ── Memory ───────────────────────────────────────────────────────

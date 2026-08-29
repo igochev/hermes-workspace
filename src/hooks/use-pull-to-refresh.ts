@@ -32,12 +32,12 @@ export function usePullToRefresh(
     if (!enabled) return
     const container = containerRef.current
     if (!container) return
+    const connectedContainer = container
 
     function onTouchStart(e: TouchEvent) {
       const touch = e.touches[0]
-      if (!touch) return
       // Only start pull if at the top of the scroll
-      if (container!.scrollTop === 0) {
+      if (connectedContainer.scrollTop === 0) {
         startYRef.current = touch.clientY
         isPullingRef.current = true
       }
@@ -46,7 +46,6 @@ export function usePullToRefresh(
     function onTouchMove(e: TouchEvent) {
       if (!isPullingRef.current) return
       const touch = e.touches[0]
-      if (!touch) return
       const delta = touch.clientY - startYRef.current
       if (delta > 0) {
         const clamped = Math.min(delta, THRESHOLD * 1.5)
@@ -68,14 +67,14 @@ export function usePullToRefresh(
       pullDistanceRef.current = 0
     }
 
-    container.addEventListener('touchstart', onTouchStart, { passive: true })
-    container.addEventListener('touchmove', onTouchMove, { passive: true })
-    container.addEventListener('touchend', onTouchEnd)
+    connectedContainer.addEventListener('touchstart', onTouchStart, { passive: true })
+    connectedContainer.addEventListener('touchmove', onTouchMove, { passive: true })
+    connectedContainer.addEventListener('touchend', onTouchEnd)
 
     return () => {
-      container.removeEventListener('touchstart', onTouchStart)
-      container.removeEventListener('touchmove', onTouchMove)
-      container.removeEventListener('touchend', onTouchEnd)
+      connectedContainer.removeEventListener('touchstart', onTouchStart)
+      connectedContainer.removeEventListener('touchmove', onTouchMove)
+      connectedContainer.removeEventListener('touchend', onTouchEnd)
     }
   }, [enabled, onRefresh, containerRef])
 

@@ -7,6 +7,7 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
+import { getRootSurfaceState } from './-root-layout-state'
 import { SearchModal } from '@/components/search/search-modal'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
@@ -22,7 +23,6 @@ import {
   ONBOARDING_KEY,
 } from '@/components/onboarding/hermes-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { getRootSurfaceState } from './-root-layout-state'
 
 
 const APP_CSP = [

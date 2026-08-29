@@ -3,7 +3,17 @@
  * Add new languages by adding a locale map below.
  */
 
-export type LocaleId = 'en' | 'es' | 'fr' | 'de' | 'zh' | 'ja' | 'ko' | 'pt' | 'ru' | 'ar'
+export type LocaleId =
+  | 'en'
+  | 'es'
+  | 'fr'
+  | 'de'
+  | 'zh'
+  | 'ja'
+  | 'ko'
+  | 'pt'
+  | 'ru'
+  | 'ar'
 
 const EN = {
   // Nav
@@ -11,8 +21,10 @@ const EN = {
   'nav.chat': 'Chat',
   'nav.files': 'Files',
   'nav.terminal': 'Terminal',
-  'nav.jobs': 'Jobs',
+  'nav.jobs': 'Scheduled Jobs',
+  'nav.executions': 'Executions',
   'nav.tasks': 'Tasks',
+  'nav.projects': 'Projects',
   'nav.memory': 'Memory',
   'nav.skills': 'Skills',
   'nav.profiles': 'Profiles',
@@ -34,8 +46,8 @@ const EN = {
   'tasks.review': 'Review',
   'tasks.done': 'Done',
   // Jobs
-  'jobs.title': 'Jobs',
-  'jobs.newJob': 'New Job',
+  'jobs.title': 'Scheduled Jobs',
+  'jobs.newJob': 'New Scheduled Job',
   // Settings
   'settings.title': 'Settings',
   'settings.language': 'Language',
@@ -59,7 +71,9 @@ const ES: LocaleTranslations = {
   'nav.files': 'Archivos',
   'nav.terminal': 'Terminal',
   'nav.jobs': 'Trabajos',
+  'nav.executions': 'Ejecuciones',
   'nav.tasks': 'Tareas',
+  'nav.projects': 'Proyectos',
   'nav.memory': 'Memoria',
   'nav.skills': 'Habilidades',
   'nav.profiles': 'Perfiles',
@@ -81,7 +95,8 @@ const ES: LocaleTranslations = {
   'jobs.newJob': 'Nuevo Trabajo',
   'settings.title': 'Configuración',
   'settings.language': 'Idioma',
-  'settings.languageDesc': 'Elige el idioma de la interfaz del espacio de trabajo.',
+  'settings.languageDesc':
+    'Elige el idioma de la interfaz del espacio de trabajo.',
   'common.save': 'Guardar',
   'common.cancel': 'Cancelar',
   'common.delete': 'Eliminar',
@@ -97,7 +112,9 @@ const FR: LocaleTranslations = {
   'nav.files': 'Fichiers',
   'nav.terminal': 'Terminal',
   'nav.jobs': 'Tâches planifiées',
+  'nav.executions': 'Exécutions',
   'nav.tasks': 'Tâches',
+  'nav.projects': 'Projets',
   'nav.memory': 'Mémoire',
   'nav.skills': 'Compétences',
   'nav.profiles': 'Profils',
@@ -119,7 +136,8 @@ const FR: LocaleTranslations = {
   'jobs.newJob': 'Nouvelle tâche',
   'settings.title': 'Paramètres',
   'settings.language': 'Langue',
-  'settings.languageDesc': "Choisissez la langue d'affichage de l'espace de travail.",
+  'settings.languageDesc':
+    "Choisissez la langue d'affichage de l'espace de travail.",
   'common.save': 'Enregistrer',
   'common.cancel': 'Annuler',
   'common.delete': 'Supprimer',
@@ -135,7 +153,9 @@ const ZH: LocaleTranslations = {
   'nav.files': '文件',
   'nav.terminal': '终端',
   'nav.jobs': '任务计划',
+  'nav.executions': '执行',
   'nav.tasks': '任务',
+  'nav.projects': '项目',
   'nav.memory': '记忆',
   'nav.skills': '技能',
   'nav.profiles': '配置',
@@ -168,7 +188,16 @@ const ZH: LocaleTranslations = {
 }
 
 const LOCALES: Record<LocaleId, LocaleTranslations> = {
-  en: EN, es: ES, fr: FR, de: EN, zh: ZH, ja: EN, ko: EN, pt: EN, ru: EN, ar: EN,
+  en: EN,
+  es: ES,
+  fr: FR,
+  de: EN,
+  zh: ZH,
+  ja: EN,
+  ko: EN,
+  pt: EN,
+  ru: EN,
+  ar: EN,
 }
 
 export const LOCALE_LABELS: Record<LocaleId, string> = {
@@ -202,5 +231,5 @@ export function setLocale(id: LocaleId): void {
 
 export function t(key: TranslationKey): string {
   const locale = getLocale()
-  return LOCALES[locale]?.[key] ?? LOCALES.en[key] ?? key
+  return LOCALES[locale][key]
 }

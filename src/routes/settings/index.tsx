@@ -18,11 +18,12 @@ import type * as React from 'react'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
+import type {LocaleId} from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useSettings } from '@/hooks/use-settings'
-import { getLocale, setLocale, LOCALE_LABELS, type LocaleId } from '@/lib/i18n'
+import { LOCALE_LABELS,  getLocale, setLocale } from '@/lib/i18n'
 import { THEMES, getTheme, isDarkTheme, setTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
@@ -988,7 +989,7 @@ function HermesConfigSection({
   const syncInputsFromData = useCallback((configData: HermesConfigData) => {
     setModelInput(configData.activeModel || '')
     setProviderInput(configData.activeProvider || '')
-    setBaseUrlInput((configData.config?.base_url as string) || '')
+    setBaseUrlInput((configData.config.base_url as string) || '')
   }, [])
 
   const fetchConfig = useCallback(async () => {
@@ -1011,8 +1012,8 @@ function HermesConfigSection({
       )
       if (res.ok) {
         const result = (await res.json()) as AvailableModelsResponse
-        setAvailableModels(result.models || [])
-        if (result.providers?.length) setAvailableProviders(result.providers)
+        setAvailableModels(result.models)
+        if (result.providers.length > 0) setAvailableProviders(result.providers)
       }
     } catch {
       // ignore
@@ -1111,24 +1112,24 @@ function HermesConfigSection({
     )
   }
 
-  const memoryConfig = (data.config.memory as Record<string, unknown>) || {}
-  const terminalConfig = (data.config.terminal as Record<string, unknown>) || {}
-  const displayConfig = (data.config.display as Record<string, unknown>) || {}
-  const agentConfig = (data.config.agent as Record<string, unknown>) || {}
+  const memoryConfig = data.config.memory as Record<string, unknown>
+  const terminalConfig = data.config.terminal as Record<string, unknown>
+  const displayConfig = data.config.display as Record<string, unknown>
+  const agentConfig = data.config.agent as Record<string, unknown>
   const smartRouting =
-    (data.config.smart_model_routing as Record<string, unknown>) || {}
-  const ttsConfig = (data.config.tts as Record<string, unknown>) || {}
-  const sttConfig = (data.config.stt as Record<string, unknown>) || {}
+    data.config.smart_model_routing as Record<string, unknown>
+  const ttsConfig = data.config.tts as Record<string, unknown>
+  const sttConfig = data.config.stt as Record<string, unknown>
   const customProviders = Array.isArray(data.config.custom_providers)
     ? (data.config.custom_providers as Array<Record<string, unknown>>)
     : []
 
   const ttsProvider = (ttsConfig.provider as string) || 'edge'
-  const ttsEdge = (ttsConfig.edge as Record<string, unknown>) || {}
-  const ttsElevenLabs = (ttsConfig.elevenlabs as Record<string, unknown>) || {}
-  const ttsOpenAi = (ttsConfig.openai as Record<string, unknown>) || {}
+  const ttsEdge = ttsConfig.edge as Record<string, unknown>
+  const ttsElevenLabs = ttsConfig.elevenlabs as Record<string, unknown>
+  const ttsOpenAi = ttsConfig.openai as Record<string, unknown>
   const sttProvider = (sttConfig.provider as string) || 'local'
-  const sttLocal = (sttConfig.local as Record<string, unknown>) || {}
+  const sttLocal = sttConfig.local as Record<string, unknown>
 
   const renderHermesOverview = () => (
     <>
@@ -1433,7 +1434,7 @@ function HermesConfigSection({
               size="sm"
               variant="outline"
               onClick={() =>
-                void navigator.clipboard?.writeText(data.hermesHome)
+                void navigator.clipboard.writeText(data.hermesHome)
               }
             >
               Copy config path

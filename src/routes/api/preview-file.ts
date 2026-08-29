@@ -6,7 +6,7 @@
  * iframe. Locks serving to a small list of trusted prefixes so the route
  * can never be used to exfiltrate arbitrary user files.
  */
-import { statSync, readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { extname, resolve as resolvePath } from 'node:path'
 import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
@@ -31,7 +31,7 @@ const MIME_BY_EXT: Record<string, string> = {
   '.ico': 'image/x-icon',
 }
 
-function allowedPrefixes(): string[] {
+function allowedPrefixes(): Array<string> {
   const home = os.homedir()
   return [
     '/tmp',
@@ -52,7 +52,7 @@ function isAllowed(absPath: string): boolean {
 export const Route = createFileRoute('/api/preview-file')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return new Response('Unauthorized', { status: 401 })
         }

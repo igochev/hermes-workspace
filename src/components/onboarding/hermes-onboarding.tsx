@@ -122,7 +122,7 @@ function getEnhancedFeatureNames(
     { enabled: capabilities.skills, label: 'Skills' },
     { enabled: capabilities.memory, label: 'Memory' },
     { enabled: capabilities.config, label: 'In-app config' },
-    { enabled: capabilities.jobs, label: 'Jobs' },
+    { enabled: capabilities.jobs, label: 'Scheduled Jobs' },
   ]
 
   return features

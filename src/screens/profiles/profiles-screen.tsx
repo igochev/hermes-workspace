@@ -37,11 +37,15 @@ type ProfileDetail = {
   name: string
   path: string
   active: boolean
+  model?: string
+  provider?: string
   config: Record<string, unknown>
   envPath?: string
   hasEnv: boolean
   sessionsDir?: string
   skillsDir?: string
+  soulPath?: string
+  systemPrompt?: string
 }
 
 async function readJson<T>(url: string): Promise<T> {
@@ -860,6 +864,18 @@ export function ProfilesScreen() {
                     accent={detailQuery.data.profile.active}
                   />
                 </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <DetailField
+                    label="Provider"
+                    value={detailQuery.data.profile.provider || 'Not set'}
+                    muted={!detailQuery.data.profile.provider}
+                  />
+                  <DetailField
+                    label="Model"
+                    value={detailQuery.data.profile.model || 'Not set'}
+                    muted={!detailQuery.data.profile.model}
+                  />
+                </div>
                 <DetailField
                   label="Path"
                   value={detailQuery.data.profile.path}
@@ -884,6 +900,27 @@ export function ProfilesScreen() {
                     mono
                     muted={!detailQuery.data.profile.skillsDir}
                   />
+                </div>
+                <div className="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
+                  <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
+                    <HugeiconsIcon
+                      icon={Key01Icon}
+                      size={14}
+                      strokeWidth={1.8}
+                    />{' '}
+                    System prompt
+                  </div>
+                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border border-primary-200 bg-primary-100/70 p-3 text-xs leading-relaxed text-primary-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                    {detailQuery.data.profile.systemPrompt || 'No SOUL.md / system prompt found for this profile.'}
+                  </pre>
+                  <div className="mt-3">
+                    <DetailField
+                      label="SOUL file"
+                      value={detailQuery.data.profile.soulPath || 'Not set'}
+                      mono
+                      muted={!detailQuery.data.profile.soulPath}
+                    />
+                  </div>
                 </div>
                 <div className="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
                   <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">

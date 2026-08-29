@@ -13,8 +13,8 @@ import {
   toSessionSummary,
   updateSession,
 } from '../../server/hermes-api'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { listLocalSessions } from '../../server/local-session-store'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {

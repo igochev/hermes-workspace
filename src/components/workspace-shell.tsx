@@ -11,10 +11,9 @@
  * Chat routes get the full ChatScreen treatment.
  * Non-chat routes show the sub-page content.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { Suspense, lazy } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SessionMeta } from '@/screens/chat/types'
 import type { AuthStatus } from '@/lib/hermes-auth'
 import { cn } from '@/lib/utils'
@@ -22,6 +21,7 @@ import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
 import { useWorkspaceStore } from '@/stores/workspace-store'
+import { useSessionEventsRefresh } from '@/screens/chat/hooks/use-session-events-refresh'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanel } from '@/components/chat-panel'
@@ -48,6 +48,43 @@ const TerminalWorkspace = lazy(() =>
 type SessionsListResponse = Array<SessionMeta>
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
   'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+export const LIVE_SESSION_STALE_TIME_MS = 1_000
+export const POLLING_SESSION_STALE_TIME_MS = 10_000
+export const SESSION_POLL_INTERVAL_MS = 15_000
+
+export function getWorkspaceShellTabIndex(path: string): number {
+  if (path === '/dashboard') return 0
+  if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
+  if (path.startsWith('/files')) return 2
+  if (path.startsWith('/terminal')) return 3
+  if (path.startsWith('/executions')) return 4
+  if (path.startsWith('/jobs')) return 5
+  if (path.startsWith('/projects')) return 6
+  if (path.startsWith('/conductor')) return 7
+  if (path.startsWith('/operations')) return 8
+  if (path.startsWith('/memory')) return 9
+  if (path.startsWith('/skills')) return 10
+  if (path.startsWith('/profiles')) return 11
+  if (path.startsWith('/settings')) return 12
+  return -1
+}
+
+export function getMobilePageTitle(pathname: string): string | null {
+  if (pathname.startsWith('/terminal')) return 'Terminal'
+  if (pathname.startsWith('/files')) return 'Files'
+  if (pathname.startsWith('/executions')) return 'Executions'
+  if (pathname.startsWith('/jobs')) return 'Scheduled Jobs'
+  if (pathname.startsWith('/projects')) return 'Projects'
+  if (pathname.startsWith('/conductor')) return 'Conductor'
+  if (pathname.startsWith('/operations')) return 'Operations'
+  if (pathname.startsWith('/memory')) return 'Memory'
+  if (pathname.startsWith('/skills')) return 'Skills'
+  if (pathname.startsWith('/profiles')) return 'Profiles'
+  if (pathname.startsWith('/settings')) return 'Settings'
+  if (pathname.startsWith('/debug')) return 'Debug'
+  if (pathname.startsWith('/activity')) return 'Activity'
+  return null
+}
 
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
@@ -97,18 +134,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
   const getTabIndex = useCallback((path: string): number => {
-    if (path === '/dashboard') return 0
-    if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
-    if (path.startsWith('/files')) return 2
-    if (path.startsWith('/terminal')) return 3
-    if (path.startsWith('/jobs')) return 4
-    if (path.startsWith('/conductor')) return 5
-    if (path.startsWith('/operations')) return 6
-    if (path.startsWith('/memory')) return 7
-    if (path.startsWith('/skills')) return 8
-    if (path.startsWith('/profiles')) return 9
-    if (path.startsWith('/settings')) return 10
-    return -1
+    return getWorkspaceShellTabIndex(path)
   }, [])
 
   const isClient = typeof window !== 'undefined'
@@ -129,20 +155,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [])
 
   // Derive active session from URL
-  const mobilePageTitle = (() => {
-    if (pathname.startsWith('/terminal')) return 'Terminal'
-    if (pathname.startsWith('/files')) return 'Files'
-    if (pathname.startsWith('/jobs')) return 'Jobs'
-    if (pathname.startsWith('/conductor')) return 'Conductor'
-    if (pathname.startsWith('/operations')) return 'Operations'
-    if (pathname.startsWith('/memory')) return 'Memory'
-    if (pathname.startsWith('/skills')) return 'Skills'
-    if (pathname.startsWith('/profiles')) return 'Profiles'
-    if (pathname.startsWith('/settings')) return 'Settings'
-    if (pathname.startsWith('/debug')) return 'Debug'
-    if (pathname.startsWith('/activity')) return 'Activity'
-    return null
-  })()
+  const mobilePageTitle = getMobilePageTitle(pathname)
 
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
@@ -152,12 +165,22 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const showDesktopSidebarBackdrop =
     !isMobile && !isOnChatRoute && !sidebarCollapsed
 
+  const queryClient = useQueryClient()
+  const sessionEventsRefresh = useSessionEventsRefresh({
+    queryClient,
+    queryKey: chatQueryKeys.sessions,
+  })
+
   // Sessions query — shared across sidebar and chat
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
     queryFn: fetchSessions,
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+    refetchInterval:
+      sessionEventsRefresh.status === 'live' ? false : SESSION_POLL_INTERVAL_MS,
+    staleTime:
+      sessionEventsRefresh.status === 'live'
+        ? LIVE_SESSION_STALE_TIME_MS
+        : POLLING_SESSION_STALE_TIME_MS,
   })
 
   const sessions = sessionsQuery.data ?? []
@@ -318,6 +341,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 sessionsFetching={sessionsFetching}
                 sessionsError={sessionsError}
                 onRetrySessions={refetchSessions}
+                sessionRefreshStatus={sessionEventsRefresh.status}
               />
             </div>
           )}

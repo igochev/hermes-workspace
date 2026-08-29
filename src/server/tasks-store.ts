@@ -13,7 +13,7 @@ export type TaskRecord = {
   column: TaskColumn
   priority: TaskPriority
   assignee: string | null
-  tags: string[]
+  tags: Array<string>
   due_date: string | null
   position: number
   created_by: string
@@ -21,7 +21,7 @@ export type TaskRecord = {
   updated_at: string
 }
 
-type TaskFile = { tasks: TaskRecord[] }
+type TaskFile = { tasks: Array<TaskRecord> }
 
 type TaskFilters = {
   column?: string | null
@@ -60,13 +60,26 @@ function writeTaskFile(data: TaskFile): void {
   fs.writeFileSync(TASKS_FILE, JSON.stringify(data, null, 2) + '\n', 'utf-8')
 }
 
+function normalizeTaskColumn(value: unknown): TaskColumn {
+  return value === 'todo' ||
+    value === 'in_progress' ||
+    value === 'review' ||
+    value === 'done'
+    ? value
+    : 'backlog'
+}
+
+function normalizeTaskPriority(value: unknown): TaskPriority {
+  return value === 'high' || value === 'low' ? value : 'medium'
+}
+
 function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' | 'created_at' | 'updated_at' | 'created_by'>): TaskRecord {
   return {
     id: task.id,
     title: task.title,
     description: task.description ?? '',
-    column: (task.column as TaskColumn) ?? 'backlog',
-    priority: (task.priority as TaskPriority) ?? 'medium',
+    column: normalizeTaskColumn(task.column),
+    priority: normalizeTaskPriority(task.priority),
     assignee: task.assignee ?? null,
     tags: Array.isArray(task.tags) ? task.tags.filter((tag): tag is string => typeof tag === 'string') : [],
     due_date: task.due_date ?? null,
@@ -77,7 +90,7 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
   }
 }
 
-export function listTasks(filters: TaskFilters = {}): TaskRecord[] {
+export function listTasks(filters: TaskFilters = {}): Array<TaskRecord> {
   let tasks = readTaskFile().tasks.map(normalizeTask)
   if (!filters.includeDone) {
     tasks = tasks.filter((task) => task.column !== 'done')
@@ -125,7 +138,7 @@ export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord
   const index = file.tasks.findIndex((task) => task.id === taskId)
   if (index === -1) return null
 
-  const current = normalizeTask(file.tasks[index] as TaskRecord)
+  const current = normalizeTask(file.tasks[index])
   const next = normalizeTask({
     ...current,
     ...updates,
@@ -149,6 +162,6 @@ export function deleteTask(taskId: string): boolean {
   const file = readTaskFile()
   const nextTasks = file.tasks.filter((task) => task.id !== taskId)
   if (nextTasks.length === file.tasks.length) return false
-  writeTaskFile({ tasks: nextTasks.map((task) => normalizeTask(task as TaskRecord)) })
+  writeTaskFile({ tasks: nextTasks.map((task) => normalizeTask(task)) })
   return true
 }
